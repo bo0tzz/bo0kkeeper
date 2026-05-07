@@ -52,12 +52,13 @@ export class BankMatcherService {
     if (txnRef) {
       const transfer = await this.db
         .selectFrom('wise_transfer')
-        .select('id')
+        .selectAll()
         .where('ourReference', '=', txnRef)
         .executeTakeFirst();
       if (transfer) {
         await this.persistTransferMatch(bankTx.id, transfer.id, MatchConfidence.AutoHigh);
         this.logger.log(`bank_tx ${bankTx.id} → wise_transfer ${transfer.id} via ${txnRef}`);
+        await this.appendWiseIncomeRow(bankTx, transfer);
         return { matched: true, type: 'wise_transfer', transferId: transfer.id, confidence: MatchConfidence.AutoHigh };
       }
     }
@@ -107,6 +108,37 @@ export class BankMatcherService {
       });
     } catch (error) {
       this.logger.error(`Sheet write failed for invoice ${invoice.number}: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Append a sheet income row for a Wise-routed inbound payment (Non-EU). The
+   * Wise transfer doesn't carry the originating client directly, so we look
+   * up the unique Non-EU client; when there's exactly one we use it. Otherwise
+   * the row is written with a placeholder name ("Wise") and the user fills in
+   * the client manually in the sheet.
+   */
+  private async appendWiseIncomeRow(
+    bankTx: BankTransaction,
+    transfer: { id: string; ourReference: string | null; targetCurrency: string },
+  ) {
+    try {
+      const reference = transfer.ourReference ?? '(no ref)';
+      const rawMinor = BigInt(bankTx.amountMinor as bigint | number | string);
+      const eurAmountMinor = rawMinor < 0n ? -rawMinor : rawMinor;
+      const allClients = await this.clientRepository.findAll();
+      const nonEuClients = allClients.filter((c) => c.class === ClientClass.NonEu);
+      const nonEuClient = nonEuClients.length === 1 ? nonEuClients[0] : null;
+      await this.sheetWriter.writeIncomeRow({
+        date: bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate),
+        invoiceNumber: reference,
+        eurAmountMinor,
+        client: { name: nonEuClient?.name ?? 'Wise', class: ClientClass.NonEu },
+        from: bankTx.counterpartyName ?? 'Wise',
+        source: `wise_transfer/${transfer.id}`,
+      });
+    } catch (error) {
+      this.logger.error(`Sheet write failed for wise_transfer ${transfer.id}: ${(error as Error).message}`);
     }
   }
 

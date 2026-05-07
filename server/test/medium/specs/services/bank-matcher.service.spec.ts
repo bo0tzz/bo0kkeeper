@@ -49,6 +49,14 @@ describe('BankMatcherService', () => {
   });
 
   it('matches a bank tx to a wise_transfer via TXN-NNNN reference (auto_high)', async () => {
+    // Seed a sole NonEu client so the sheet write picks it up by class.
+    const nonEuClient = await clientRepo.create({
+      name: 'OverseasClientCo',
+      class: ClientClass.NonEu,
+      tradeName: TradeName.ItServices,
+      address: { line1: '1 Fake Park Dr', city: 'Nullstate' },
+    });
+
     const transfer = await transferRepo.create({
       wiseTransferId: 'WISE-1',
       direction: WiseTransferDirection.Out,
@@ -93,6 +101,18 @@ describe('BankMatcherService', () => {
     expect(refetched?.matchedTransferId).toBe(transfer.id);
     expect(refetched?.matchConfidence).toBe(MatchConfidence.AutoHigh);
     expect(refetched?.matchedAt).toBeInstanceOf(Date);
+
+    // Wise income row appended with the unique NonEu client and TXN ref as id.
+    expect(sheetWriter.writeIncomeRow).toHaveBeenCalledOnce();
+    const args = sheetWriter.writeIncomeRow.mock.calls[0][0] as {
+      invoiceNumber: string;
+      eurAmountMinor: bigint;
+      client: { name: string; class: ClientClass };
+    };
+    expect(args.invoiceNumber).toBe('TXN-0044');
+    expect(args.eurAmountMinor).toBe(404_572n);
+    expect(args.client.name).toBe(nonEuClient.name);
+    expect(args.client.class).toBe(ClientClass.NonEu);
   });
 
   it('matches a bank tx to an invoice via YYYY/NNN reference', async () => {
