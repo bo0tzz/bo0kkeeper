@@ -31,7 +31,17 @@ export async function apiPost<T>(path: string, body: unknown, options: ApiOption
   const res = await fetchFn(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(body ?? {}),
+  });
+  return parse<T>(res);
+}
+
+export async function apiPatch<T>(path: string, body: unknown, options: ApiOptions = {}): Promise<T> {
+  const fetchFn = options.fetch ?? fetch;
+  const res = await fetchFn(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
   });
   return parse<T>(res);
 }
