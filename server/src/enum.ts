@@ -81,3 +81,15 @@ export enum WiseTransferState {
   Cancelled = 'cancelled',
   Failed = 'failed',
 }
+
+/** Origin of a bank-transaction row. */
+export enum BankSource {
+  SnsCsv = 'sns_csv',
+  EnableBanking = 'enable_banking',
+}
+
+export enum MatchConfidence {
+  AutoHigh = 'auto_high',
+  AutoLow = 'auto_low',
+  Manual = 'manual',
+}

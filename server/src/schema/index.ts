@@ -1,4 +1,5 @@
 import { Database, Extensions, Generated, Int8 } from '@immich/sql-tools';
+import { BankTransactionTable } from 'src/schema/tables/bank-transaction.table';
 import { ClientTable } from 'src/schema/tables/client.table';
 import { EventTable } from 'src/schema/tables/event.table';
 import { InvoiceLineTable } from 'src/schema/tables/invoice-line.table';
@@ -9,7 +10,15 @@ import { WiseTransferTable } from 'src/schema/tables/wise-transfer.table';
 @Extensions(['uuid-ossp', 'plpgsql'])
 @Database({ name: 'bo0kkeeper' })
 export class Bo0kkeeperDatabase {
-  tables = [EventTable, ClientTable, WiseTransferTable, InvoiceTable, InvoiceLineTable, InvoiceNumberSequenceTable];
+  tables = [
+    EventTable,
+    ClientTable,
+    WiseTransferTable,
+    InvoiceTable,
+    InvoiceLineTable,
+    InvoiceNumberSequenceTable,
+    BankTransactionTable,
+  ];
   functions = [];
   enum = [];
 }
@@ -31,4 +40,5 @@ export interface DB {
   invoice: InvoiceTable;
   invoice_line: InvoiceLineTable;
   invoice_number_sequence: InvoiceNumberSequenceTable;
+  bank_transaction: BankTransactionTable;
 }
