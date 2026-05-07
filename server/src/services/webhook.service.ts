@@ -2,15 +2,19 @@ import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { createVerify } from 'node:crypto';
 import { loadConfig } from 'src/config';
 import { WiseWebhookDto } from 'src/dtos/webhook.dto';
-import { EventSource } from 'src/enum';
+import { EventSource, JobName } from 'src/enum';
 import { EventRepository, IngestResult, NewEvent } from 'src/repositories/event.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 
 @Injectable()
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name);
   private readonly wiseConfig = loadConfig().wise;
 
-  constructor(private readonly eventRepository: EventRepository) {}
+  constructor(
+    private readonly eventRepository: EventRepository,
+    private readonly jobRepository: JobRepository,
+  ) {}
 
   /**
    * Verify Wise's RSA-SHA256 signature over the raw request body. In dev mode
@@ -40,12 +44,14 @@ export class WebhookService {
 
   /**
    * Build the events row for a Wise webhook payload and ingest idempotently.
+   * On first sight, also enqueue any follow-up @OnJob handlers keyed off the
+   * event type. Retries (duplicate ingests) don't re-enqueue.
    *
    * `externalId` priority: explicit X-Delivery-Id header → derived from
    * `subscription_id + sent_at + resource.id` → `subscription_id + event_type + sent_at`.
    * Whichever is unique enough to deduplicate retries.
    */
-  ingestWiseEvent(payload: WiseWebhookDto, deliveryId?: string): Promise<IngestResult> {
+  async ingestWiseEvent(payload: WiseWebhookDto, deliveryId?: string): Promise<IngestResult> {
     const externalId = deliveryId ?? deriveWiseExternalId(payload);
     const occurredAt = payload.data.occurred_at ?? payload.sent_at ?? new Date().toISOString();
 
@@ -58,7 +64,22 @@ export class WebhookService {
       correlationId: deriveCorrelationId(payload),
     };
 
-    return this.eventRepository.ingest(event);
+    const result = await this.eventRepository.ingest(event);
+
+    if (result.ingested) {
+      await this.enqueueFollowUp(payload.event_type, result.event.id);
+    }
+
+    return result;
+  }
+
+  private async enqueueFollowUp(eventType: string, eventId: string): Promise<void> {
+    if (eventType === 'transfers#state-change') {
+      await this.jobRepository.queue(JobName.WiseTransferStateChange, { eventId });
+      return;
+    }
+    // `balances#credit` is intentionally not auto-enqueued: drafts need a TXN
+    // reference and human review. The admin UI calls `/api/wise/draft-from-event`.
   }
 }
 
