@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { importPKCS8, SignJWT } from 'jose';
 import { Config, loadConfig } from 'src/config';
 
@@ -40,7 +40,7 @@ export class SheetsService {
   private readonly fetchFn: FetchLike;
   private accessToken?: { token: string; expiresAt: number };
 
-  constructor(fetchFn: FetchLike = fetch) {
+  constructor(@Optional() fetchFn: FetchLike = fetch) {
     this.config = loadConfig().sheets;
     this.fetchFn = fetchFn;
   }

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { spawn } from 'node:child_process';
 import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -26,8 +26,8 @@ export class RenderService {
   private readonly logger = new Logger(RenderService.name);
 
   constructor(
-    private readonly templatesDir: string = TEMPLATES_DIR,
-    private readonly typstBin: string = process.env.TYPST_BIN ?? 'typst',
+    @Optional() private readonly templatesDir: string = TEMPLATES_DIR,
+    @Optional() private readonly typstBin: string = process.env.TYPST_BIN ?? 'typst',
   ) {}
 
   async render(input: RenderInput): Promise<Buffer> {

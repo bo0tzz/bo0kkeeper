@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Config, loadConfig } from 'src/config';
 
 /**
@@ -50,7 +50,7 @@ export class PaperlessService {
   private readonly config: Config['paperless'];
   private readonly fetchFn: FetchLike;
 
-  constructor(fetchFn: FetchLike = fetch) {
+  constructor(@Optional() fetchFn: FetchLike = fetch) {
     this.config = loadConfig().paperless;
     this.fetchFn = fetchFn;
   }

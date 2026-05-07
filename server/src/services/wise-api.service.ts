@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Config, loadConfig } from 'src/config';
 
@@ -69,7 +69,7 @@ export class WiseApiService {
   private readonly config: Config['wise'];
   private readonly fetchFn: FetchLike;
 
-  constructor(fetchFn: FetchLike = fetch) {
+  constructor(@Optional() fetchFn: FetchLike = fetch) {
     this.config = loadConfig().wise;
     this.fetchFn = fetchFn;
   }
