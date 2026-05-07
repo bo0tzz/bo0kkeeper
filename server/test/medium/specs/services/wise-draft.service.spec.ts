@@ -135,4 +135,23 @@ describe('WiseDraftService', () => {
       }),
     ).rejects.toThrow(/Event not found/);
   });
+
+  it('auto-allocates a TXN reference from the sequence when omitted', async () => {
+    const ingest = await eventRepo.ingest({
+      source: EventSource.Wise,
+      eventType: 'balances#credit',
+      externalId: 'delivery-auto-ref',
+      occurredAt: new Date('2099-01-15T13:26:00Z'),
+      payload: balanceCreditPayload,
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+
+    const row = await service.draftFromEvent({ eventId: ingest.event.id });
+
+    // Sequence starts at 44 (the user's existing manual chain ends at TXN-0001).
+    expect(row.ourReference).toBe('TXN-0044');
+    expect(createTransferMock).toHaveBeenCalledWith(expect.objectContaining({ reference: 'TXN-0044' }));
+  });
 });

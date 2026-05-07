@@ -3,8 +3,14 @@ import z from 'zod';
 
 const DraftFromEventBodySchema = z
   .object({
-    /** TXN-NNNN reference applied to the outbound transfer. */
-    ourReference: z.string().regex(/^TXN-\d{4,}$/, { error: 'Expected TXN-NNNN format' }),
+    /**
+     * Optional `TXN-NNNN` reference. Omit to auto-allocate from the
+     * `wise_txn_sequence` Postgres sequence.
+     */
+    ourReference: z
+      .string()
+      .regex(/^TXN-\d{4,}$/, { error: 'Expected TXN-NNNN format' })
+      .optional(),
   })
   .meta({ id: 'DraftFromEventDto' });
 export class DraftFromEventDto extends createZodDto(DraftFromEventBodySchema) {}

@@ -9,8 +9,12 @@ const TARGET_CURRENCY = 'EUR';
 
 export type DraftFromEventInput = {
   eventId: string;
-  /** Our `TXN-NNNN` reference for the outgoing transfer. Surfaces in the bank statement. */
-  ourReference: string;
+  /**
+   * Our `TXN-NNNN` reference for the outgoing transfer. Surfaces in the bank statement.
+   * Optional — when omitted, the next reference is allocated from the
+   * `wise_txn_sequence` Postgres sequence.
+   */
+  ourReference?: string;
 };
 
 /**
@@ -54,8 +58,9 @@ export class WiseDraftService {
     }
 
     const credit = parseBalanceCreditPayload(event.payload);
+    const ourReference = input.ourReference ?? (await this.wiseTransferRepository.allocateTxnReference());
     this.logger.log(
-      `Drafting transfer from event ${event.id}: ${credit.amount} ${credit.currency} → ${TARGET_CURRENCY} as ${input.ourReference}`,
+      `Drafting transfer from event ${event.id}: ${credit.amount} ${credit.currency} → ${TARGET_CURRENCY} as ${ourReference}`,
     );
 
     const quote = await this.wiseApiService.createQuote({
@@ -67,7 +72,7 @@ export class WiseDraftService {
     const transfer = await this.wiseApiService.createTransfer({
       quoteId: quote.id,
       recipientId,
-      reference: input.ourReference,
+      reference: ourReference,
     });
 
     const row: NewWiseTransfer = {
@@ -82,7 +87,7 @@ export class WiseDraftService {
       feeCurrency: quote.feeCurrency,
       state: mapTransferState(transfer.state),
       stateUpdatedAt: new Date(),
-      ourReference: input.ourReference,
+      ourReference,
       counterpartyName: null,
       correlationId: event.correlationId,
     };
