@@ -13,8 +13,11 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { loadConfig } from 'src/config';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
+import { ClientRepository } from 'src/repositories/client.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { SheetWriterService } from 'src/services/sheet-writer.service';
+import { SheetsService } from 'src/services/sheets.service';
 import { getKyselyConfig } from 'src/utils/database';
 import { parseSnsCsv } from 'src/utils/sns-csv';
 
@@ -34,7 +37,9 @@ async function main() {
     console.log(`Parsed ${rows.length} rows from ${csvPath}`);
 
     const bankRepo = new BankTransactionRepository(db);
-    const matcher = new BankMatcherService(db, bankRepo);
+    const clientRepo = new ClientRepository(db);
+    const sheetWriter = new SheetWriterService(new SheetsService());
+    const matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter);
 
     let ingested = 0;
     let duplicates = 0;

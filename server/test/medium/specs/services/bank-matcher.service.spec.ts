@@ -13,8 +13,9 @@ import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyDB } from 'test/utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 beforeEach(() => {
   process.env.OIDC_ISSUER ??= 'http://idp.test';
@@ -28,6 +29,7 @@ describe('BankMatcherService', () => {
   let transferRepo: WiseTransferRepository;
   let invoiceRepo: InvoiceRepository;
   let clientRepo: ClientRepository;
+  let sheetWriter: SheetWriterService & { writeIncomeRow: ReturnType<typeof vi.fn> };
   let matcher: BankMatcherService;
 
   beforeEach(async () => {
@@ -36,7 +38,10 @@ describe('BankMatcherService', () => {
     transferRepo = new WiseTransferRepository(db);
     invoiceRepo = new InvoiceRepository(db);
     clientRepo = new ClientRepository(db);
-    matcher = new BankMatcherService(db, bankRepo);
+    sheetWriter = {
+      writeIncomeRow: vi.fn().mockResolvedValue(void 0),
+    } as unknown as SheetWriterService & { writeIncomeRow: ReturnType<typeof vi.fn> };
+    matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter);
   });
 
   afterEach(async () => {
@@ -129,6 +134,64 @@ describe('BankMatcherService', () => {
     if (result.matched && result.type === 'invoice') {
       expect(result.invoiceId).toBe(invoice.id);
     }
+
+    const refetched = await bankRepo.findById(ingest.row.id);
+    expect(refetched?.matchedInvoiceId).toBe(invoice.id);
+
+    // Sheet income row appended (kasstelsel — payment received in NL bank).
+    expect(sheetWriter.writeIncomeRow).toHaveBeenCalledOnce();
+    const args = sheetWriter.writeIncomeRow.mock.calls[0][0] as {
+      invoiceNumber: string;
+      eurAmountMinor: bigint;
+      client: { name: string; class: ClientClass };
+      from: string;
+      source: string;
+    };
+    expect(args.invoiceNumber).toBe(invoice.number);
+    expect(args.eurAmountMinor).toBe(23_898n);
+    expect(args.client.name).toBe('Acme Studio');
+    expect(args.client.class).toBe(ClientClass.Domestic);
+    expect(args.from).toBe('F. Acme Studio');
+    expect(args.source).toBe(`bank_tx/${ingest.row.id}`);
+  });
+
+  it('absorbs sheet write failures so the match still persists', async () => {
+    sheetWriter.writeIncomeRow.mockRejectedValueOnce(new Error('sheets api down'));
+
+    const client = await clientRepo.create({
+      name: 'Sheet-Failing Client',
+      class: ClientClass.Domestic,
+      tradeName: TradeName.ItServices,
+      address: { line1: 'X', city: 'Y' },
+    });
+    const invoice = await invoiceRepo.issue({
+      year: 2099,
+      invoice: {
+        clientId: client.id,
+        issuedAt: new Date('2099-04-01'),
+        currency: 'EUR',
+        totalMinor: 12_100n,
+        sourceEventId: null,
+      },
+      lines: [{ ordinal: 0, description: 'Services', lineTotalMinor: 12_100n, unitLabel: null, quantity: null }],
+    });
+    const ingest = await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: '60:fail',
+      txDate: new Date('2099-04-01'),
+      amountMinor: 12_100n,
+      currency: 'EUR',
+      counterpartyName: 'Sheet-Failing Client',
+      counterpartyIban: null,
+      description: `Payment for ${invoice.number}`,
+      rawPayload: {},
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+
+    const result = await matcher.tryMatch(ingest.row);
+    expect(result.matched).toBe(true);
 
     const refetched = await bankRepo.findById(ingest.row.id);
     expect(refetched?.matchedInvoiceId).toBe(invoice.id);

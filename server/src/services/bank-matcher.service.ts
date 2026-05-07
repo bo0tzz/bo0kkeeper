@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { MatchConfidence } from 'src/enum';
+import { ClientClass, MatchConfidence } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
+import { ClientRepository } from 'src/repositories/client.repository';
 import { DB } from 'src/schema';
+import { SheetWriterService } from 'src/services/sheet-writer.service';
 
 const TXN_REF_PATTERN = /\bTXN-\d{4,}\b/;
 const INVOICE_NUMBER_PATTERN = /\b\d{4}\/\d{3}\b/;
@@ -35,6 +37,8 @@ export class BankMatcherService {
   constructor(
     @InjectKysely() private readonly db: Kysely<DB>,
     private readonly bankTransactionRepository: BankTransactionRepository,
+    private readonly clientRepository: ClientRepository,
+    private readonly sheetWriter: SheetWriterService,
   ) {}
 
   async tryMatch(bankTx: BankTransaction): Promise<MatchResult> {
@@ -62,17 +66,48 @@ export class BankMatcherService {
     if (invoiceNumber) {
       const invoice = await this.db
         .selectFrom('invoice')
-        .select('id')
+        .selectAll()
         .where('number', '=', invoiceNumber)
         .executeTakeFirst();
       if (invoice) {
         await this.persistInvoiceMatch(bankTx.id, invoice.id, MatchConfidence.AutoHigh);
         this.logger.log(`bank_tx ${bankTx.id} → invoice ${invoice.id} via ${invoiceNumber}`);
+        await this.appendIncomeRow(bankTx, invoice);
         return { matched: true, type: 'invoice', invoiceId: invoice.id, confidence: MatchConfidence.AutoHigh };
       }
     }
 
     return { matched: false, reason: 'no high-confidence signal' };
+  }
+
+  /**
+   * Append a sheet income row for the matched invoice. Best-effort: a sheets
+   * outage or a missing service-account config must not block the match itself
+   * (the row is still persisted and visible in the admin UI).
+   *
+   * Date convention: the bank tx date is the kasstelsel "payment received"
+   * date, which is what the sheet is keyed on.
+   */
+  private async appendIncomeRow(bankTx: BankTransaction, invoice: { clientId: string; number: string }) {
+    try {
+      const client = await this.clientRepository.findById(invoice.clientId);
+      if (!client) {
+        this.logger.warn(`Skipping sheet write for invoice ${invoice.number}: client ${invoice.clientId} not found`);
+        return;
+      }
+      const rawMinor = BigInt(bankTx.amountMinor as bigint | number | string);
+      const eurAmountMinor = rawMinor < 0n ? -rawMinor : rawMinor;
+      await this.sheetWriter.writeIncomeRow({
+        date: bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate),
+        invoiceNumber: invoice.number,
+        eurAmountMinor,
+        client: { name: client.name, class: client.class as ClientClass },
+        from: bankTx.counterpartyName ?? client.name,
+        source: `bank_tx/${bankTx.id}`,
+      });
+    } catch (error) {
+      this.logger.error(`Sheet write failed for invoice ${invoice.number}: ${(error as Error).message}`);
+    }
   }
 
   /** Bulk match every unmatched bank tx. Returns counts. */
