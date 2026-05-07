@@ -106,7 +106,7 @@ export class InvoiceComposerService {
     });
 
     const template = TEMPLATE_BY_CLASS[client.class];
-    const data = buildTemplateData(client, issued);
+    const data = template === 'overseas-non-eu' ? buildNonEuData(client, issued) : buildDomesticData(client, issued);
     const pdf = await this.renderService.render({ template, data });
 
     let paperlessTaskId: string | undefined;
@@ -149,46 +149,84 @@ function eurFromMinor(minor: bigint, fxRate: string | null): string {
   return eur.toFixed(2);
 }
 
-function buildTemplateData(client: Client, invoice: InvoiceWithLines): Record<string, unknown> {
-  const issuerAddress = (
-    client.tradeName === 'it_services'
-      ? {
-          name: 'de Willigen IT Services',
-        }
-      : {
-          name: 'de Willigen 3D',
-        }
-  ) as Record<string, string>;
+function buildIssuer(client: Client): Record<string, string> {
+  const name = client.tradeName === 'it_services' ? 'de Willigen IT Services' : 'de Willigen 3D';
+  return {
+    name,
+    addressLine1: 'Example Street 1',
+    postalCode: '1234 AB',
+    city: 'Exampletown',
+    country: 'The Netherlands',
+    kvk: 'CONFIGURE',
+    vatId: 'CONFIGURE',
+  };
+}
+
+function buildClientBlock(client: Client): Record<string, string> {
+  return {
+    name: client.name,
+    addressLine1: (client.address as Record<string, string>)['line1'] ?? '',
+    city: (client.address as Record<string, string>)['city'] ?? '',
+  };
+}
+
+function buildNonEuData(client: Client, invoice: InvoiceWithLines): Record<string, unknown> {
+  const totalMinor = BigInt(invoice.totalMinor as unknown as string);
+  const eurTotalMinor =
+    invoice.eurTotalMinor === null || invoice.eurTotalMinor === undefined
+      ? totalMinor
+      : BigInt(invoice.eurTotalMinor as unknown as string);
 
   return {
-    issuer: {
-      ...issuerAddress,
-      addressLine1: 'Example Street 1',
-      postalCode: '1234 AB',
-      city: 'Exampletown',
-      country: 'The Netherlands',
-      kvk: 'CONFIGURE',
-      vatId: 'CONFIGURE',
-    },
-    client: {
-      name: client.name,
-      addressLine1: (client.address as Record<string, string>)['line1'] ?? '',
-      city: (client.address as Record<string, string>)['city'] ?? '',
-    },
+    issuer: buildIssuer(client),
+    client: buildClientBlock(client),
     invoice: {
       number: invoice.number,
       dateFormatted: formatDate(invoice.issuedAt),
-      totalUsd: formatMinor(BigInt(invoice.totalMinor as unknown as string)),
-      totalEur:
-        invoice.eurTotalMinor === null || invoice.eurTotalMinor === undefined
-          ? formatMinor(BigInt(invoice.totalMinor as unknown as string))
-          : formatMinor(BigInt(invoice.eurTotalMinor as unknown as string)),
+      totalUsd: formatMinor(totalMinor),
+      totalEur: formatMinor(eurTotalMinor),
     },
     lines: invoice.lines.map((line) => ({
       description: line.description,
       usdAmount: formatMinor(BigInt(line.lineTotalMinor as unknown as string)),
       eurAmount: eurFromMinor(BigInt(line.lineTotalMinor as unknown as string), invoice.fxRate),
     })),
+  };
+}
+
+function buildDomesticData(client: Client, invoice: InvoiceWithLines): Record<string, unknown> {
+  const totalMinor = BigInt(invoice.totalMinor as unknown as string);
+  const btwMinor =
+    invoice.btwMinor === null || invoice.btwMinor === undefined ? 0n : BigInt(invoice.btwMinor as unknown as string);
+  const subtotalMinor = totalMinor - btwMinor;
+  const btwRatePercent =
+    invoice.btwRateBps === null || invoice.btwRateBps === undefined
+      ? '0%'
+      : `${(invoice.btwRateBps / 100).toFixed(0)}%`;
+
+  return {
+    issuer: buildIssuer(client),
+    client: buildClientBlock(client),
+    invoice: {
+      number: invoice.number,
+      dateFormatted: formatDate(invoice.issuedAt),
+      subtotal: formatMinor(subtotalMinor),
+      btwRate: btwRatePercent,
+      btwAmount: formatMinor(btwMinor),
+      total: formatMinor(totalMinor),
+    },
+    lines: invoice.lines.map((line) => ({
+      description: line.description,
+      // Domestic template wants per-line unit + quantity + total. The composer
+      // input uses unitLabel/quantity/lineTotalMinor; surface those here.
+      unit: line.unitLabel ?? '',
+      quantity: line.quantity ?? '',
+      total: formatMinor(BigInt(line.lineTotalMinor as unknown as string)),
+    })),
+    payment: {
+      iban: 'CONFIGURE',
+      name: client.tradeName === 'it_services' ? 'de Willigen IT Services' : 'de Willigen 3D',
+    },
   };
 }
 
