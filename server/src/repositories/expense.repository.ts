@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, Selectable, Updateable } from 'kysely';
+import { Insertable, Kysely, Selectable, sql, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { ExpenseStatus } from 'src/enum';
+import { ExpenseLocationClass, ExpenseStatus } from 'src/enum';
 import { DB } from 'src/schema';
 import { ExpenseTable } from 'src/schema/tables/expense.table';
 
@@ -57,6 +57,38 @@ export class ExpenseRepository {
       .execute() as Promise<Expense[]>;
   }
 
+  /**
+   * Paginated list with optional filters; backs the admin expense browser.
+   * Sort order: pending review first (so the queue lands at the top), then by
+   * expense date descending — newer receipts surface first within each status.
+   */
+  async findMany(filter: ExpenseListFilter): Promise<ExpenseListPage> {
+    const baseQuery = this.db
+      .selectFrom('expense')
+      .$if(!!filter.status, (qb) => qb.where('status', '=', filter.status!))
+      .$if(!!filter.locationClass, (qb) => qb.where('locationClass', '=', filter.locationClass!))
+      .$if(!!filter.from, (qb) => qb.where('expenseDate', '>=', filter.from!))
+      .$if(!!filter.to, (qb) => qb.where('expenseDate', '<=', filter.to!));
+
+    const [items, totalRow] = await Promise.all([
+      baseQuery
+        .selectAll()
+        .orderBy(({ ref }) => sql`CASE ${ref('status')} WHEN ${ExpenseStatus.PendingReview} THEN 0 ELSE 1 END`)
+        .orderBy('expenseDate', 'desc')
+        .limit(filter.limit)
+        .offset(filter.offset)
+        .execute(),
+      baseQuery.select((eb) => eb.fn.countAll().as('total')).executeTakeFirstOrThrow(),
+    ]);
+
+    const total = Number(totalRow.total);
+    return {
+      items: items as Expense[],
+      total,
+      hasMore: filter.offset + items.length < total,
+    };
+  }
+
   /** Apply review edits + flip status. Idempotent for the same `status`. */
   async update(id: string, patch: ExpenseUpdate): Promise<Expense | undefined> {
     const updated = (await this.db
@@ -80,3 +112,20 @@ export class ExpenseRepository {
     });
   }
 }
+
+export type ExpenseListFilter = {
+  status?: ExpenseStatus;
+  locationClass?: ExpenseLocationClass;
+  /** Inclusive lower bound on expenseDate. */
+  from?: Date;
+  /** Inclusive upper bound on expenseDate. */
+  to?: Date;
+  limit: number;
+  offset: number;
+};
+
+export type ExpenseListPage = {
+  items: Expense[];
+  total: number;
+  hasMore: boolean;
+};
