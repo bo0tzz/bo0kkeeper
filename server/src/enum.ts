@@ -39,7 +39,8 @@ export enum QueueName {
 
 /** Job names; every value must have exactly one @OnJob handler at boot. */
 export enum JobName {
-  // Placeholder. Real jobs land with their handlers in later phases.
+  /** Apply a Wise `transfers#state-change` event to its `wise_transfer` row. */
+  WiseTransferStateChange = 'wise.transfer.state_change',
 }
 
 /** Tax/billing classification of a client; drives BTW treatment + invoice template selection. */

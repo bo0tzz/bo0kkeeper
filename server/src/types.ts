@@ -17,10 +17,8 @@ export type AuthUser = {
  * (`jobRepository.queue(name, data)`) and consumers (`@OnJob` handlers) get
  * end-to-end typed payloads.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 type JobItemMap = {
-  // Example shape (filled in once we have real jobs):
-  // [JobName.WiseEventProcess]: { eventId: string };
+  [JobName.WiseTransferStateChange]: { eventId: string };
 };
 
 /** Producer-side: `data` shape for a given job name. */
