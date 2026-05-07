@@ -1,0 +1,91 @@
+[tools]
+node = "24"
+pnpm = "10"
+
+[tasks.install]
+run = "pnpm install"
+description = "Install all workspace dependencies"
+
+[tasks.dev]
+run = "docker compose -f ./docker/docker-compose.dev.yml up --remove-orphans"
+description = "Start dev services (Postgres, etc.)"
+
+[tasks."dev-down"]
+run = "docker compose -f ./docker/docker-compose.dev.yml down --remove-orphans"
+description = "Stop dev services"
+
+[tasks."build-server"]
+run = "pnpm --filter bo0kkeeper build"
+description = "Build the NestJS server"
+
+[tasks."build-web"]
+run = "pnpm --filter web build"
+description = "Build the SvelteKit web app"
+
+[tasks.build]
+run = [
+  { task = "build-server" },
+  { task = "build-web" },
+]
+description = "Build everything"
+
+[tasks."test-server"]
+run = "pnpm --filter bo0kkeeper test"
+description = "Server unit tests"
+
+[tasks."test-medium"]
+run = "pnpm --filter bo0kkeeper test:medium"
+description = "Server integration tests (testcontainers Postgres)"
+
+[tasks."test-web"]
+run = "pnpm --filter web test"
+description = "Web unit tests"
+
+[tasks.test]
+run = [
+  { task = "test-server" },
+  { task = "test-medium" },
+  { task = "test-web" },
+]
+description = "Run all tests (unit + integration + web)"
+
+[tasks."lint-server"]
+run = "pnpm --filter bo0kkeeper lint"
+
+[tasks."lint-web"]
+run = "pnpm --filter web lint"
+
+[tasks.lint]
+run = [
+  { task = "lint-server" },
+  { task = "lint-web" },
+]
+description = "Lint everything"
+
+[tasks.format]
+run = "pnpm --recursive --parallel format"
+description = "Check formatting"
+
+[tasks."format-fix"]
+run = "pnpm --recursive --parallel format:fix"
+description = "Apply formatting"
+
+[tasks.check]
+run = "pnpm --recursive --parallel check"
+description = "Type-check everything"
+
+[tasks.checklist]
+run = [
+  { task = "format" },
+  { task = "lint" },
+  { task = "check" },
+  { task = "test" },
+]
+description = "Full pre-commit-style check"
+
+[tasks.clean]
+run = [
+  { task = "dev-down" },
+  "rm -rf node_modules server/node_modules web/node_modules",
+]
+description = "Tear down dev services and remove node_modules"

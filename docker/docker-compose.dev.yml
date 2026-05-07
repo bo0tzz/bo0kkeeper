@@ -1,0 +1,25 @@
+name: bo0kkeeper-dev
+
+services:
+  database:
+    container_name: bo0kkeeper_postgres
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_DB: ${DB_DATABASE_NAME:-bo0kkeeper}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      # Postgres 18+ wants the parent dir mounted (data lives in a major-version subdir).
+      - postgres-data:/var/lib/postgresql
+    ports:
+      - "5432:5432"
+    shm_size: 128mb
+    healthcheck:
+      test: pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:

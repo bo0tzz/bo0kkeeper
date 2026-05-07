@@ -1,0 +1,17 @@
+packages:
+  - server
+  - web
+ignoredBuiltDependencies:
+  - "@nestjs/core"
+  - "@swc/core"
+  - esbuild
+onlyBuiltDependencies:
+  - "@tailwindcss/oxide"
+packageExtensions:
+  nestjs-kysely:
+    dependencies:
+      tslib: "*"
+dedupePeerDependents: false
+preferWorkspacePackages: true
+injectWorkspacePackages: true
+shamefullyHoist: false
