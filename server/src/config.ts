@@ -48,6 +48,13 @@ const ConfigSchema = z.object({
   PAPERLESS_BASE_URL: z.url().optional(),
   /** Paperless API token (from `/admin/` user profile). */
   PAPERLESS_TOKEN: z.string().optional(),
+
+  /** Google Sheets service-account email (e.g. `bookkeeper@project.iam.gserviceaccount.com`). */
+  SHEETS_SERVICE_ACCOUNT_EMAIL: z.email().optional(),
+  /** PEM-encoded RSA private key for the service account. */
+  SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY: z.string().optional(),
+  /** Spreadsheet id (the long string in the gdrive URL). */
+  SHEETS_SPREADSHEET_ID: z.string().optional(),
 });
 
 export type Config = {
@@ -85,6 +92,11 @@ export type Config = {
   paperless: {
     baseUrl?: string;
     token?: string;
+  };
+  sheets: {
+    serviceAccountEmail?: string;
+    serviceAccountPrivateKey?: string;
+    spreadsheetId?: string;
   };
 };
 
@@ -133,6 +145,11 @@ export function loadConfig(): Config {
     paperless: {
       baseUrl: result.data.PAPERLESS_BASE_URL,
       token: result.data.PAPERLESS_TOKEN,
+    },
+    sheets: {
+      serviceAccountEmail: result.data.SHEETS_SERVICE_ACCOUNT_EMAIL,
+      serviceAccountPrivateKey: result.data.SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY,
+      spreadsheetId: result.data.SHEETS_SPREADSHEET_ID,
     },
   };
 }
