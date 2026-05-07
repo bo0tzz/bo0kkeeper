@@ -1,4 +1,5 @@
 import { AuthService } from 'src/services/auth.service';
+import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { InvoiceComposerService } from 'src/services/invoice-composer.service';
 import { PaperlessService } from 'src/services/paperless.service';
 import { RenderService } from 'src/services/render.service';
@@ -11,6 +12,7 @@ import { WiseEventService } from 'src/services/wise-event.service';
 
 export const services = [
   AuthService,
+  BankMatcherService,
   InvoiceComposerService,
   PaperlessService,
   RenderService,
