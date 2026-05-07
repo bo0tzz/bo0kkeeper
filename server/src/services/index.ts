@@ -1,4 +1,5 @@
 import { AuthService } from 'src/services/auth.service';
+import { PaperlessService } from 'src/services/paperless.service';
 import { RenderService } from 'src/services/render.service';
 import { WebhookService } from 'src/services/webhook.service';
 import { WiseApiService } from 'src/services/wise-api.service';
@@ -7,6 +8,7 @@ import { WiseEventService } from 'src/services/wise-event.service';
 
 export const services = [
   AuthService,
+  PaperlessService,
   RenderService,
   WebhookService,
   WiseApiService,

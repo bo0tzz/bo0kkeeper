@@ -43,6 +43,11 @@ const ConfigSchema = z.object({
    * sheet is at TXN-0001 at go-live; the system continues from this number.
    */
   WISE_TXN_REFERENCE_START: z.coerce.number().int().nonnegative().default(0),
+
+  /** Paperless-ngx base URL, e.g. `https://paperless.lan` (no trailing slash). */
+  PAPERLESS_BASE_URL: z.url().optional(),
+  /** Paperless API token (from `/admin/` user profile). */
+  PAPERLESS_TOKEN: z.string().optional(),
 });
 
 export type Config = {
@@ -76,6 +81,10 @@ export type Config = {
     targetRecipientId?: number;
     /** Starting offset for `TXN-NNNN` references issued by this system. */
     txnReferenceStart: number;
+  };
+  paperless: {
+    baseUrl?: string;
+    token?: string;
   };
 };
 
@@ -120,6 +129,10 @@ export function loadConfig(): Config {
       profileId: result.data.WISE_PROFILE_ID,
       targetRecipientId: result.data.WISE_TARGET_RECIPIENT_ID,
       txnReferenceStart: result.data.WISE_TXN_REFERENCE_START,
+    },
+    paperless: {
+      baseUrl: result.data.PAPERLESS_BASE_URL,
+      token: result.data.PAPERLESS_TOKEN,
     },
   };
 }
