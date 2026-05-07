@@ -19,6 +19,7 @@ export type AuthUser = {
  */
 type JobItemMap = {
   [JobName.WiseTransferStateChange]: { eventId: string };
+  [JobName.ProcessPaperlessDocument]: { eventId: string };
 };
 
 /** Producer-side: `data` shape for a given job name. */

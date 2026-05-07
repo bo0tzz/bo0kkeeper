@@ -41,6 +41,8 @@ export enum QueueName {
 export enum JobName {
   /** Apply a Wise `transfers#state-change` event to its `wise_transfer` row. */
   WiseTransferStateChange = 'wise.transfer.state_change',
+  /** Convert a paperless `document.consumed` event into a pending expense. */
+  ProcessPaperlessDocument = 'paperless.document.consumed',
 }
 
 /** Tax/billing classification of a client; drives BTW treatment + invoice template selection. */
