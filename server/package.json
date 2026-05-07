@@ -25,7 +25,8 @@
     "migrations:debug": "sql-tools -u ${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/bo0kkeeper} migrations generate --debug",
     "scrub": "node ./dist/bin/scrub.js",
     "replay": "node ./dist/bin/replay.js",
-    "sync:open-api": "node ./dist/bin/sync-open-api.js"
+    "sync:open-api": "node ./dist/bin/sync-open-api.js",
+    "import-sns": "node ./dist/bin/import-sns.js"
   },
   "dependencies": {
     "@immich/sql-tools": "^0.5.1",
