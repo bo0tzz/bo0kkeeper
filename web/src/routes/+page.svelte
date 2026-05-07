@@ -8,6 +8,7 @@
     <Text>Bookkeeping automation.</Text>
     <Stack gap={2}>
       <Button href="/events">Events</Button>
+      <Button href="/wise">Wise inbound credits</Button>
       <Button href="/expenses">Expenses</Button>
       <Button href="/aggregator">BTW-aangifte rollup</Button>
     </Stack>
