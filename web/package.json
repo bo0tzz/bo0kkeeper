@@ -19,6 +19,7 @@
     "prepare": "svelte-kit sync"
   },
   "dependencies": {
+    "@bo0kkeeper/sdk": "workspace:*",
     "@immich/ui": "^0.61.3"
   },
   "devDependencies": {

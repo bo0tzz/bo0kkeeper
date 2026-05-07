@@ -3,3 +3,5 @@ node_modules/
 coverage/
 **/*.md
 pnpm-lock.yaml
+# Generated OpenAPI spec — copied from build output by `mise run open-api`.
+server-openapi-specs.json

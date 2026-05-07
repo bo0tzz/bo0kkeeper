@@ -44,9 +44,13 @@ export class WiseTransferTable {
   @Column({ type: 'text' })
   targetCurrency!: string;
 
-  /** Locked-in FX rate from Wise (double precision). Null for same-currency transfers. */
-  @Column({ type: 'double precision', nullable: true })
-  fxRate!: number | null;
+  /**
+   * Locked-in FX rate from Wise, stored as a decimal string for exact precision.
+   * Wise returns rates with up to ~6 fractional digits; we never do arithmetic on
+   * this value, only display/record. Null for same-currency transfers.
+   */
+  @Column({ type: 'text', nullable: true })
+  fxRate!: string | null;
 
   @Column({ type: 'bigint', default: 0 })
   feeMinor!: Generated<ColumnType<bigint>>;

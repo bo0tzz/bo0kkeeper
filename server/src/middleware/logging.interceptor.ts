@@ -1,5 +1,6 @@
 import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { ClsService } from 'nestjs-cls';
 import { finalize, Observable } from 'rxjs';
 
 const maxArrayLength = 100;
@@ -21,6 +22,8 @@ const replacer = (key: string, value: unknown) => {
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger(LoggingInterceptor.name);
 
+  constructor(private readonly cls: ClsService) {}
+
   intercept(context: ExecutionContext, next: CallHandler<any>): Observable<any> {
     const handler = context.switchToHttp();
     const req = handler.getRequest<Request>();
@@ -29,13 +32,20 @@ export class LoggingInterceptor implements NestInterceptor {
     const { method, ip, url } = req;
     const start = performance.now();
 
+    // Echo the correlation id back so clients can quote it in bug reports.
+    const correlationId = this.cls.getId();
+    if (correlationId) {
+      res.setHeader('X-Correlation-Id', correlationId);
+    }
+
     return next.handle().pipe(
       finalize(() => {
         const duration = (performance.now() - start).toFixed(2);
         const { statusCode } = res;
-        this.logger.debug(`${method} ${url} ${statusCode} ${duration}ms ${ip}`);
+        const prefix = correlationId ? `[${correlationId}] ` : '';
+        this.logger.debug(`${prefix}${method} ${url} ${statusCode} ${duration}ms ${ip}`);
         if (req.body && Object.keys(req.body).length > 0) {
-          this.logger.verbose(JSON.stringify(req.body, replacer));
+          this.logger.verbose(`${prefix}${JSON.stringify(req.body, replacer)}`);
         }
       }),
     );

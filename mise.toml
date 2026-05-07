@@ -2,6 +2,10 @@
 node = "24"
 pnpm = "10"
 
+# Local dev env (DB, OIDC, secrets). Gitignored — see .gitignore.
+[env]
+_.file = ".env"
+
 [tasks.install]
 run = "pnpm install"
 description = "Install all workspace dependencies"
@@ -73,6 +77,10 @@ description = "Apply formatting"
 [tasks.check]
 run = "pnpm --recursive --parallel check"
 description = "Type-check everything"
+
+[tasks."open-api"]
+run = "./open-api/bin/generate-open-api.sh"
+description = "Regenerate the OpenAPI spec and rebuild the typed SDK"
 
 [tasks.checklist]
 run = [

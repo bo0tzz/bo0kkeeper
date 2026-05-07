@@ -1,16 +1,17 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Authenticated } from 'src/decorators';
 import { EventResponseDto, ListEventsQueryDto, ListEventsResponseDto, mapEvent } from 'src/dtos/event.dto';
 import { EventRepository } from 'src/repositories/event.repository';
-import { UUIDParamDto } from 'src/validation';
 
+@ApiTags('Events')
 @Controller('/api/events')
 export class EventsController {
   constructor(private readonly eventRepository: EventRepository) {}
 
   @Get()
   @Authenticated()
-  async list(@Query() query: ListEventsQueryDto): Promise<ListEventsResponseDto> {
+  async listEvents(@Query() query: ListEventsQueryDto): Promise<ListEventsResponseDto> {
     const page = await this.eventRepository.findMany({
       source: query.source,
       eventType: query.eventType,
@@ -27,7 +28,7 @@ export class EventsController {
 
   @Get(':id')
   @Authenticated()
-  async getOne(@Param() { id }: UUIDParamDto): Promise<EventResponseDto | { message: string }> {
+  async getEvent(@Param('id', ParseUUIDPipe) id: string): Promise<EventResponseDto | { message: string }> {
     const event = await this.eventRepository.findById(id);
     if (!event) {
       return { message: 'Event not found' };

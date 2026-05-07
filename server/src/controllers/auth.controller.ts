@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { loadConfig } from 'src/config';
 import { Auth, Authenticated } from 'src/decorators';
@@ -11,6 +12,7 @@ const STATE_COOKIE = 'bo0kkeeper.oauth_state';
 const VERIFIER_COOKIE = 'bo0kkeeper.oauth_code_verifier';
 const RETURN_TO_COOKIE = 'bo0kkeeper.oauth_return_to';
 
+@ApiTags('Auth')
 @Controller('/api/auth')
 export class AuthController {
   private readonly cookieSecure = loadConfig().cookie.secure;
@@ -72,7 +74,7 @@ export class AuthController {
 
   @Get('me')
   @Authenticated()
-  me(@Auth() user: AuthUser): AuthMeDto {
+  getMe(@Auth() user: AuthUser): AuthMeDto {
     return { sub: user.sub, email: user.email, name: user.name } as AuthMeDto;
   }
 }

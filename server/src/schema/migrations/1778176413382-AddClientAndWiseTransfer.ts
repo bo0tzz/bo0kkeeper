@@ -24,7 +24,7 @@ export async function up(db: Kysely<any>): Promise<void> {
   "sourceCurrency" text NOT NULL,
   "targetAmountMinor" bigint NOT NULL,
   "targetCurrency" text NOT NULL,
-  "fxRate" double precision,
+  "fxRate" text,
   "feeMinor" bigint NOT NULL DEFAULT 0,
   "feeCurrency" text NOT NULL DEFAULT '',
   "state" character varying NOT NULL,

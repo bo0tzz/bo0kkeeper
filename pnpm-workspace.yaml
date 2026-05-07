@@ -1,6 +1,7 @@
 packages:
   - server
   - web
+  - open-api/typescript-sdk
 ignoredBuiltDependencies:
   - "@nestjs/core"
   - "@swc/core"

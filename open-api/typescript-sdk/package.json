@@ -1,0 +1,25 @@
+{
+  "name": "@bo0kkeeper/sdk",
+  "version": "0.1.0",
+  "description": "Auto-generated TypeScript SDK for the bo0kkeeper API",
+  "private": true,
+  "type": "module",
+  "main": "./build/index.js",
+  "types": "./build/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "default": "./build/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@oazapfts/runtime": "^1.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.9",
+    "typescript": "^6.0.0"
+  }
+}

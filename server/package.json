@@ -24,13 +24,15 @@
     "migrations:revert": "sql-tools -u ${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/bo0kkeeper} migrations revert",
     "migrations:debug": "sql-tools -u ${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/bo0kkeeper} migrations generate --debug",
     "scrub": "node ./dist/bin/scrub.js",
-    "replay": "node ./dist/bin/replay.js"
+    "replay": "node ./dist/bin/replay.js",
+    "sync:open-api": "node ./dist/bin/sync-open-api.js"
   },
   "dependencies": {
     "@immich/sql-tools": "^0.5.1",
     "@nestjs/common": "^11.0.4",
     "@nestjs/core": "^11.0.4",
     "@nestjs/platform-express": "^11.0.4",
+    "@nestjs/swagger": "^11.0.2",
     "compression": "^1.8.0",
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
