@@ -1,0 +1,8 @@
+{
+  "event_type": "document.consumed",
+  "document_id": 4242,
+  "correspondent": "Daily Groceries NL",
+  "created": "2099-04-15T00:00:00Z",
+  "title": "Receipt 2099-04-15",
+  "doc_url": "https://paperless.test/documents/4242/"
+}

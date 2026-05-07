@@ -1,7 +1,7 @@
 import { Body, Controller, Headers, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { WiseWebhookDto } from 'src/dtos/webhook.dto';
+import { PaperlessWebhookDto, WiseWebhookDto } from 'src/dtos/webhook.dto';
 import { WebhookService } from 'src/services/webhook.service';
 
 type RawRequest = Request & { rawBody?: string };
@@ -27,6 +27,24 @@ export class WebhookController {
   ) {
     this.webhookService.verifyWiseSignature(req.rawBody ?? '', signature);
     const result = await this.webhookService.ingestWiseEvent(body, deliveryId);
+    return { ingested: result.ingested };
+  }
+
+  /**
+   * Paperless-ngx workflow webhook endpoint. paperless-ngx fires a "Webhook"
+   * action on document consumption with a JSON body containing the document
+   * id (and whatever extra fields the workflow template includes). Auth is a
+   * shared bearer token; the workflow is configured to send it.
+   */
+  @Post('paperless')
+  @HttpCode(HttpStatus.OK)
+  async ingestPaperlessWebhook(
+    @Body() body: PaperlessWebhookDto,
+    @Headers('authorization') authorization: string | undefined,
+    @Headers('x-delivery-id') deliveryId: string | undefined,
+  ) {
+    this.webhookService.verifyPaperlessAuthorization(authorization);
+    const result = await this.webhookService.ingestPaperlessEvent(body, deliveryId);
     return { ingested: result.ingested };
   }
 }

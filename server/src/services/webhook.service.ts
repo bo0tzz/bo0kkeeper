@@ -1,7 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { createVerify } from 'node:crypto';
+import { createVerify, timingSafeEqual } from 'node:crypto';
 import { loadConfig } from 'src/config';
-import { WiseWebhookDto } from 'src/dtos/webhook.dto';
+import { PaperlessWebhookDto, WiseWebhookDto } from 'src/dtos/webhook.dto';
 import { EventSource, JobName } from 'src/enum';
 import { EventRepository, IngestResult, NewEvent } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
@@ -10,6 +10,7 @@ import { JobRepository } from 'src/repositories/job.repository';
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name);
   private readonly wiseConfig = loadConfig().wise;
+  private readonly paperlessConfig = loadConfig().paperless;
 
   constructor(
     private readonly eventRepository: EventRepository,
@@ -81,6 +82,68 @@ export class WebhookService {
     // `balances#credit` is intentionally not auto-enqueued: drafts need a TXN
     // reference and human review. The admin UI calls `/api/wise/draft-from-event`.
   }
+
+  /**
+   * Verify the shared bearer token configured for paperless-ngx workflow
+   * webhooks. When `PAPERLESS_WEBHOOK_TOKEN` is unset, verification is skipped
+   * with a log line — same dev-bypass shape as Wise.
+   */
+  verifyPaperlessAuthorization(authHeader?: string): void {
+    const expected = this.paperlessConfig.webhookToken;
+    if (!expected) {
+      this.logger.warn('Paperless webhook authentication is disabled (PAPERLESS_WEBHOOK_TOKEN not set)');
+      return;
+    }
+    const presented = authHeader?.replace(/^Bearer\s+/i, '').trim();
+    if (!presented || !constantTimeEquals(presented, expected)) {
+      throw new UnauthorizedException('Invalid Paperless webhook token');
+    }
+  }
+
+  /**
+   * Ingest a paperless `document.consumed` workflow webhook idempotently and
+   * enqueue ProcessPaperlessDocument on first sight. The `externalId` is the
+   * document id — paperless guarantees one consume callback per document.
+   */
+  async ingestPaperlessEvent(payload: PaperlessWebhookDto, deliveryId?: string): Promise<IngestResult> {
+    const documentId = payload.document_id ?? payload.id ?? payload.doc_pk;
+    if (documentId === undefined) {
+      // Schema-level refine catches this; defensive guard for direct callers.
+      throw new Error('paperless webhook body has no document id');
+    }
+    const occurredAt = payload.created ?? payload.created_date ?? new Date().toISOString();
+    const externalId = deliveryId ?? `paperless:${documentId}`;
+    const eventType = payload.event_type ?? 'document.consumed';
+
+    const event: NewEvent = {
+      source: EventSource.Paperless,
+      eventType,
+      externalId,
+      occurredAt: parseDateOrNow(occurredAt),
+      payload: payload as unknown as Record<string, unknown>,
+      correlationId: null,
+    };
+
+    const result = await this.eventRepository.ingest(event);
+    if (result.ingested) {
+      await this.jobRepository.queue(JobName.ProcessPaperlessDocument, { eventId: result.event.id });
+    }
+    return result;
+  }
+}
+
+function constantTimeEquals(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) {
+    return false;
+  }
+  return timingSafeEqual(aBuf, bBuf);
+}
+
+function parseDateOrNow(value: string): Date {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? new Date() : d;
 }
 
 function deriveWiseExternalId(payload: WiseWebhookDto): string {

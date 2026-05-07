@@ -48,6 +48,12 @@ const ConfigSchema = z.object({
   PAPERLESS_BASE_URL: z.url().optional(),
   /** Paperless API token (from `/admin/` user profile). */
   PAPERLESS_TOKEN: z.string().optional(),
+  /**
+   * Shared secret expected on inbound paperless workflow webhooks. The workflow
+   * is configured in paperless-ngx to send `Authorization: Bearer <token>`.
+   * When set, requests without a matching header are rejected.
+   */
+  PAPERLESS_WEBHOOK_TOKEN: z.string().optional(),
 
   /** Google Sheets service-account email (e.g. `bookkeeper@project.iam.gserviceaccount.com`). */
   SHEETS_SERVICE_ACCOUNT_EMAIL: z.email().optional(),
@@ -92,6 +98,7 @@ export type Config = {
   paperless: {
     baseUrl?: string;
     token?: string;
+    webhookToken?: string;
   };
   sheets: {
     serviceAccountEmail?: string;
@@ -145,6 +152,7 @@ export function loadConfig(): Config {
     paperless: {
       baseUrl: result.data.PAPERLESS_BASE_URL,
       token: result.data.PAPERLESS_TOKEN,
+      webhookToken: result.data.PAPERLESS_WEBHOOK_TOKEN,
     },
     sheets: {
       serviceAccountEmail: result.data.SHEETS_SERVICE_ACCOUNT_EMAIL,

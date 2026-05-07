@@ -9,10 +9,11 @@ import { WebhookService } from 'src/services/webhook.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const FIXTURES = resolve(process.cwd(), 'test/fixtures/wise');
+const WISE_FIXTURES = resolve(process.cwd(), 'test/fixtures/wise');
+const PAPERLESS_FIXTURES = resolve(process.cwd(), 'test/fixtures/paperless');
 
-async function loadFixture(name: string) {
-  const raw = await readFile(resolve(FIXTURES, name), 'utf8');
+async function loadFixture(name: string, dir = WISE_FIXTURES) {
+  const raw = await readFile(resolve(dir, name), 'utf8');
   return { raw, parsed: JSON.parse(raw) };
 }
 
@@ -104,5 +105,82 @@ describe('WebhookService — Wise ingestion', () => {
 
     await service.ingestWiseEvent(parsed, 'state-change-2');
     expect(jobRepository.queue).toHaveBeenCalledOnce();
+  });
+});
+
+describe('WebhookService — Paperless ingestion', () => {
+  let db: Kysely<DB>;
+  let eventRepository: EventRepository;
+  let jobRepository: JobRepository & { queue: ReturnType<typeof vi.fn> };
+  let service: WebhookService;
+
+  beforeEach(async () => {
+    process.env.WISE_WEBHOOK_VERIFY = 'false';
+    process.env.OIDC_ISSUER ??= 'http://idp.test';
+    process.env.OIDC_CLIENT_ID ??= 'test-client';
+    process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
+    delete process.env.PAPERLESS_WEBHOOK_TOKEN;
+    db = await getKyselyDB();
+    eventRepository = new EventRepository(db);
+    jobRepository = fakeJobRepo();
+    service = new WebhookService(eventRepository, jobRepository);
+  });
+
+  afterEach(async () => {
+    await db.destroy();
+  });
+
+  it('ingests a paperless workflow webhook and enqueues ProcessPaperlessDocument', async () => {
+    const { parsed } = await loadFixture('document-consumed.example.json', PAPERLESS_FIXTURES);
+
+    const result = await service.ingestPaperlessEvent(parsed, 'paperless-delivery-1');
+
+    expect(result.ingested).toBe(true);
+    if (result.ingested) {
+      expect(result.event.source).toBe(EventSource.Paperless);
+      expect(result.event.eventType).toBe('document.consumed');
+      expect(result.event.externalId).toBe('paperless-delivery-1');
+    }
+    expect(jobRepository.queue).toHaveBeenCalledOnce();
+    if (result.ingested) {
+      expect(jobRepository.queue).toHaveBeenCalledWith(JobName.ProcessPaperlessDocument, {
+        eventId: result.event.id,
+      });
+    }
+  });
+
+  it('falls back to a derived externalId keyed on document_id when no header is present', async () => {
+    const { parsed } = await loadFixture('document-consumed.example.json', PAPERLESS_FIXTURES);
+
+    const result = await service.ingestPaperlessEvent(parsed);
+    expect(result.ingested).toBe(true);
+    if (result.ingested) {
+      expect(result.event.externalId).toBe('paperless:4242');
+    }
+  });
+
+  it('is idempotent on retry of the same paperless delivery', async () => {
+    const { parsed } = await loadFixture('document-consumed.example.json', PAPERLESS_FIXTURES);
+
+    const first = await service.ingestPaperlessEvent(parsed, 'pdelivery-2');
+    expect(first.ingested).toBe(true);
+    expect(jobRepository.queue).toHaveBeenCalledOnce();
+
+    const second = await service.ingestPaperlessEvent(parsed, 'pdelivery-2');
+    expect(second.ingested).toBe(false);
+    expect(jobRepository.queue).toHaveBeenCalledOnce();
+  });
+
+  it('skips authorization with a warning when no token is configured', () => {
+    expect(() => service.verifyPaperlessAuthorization()).not.toThrow();
+    expect(() => service.verifyPaperlessAuthorization('Bearer anything')).not.toThrow();
+  });
+
+  it('rejects mismatched bearer token when configured', () => {
+    process.env.PAPERLESS_WEBHOOK_TOKEN = 'shared-secret';
+    const guardedService = new WebhookService(eventRepository, jobRepository);
+    expect(() => guardedService.verifyPaperlessAuthorization('Bearer wrong')).toThrow(/Invalid Paperless/);
+    expect(() => guardedService.verifyPaperlessAuthorization()).toThrow(/Invalid Paperless/);
+    expect(() => guardedService.verifyPaperlessAuthorization('Bearer shared-secret')).not.toThrow();
   });
 });
