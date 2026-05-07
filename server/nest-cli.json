@@ -4,6 +4,7 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": false,
-    "webpack": false
+    "webpack": false,
+    "assets": [{ "include": "templates/**/*", "outDir": "dist", "watchAssets": true }]
   }
 }
