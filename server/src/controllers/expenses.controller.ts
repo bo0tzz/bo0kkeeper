@@ -1,6 +1,6 @@
 import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Authenticated } from 'src/decorators';
+import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import {
   ExpenseApproveDto,
   ExpenseRejectDto,
@@ -19,6 +19,7 @@ export class ExpensesController {
 
   @Get()
   @Authenticated()
+  @ApiQueryFromDto(ListExpensesQueryDto)
   async listExpenses(@Query() query: ListExpensesQueryDto): Promise<ListExpensesResponseDto> {
     const page = await this.expenseRepository.findMany({
       status: query.status,

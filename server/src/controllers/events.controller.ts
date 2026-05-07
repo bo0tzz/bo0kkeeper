@@ -1,6 +1,6 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Authenticated } from 'src/decorators';
+import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import { EventResponseDto, ListEventsQueryDto, ListEventsResponseDto, mapEvent } from 'src/dtos/event.dto';
 import { EventRepository } from 'src/repositories/event.repository';
 
@@ -11,6 +11,7 @@ export class EventsController {
 
   @Get()
   @Authenticated()
+  @ApiQueryFromDto(ListEventsQueryDto)
   async listEvents(@Query() query: ListEventsQueryDto): Promise<ListEventsResponseDto> {
     const page = await this.eventRepository.findMany({
       source: query.source,

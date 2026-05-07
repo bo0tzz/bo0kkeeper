@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Authenticated } from 'src/decorators';
+import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import { QuarterlyAggregateQueryDto, QuarterlyAggregateResponseDto, mapAggregate } from 'src/dtos/aggregator.dto';
 import { QuarterlyAggregatorService } from 'src/services/quarterly-aggregator.service';
 
@@ -16,6 +16,7 @@ export class AggregatorController {
    */
   @Get('quarterly')
   @Authenticated()
+  @ApiQueryFromDto(QuarterlyAggregateQueryDto)
   async getQuarterlyAggregate(@Query() query: QuarterlyAggregateQueryDto): Promise<QuarterlyAggregateResponseDto> {
     const aggregate = await this.aggregator.aggregate(query.year, query.quarter);
     return mapAggregate(aggregate);

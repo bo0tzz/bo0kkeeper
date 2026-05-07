@@ -1,5 +1,7 @@
 import { applyDecorators, createParamDecorator, ExecutionContext, SetMetadata } from '@nestjs/common';
+import { ApiQuery } from '@nestjs/swagger';
 import { Request } from 'express';
+import { type ZodDto, zodToOpenAPI } from 'nestjs-zod';
 import { MetadataKey } from 'src/constants';
 import { JobName, QueueName } from 'src/enum';
 import { AuthUser } from 'src/types';
@@ -35,3 +37,57 @@ export type JobConfig = {
  * exactly one handler. Real wiring lands in Phase 0g (pg-boss).
  */
 export const OnJob = (config: JobConfig): MethodDecorator => SetMetadata(MetadataKey.JobConfig, config);
+
+/**
+ * Walk a Zod query DTO and emit a `@ApiQuery` decorator per top-level field
+ * so the generated OpenAPI spec carries the parameter list. Without this,
+ * `@Query() dto: SomeDto` produces an empty `parameters: []` in the spec —
+ * `nestjs-zod`'s OpenAPI patch only handles request-body schemas.
+ *
+ * Usage:
+ *   `@Get()`
+ *   `@ApiQueryFromDto(SomeQueryDto)`
+ *   `async list(@Query() query: SomeQueryDto): Promise<...>`
+ *
+ * Caveats: only handles flat object schemas at the top level. `optional()` or
+ * `default(...)` on a field marks it `required: false` in the spec.
+ */
+export const ApiQueryFromDto = (dto: ZodDto): MethodDecorator & ClassDecorator => {
+  const schema = dto.schema as { shape?: Record<string, unknown> };
+  const shape = schema.shape;
+  if (!shape) {
+    return applyDecorators();
+  }
+
+  const decorators: (MethodDecorator & ClassDecorator)[] = [];
+  for (const [name, field] of Object.entries(shape)) {
+    const openApi = zodToOpenAPI(field as Parameters<typeof zodToOpenAPI>[0]);
+    decorators.push(
+      ApiQuery({
+        name,
+        required: !isOptionalField(field),
+        schema: openApi,
+      }) as MethodDecorator & ClassDecorator,
+    );
+  }
+  return applyDecorators(...decorators);
+};
+
+function isOptionalField(field: unknown): boolean {
+  // Zod 4: `field.def.type === 'optional' | 'default'` when the field has been
+  // wrapped. Fall back to the legacy `_def.typeName` for compatibility with
+  // anything still on the v3 path.
+  const def =
+    (field as { def?: { type?: string }; _def?: { typeName?: string } }).def ??
+    (field as { _def?: { typeName?: string } })._def;
+  if (!def) {
+    return false;
+  }
+  if ('type' in def && def.type !== undefined) {
+    return def.type === 'optional' || def.type === 'default';
+  }
+  if ('typeName' in def && def.typeName !== undefined) {
+    return def.typeName === 'ZodOptional' || def.typeName === 'ZodDefault';
+  }
+  return false;
+}
