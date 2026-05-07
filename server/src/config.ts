@@ -29,6 +29,20 @@ const ConfigSchema = z.object({
    */
   WISE_WEBHOOK_PUBLIC_KEY: z.string().optional(),
   WISE_WEBHOOK_VERIFY: z.stringbool({ truthy: ['true'], falsy: ['false'] }).default(true),
+
+  /** Wise REST API base. Sandbox: https://api.sandbox.transferwise.tech */
+  WISE_API_BASE_URL: z.url().default('https://api.transferwise.com'),
+  /** Personal API token. Required to draft transfers; optional otherwise. */
+  WISE_API_TOKEN: z.string().optional(),
+  /** Numeric Wise profile id (business profile). */
+  WISE_PROFILE_ID: z.coerce.number().int().positive().optional(),
+  /** Recipient id of the user's Dutch bank account in Wise. */
+  WISE_TARGET_RECIPIENT_ID: z.coerce.number().int().positive().optional(),
+  /**
+   * Starting offset for the `TXN-NNNN` reference sequence. The user's existing
+   * sheet is at TXN-0001 at go-live; the system continues from this number.
+   */
+  WISE_TXN_REFERENCE_START: z.coerce.number().int().nonnegative().default(0),
 });
 
 export type Config = {
@@ -52,6 +66,16 @@ export type Config = {
     verifySignatures: boolean;
     /** PEM-encoded RSA public key. */
     publicKey?: string;
+    /** REST API base URL. */
+    apiBaseUrl: string;
+    /** Personal API token, when set. */
+    apiToken?: string;
+    /** Numeric Wise profile id. */
+    profileId?: number;
+    /** Wise recipient id for the target Dutch bank account. */
+    targetRecipientId?: number;
+    /** Starting offset for `TXN-NNNN` references issued by this system. */
+    txnReferenceStart: number;
   };
 };
 
@@ -91,6 +115,11 @@ export function loadConfig(): Config {
     wise: {
       verifySignatures: result.data.WISE_WEBHOOK_VERIFY,
       publicKey: result.data.WISE_WEBHOOK_PUBLIC_KEY,
+      apiBaseUrl: result.data.WISE_API_BASE_URL,
+      apiToken: result.data.WISE_API_TOKEN,
+      profileId: result.data.WISE_PROFILE_ID,
+      targetRecipientId: result.data.WISE_TARGET_RECIPIENT_ID,
+      txnReferenceStart: result.data.WISE_TXN_REFERENCE_START,
     },
   };
 }
