@@ -59,10 +59,14 @@ export type AggregatorWarning =
  * needs to file BTW-aangifte. The DB is authoritative; the sheet is the
  * accountant-readable mirror, not the source of truth.
  *
- * Date convention (period-basis, first cut): invoices counted by `issuedAt`,
- * expenses counted by `expenseDate`. Strict kasstelsel (bank-match dates) is
- * a follow-up — the warnings already surface what would prevent that switch
- * (unmatched invoices, pending-review expenses).
+ * Income side runs on kasstelsel (cash-basis): a bank_transaction inside
+ * the quarter that matched an invoice or a Wise transfer counts as income
+ * on the date it cleared. Invoices issued in the quarter but not yet paid
+ * surface as `invoice_unmatched` warnings, not as income.
+ *
+ * Expenses are counted by `expenseDate` (the receipt date). For credit-card
+ * purchases this is close to the cash-basis date but not exactly it; a
+ * follow-up could read bank-tx dates for paid expenses.
  */
 @Injectable()
 export class QuarterlyAggregatorService {
@@ -74,56 +78,77 @@ export class QuarterlyAggregatorService {
     const { periodStart, periodEnd } = quarterRange(year, quarter);
     this.logger.debug(`Aggregating ${year} Q${quarter}: [${periodStart.toISOString()}, ${periodEnd.toISOString()})`);
 
-    const [invoiceRows, expenseRows, unmatchedSample, pendingExpensesSample, lowConfidenceMatchSample] =
-      await Promise.all([
-        this.db
-          .selectFrom('invoice')
-          .innerJoin('client', 'client.id', 'invoice.clientId')
-          .select([
-            'invoice.id as id',
-            'invoice.number as number',
-            'invoice.totalMinor as totalMinor',
-            'invoice.eurTotalMinor as eurTotalMinor',
-            'invoice.btwMinor as btwMinor',
-            'invoice.currency as currency',
-            'client.class as clientClass',
-          ])
-          .where('invoice.issuedAt', '>=', periodStart)
-          .where('invoice.issuedAt', '<', periodEnd)
-          .execute(),
-        this.db
-          .selectFrom('expense')
-          .select(['id', 'amountMinor', 'btwMinor', 'currency', 'locationClass', 'vendor'])
-          .where('status', '=', ExpenseStatus.Approved)
-          .where('expenseDate', '>=', periodStart)
-          .where('expenseDate', '<', periodEnd)
-          .execute(),
-        this.db
-          .selectFrom('invoice')
-          .leftJoin('bank_transaction', 'bank_transaction.matchedInvoiceId', 'invoice.id')
-          .select(['invoice.number'])
-          .where('invoice.issuedAt', '>=', periodStart)
-          .where('invoice.issuedAt', '<', periodEnd)
-          .where('bank_transaction.id', 'is', null)
-          .limit(5)
-          .execute(),
-        this.db
-          .selectFrom('expense')
-          .select(['vendor'])
-          .where('status', '=', ExpenseStatus.PendingReview)
-          .where('expenseDate', '>=', periodStart)
-          .where('expenseDate', '<', periodEnd)
-          .limit(5)
-          .execute(),
-        this.db
-          .selectFrom('bank_transaction')
-          .select(['id'])
-          .where('matchConfidence', '=', MatchConfidence.AutoLow)
-          .where('txDate', '>=', periodStart)
-          .where('txDate', '<', periodEnd)
-          .limit(5)
-          .execute(),
-      ]);
+    const [
+      invoiceMatchRows,
+      transferMatchRows,
+      expenseRows,
+      unmatchedSample,
+      pendingExpensesSample,
+      lowConfidenceMatchSample,
+    ] = await Promise.all([
+      // Bank tx that matched an invoice in the quarter — kasstelsel income.
+      this.db
+        .selectFrom('bank_transaction')
+        .innerJoin('invoice', 'invoice.id', 'bank_transaction.matchedInvoiceId')
+        .innerJoin('client', 'client.id', 'invoice.clientId')
+        .select([
+          'invoice.id as id',
+          'invoice.number as number',
+          'invoice.totalMinor as totalMinor',
+          'invoice.eurTotalMinor as eurTotalMinor',
+          'invoice.btwMinor as btwMinor',
+          'invoice.currency as currency',
+          'client.class as clientClass',
+        ])
+        .where('bank_transaction.txDate', '>=', periodStart)
+        .where('bank_transaction.txDate', '<', periodEnd)
+        .execute(),
+      // Bank tx that matched a Wise transfer (Non-EU income arriving in EUR).
+      this.db
+        .selectFrom('bank_transaction')
+        .innerJoin('wise_transfer', 'wise_transfer.id', 'bank_transaction.matchedTransferId')
+        .select([
+          'wise_transfer.id as id',
+          'wise_transfer.targetAmountMinor as targetAmountMinor',
+          'wise_transfer.targetCurrency as targetCurrency',
+        ])
+        .where('bank_transaction.txDate', '>=', periodStart)
+        .where('bank_transaction.txDate', '<', periodEnd)
+        .execute(),
+      this.db
+        .selectFrom('expense')
+        .select(['id', 'amountMinor', 'btwMinor', 'currency', 'locationClass', 'vendor'])
+        .where('status', '=', ExpenseStatus.Approved)
+        .where('expenseDate', '>=', periodStart)
+        .where('expenseDate', '<', periodEnd)
+        .execute(),
+      // Invoices issued before period-end that are not yet matched. Cross-quarter
+      // unpaid invoices show up here too — useful prompt for the user to chase.
+      this.db
+        .selectFrom('invoice')
+        .leftJoin('bank_transaction', 'bank_transaction.matchedInvoiceId', 'invoice.id')
+        .select(['invoice.number'])
+        .where('invoice.issuedAt', '<', periodEnd)
+        .where('bank_transaction.id', 'is', null)
+        .limit(5)
+        .execute(),
+      this.db
+        .selectFrom('expense')
+        .select(['vendor'])
+        .where('status', '=', ExpenseStatus.PendingReview)
+        .where('expenseDate', '>=', periodStart)
+        .where('expenseDate', '<', periodEnd)
+        .limit(5)
+        .execute(),
+      this.db
+        .selectFrom('bank_transaction')
+        .select(['id'])
+        .where('matchConfidence', '=', MatchConfidence.AutoLow)
+        .where('txDate', '>=', periodStart)
+        .where('txDate', '<', periodEnd)
+        .limit(5)
+        .execute(),
+    ]);
 
     const byClass: Record<ClientClass, IncomeBucket> = {
       [ClientClass.NonEu]: emptyBucket(),
@@ -134,7 +159,7 @@ export class QuarterlyAggregatorService {
 
     let totalGross = 0n;
     let totalBtw = 0n;
-    for (const row of invoiceRows) {
+    for (const row of invoiceMatchRows) {
       const cls = row.clientClass as ClientClass;
       const eurGross = pickEurMinor(row.eurTotalMinor, row.totalMinor, row.currency);
       const eurBtw =
@@ -145,6 +170,18 @@ export class QuarterlyAggregatorService {
       bucket.btwEurMinor += eurBtw;
       totalGross += eurGross;
       totalBtw += eurBtw;
+    }
+    // Wise transfers that landed in the quarter contribute Non-EU income at the
+    // EUR amount that actually arrived. No BTW (export, outside scope).
+    for (const row of transferMatchRows) {
+      if (row.targetCurrency !== 'EUR') {
+        continue;
+      }
+      const eurGross = BigInt(row.targetAmountMinor as unknown as string);
+      const bucket = byClass[ClientClass.NonEu];
+      bucket.invoiceCount += 1;
+      bucket.grossEurMinor += eurGross;
+      totalGross += eurGross;
     }
 
     let expenseGross = 0n;

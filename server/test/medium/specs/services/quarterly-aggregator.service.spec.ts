@@ -1,9 +1,18 @@
 import { Kysely } from 'kysely';
-import { BankSource, ClientClass, ExpenseLocationClass, ExpenseStatus, TradeName } from 'src/enum';
+import {
+  BankSource,
+  ClientClass,
+  ExpenseLocationClass,
+  ExpenseStatus,
+  TradeName,
+  WiseTransferDirection,
+  WiseTransferState,
+} from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { QuarterlyAggregatorService, quarterRange } from 'src/services/quarterly-aggregator.service';
 import { getKyselyDB } from 'test/utils';
@@ -29,6 +38,7 @@ describe('QuarterlyAggregatorService', () => {
   let invoiceRepo: InvoiceRepository;
   let clientRepo: ClientRepository;
   let expenseRepo: ExpenseRepository;
+  let transferRepo: WiseTransferRepository;
   let aggregator: QuarterlyAggregatorService;
 
   beforeEach(async () => {
@@ -37,6 +47,7 @@ describe('QuarterlyAggregatorService', () => {
     invoiceRepo = new InvoiceRepository(db);
     clientRepo = new ClientRepository(db);
     expenseRepo = new ExpenseRepository(db);
+    transferRepo = new WiseTransferRepository(db);
     aggregator = new QuarterlyAggregatorService(db);
   });
 
@@ -44,22 +55,16 @@ describe('QuarterlyAggregatorService', () => {
     await db.destroy();
   });
 
-  it('aggregates income by client class and rolls up totals', async () => {
+  it('aggregates income by client class on bank-tx date (kasstelsel)', async () => {
     const domestic = await clientRepo.create({
       name: 'Acme Studio',
       class: ClientClass.Domestic,
       tradeName: TradeName.ItServices,
       address: { line1: 'X', city: 'Y' },
     });
-    const nonEu = await clientRepo.create({
-      name: 'OverseasClientCo',
-      class: ClientClass.NonEu,
-      tradeName: TradeName.ItServices,
-      address: { line1: 'X', city: 'Y' },
-    });
 
-    // Domestic invoice in Q1: 1000.00 + 21% BTW = 1210.00
-    await invoiceRepo.issue({
+    // Domestic invoice issued and paid in Q1: 1000.00 + 21% BTW = 1210.00.
+    const paidInvoice = await invoiceRepo.issue({
       year: 2099,
       invoice: {
         clientId: domestic.id,
@@ -72,8 +77,28 @@ describe('QuarterlyAggregatorService', () => {
       },
       lines: [{ ordinal: 0, description: 'Services', lineTotalMinor: 121_000n, unitLabel: null, quantity: null }],
     });
+    await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'q1:domestic-paid',
+      txDate: new Date('2099-02-20'),
+      amountMinor: 121_000n,
+      currency: 'EUR',
+      counterpartyName: 'Acme Studio',
+      counterpartyIban: null,
+      description: `Payment for ${paidInvoice.number}`,
+      rawPayload: {},
+      matchedInvoiceId: paidInvoice.id,
+      matchedAt: new Date('2099-02-20'),
+    });
 
-    // Non-EU invoice in Q1: USD 5000.00 → EUR 4500.00 at 0.9 (no BTW)
+    // Non-EU income: USD invoice was issued but hasn't been paid yet, AND a
+    // separate Wise transfer landed €4500 in the quarter — that's the income.
+    const nonEu = await clientRepo.create({
+      name: 'OverseasClientCo',
+      class: ClientClass.NonEu,
+      tradeName: TradeName.ItServices,
+      address: { line1: 'X', city: 'Y' },
+    });
     await invoiceRepo.issue({
       year: 2099,
       invoice: {
@@ -89,20 +114,62 @@ describe('QuarterlyAggregatorService', () => {
       },
       lines: [{ ordinal: 0, description: 'Services', lineTotalMinor: 500_000n, unitLabel: null, quantity: null }],
     });
+    const transfer = await transferRepo.create({
+      wiseTransferId: 'WISE-Q1',
+      direction: WiseTransferDirection.Out,
+      sourceAmountMinor: 500_000n,
+      sourceCurrency: 'USD',
+      targetAmountMinor: 450_000n,
+      targetCurrency: 'EUR',
+      fxRate: '0.9',
+      feeMinor: 1500n,
+      feeCurrency: 'USD',
+      state: WiseTransferState.OutgoingPaymentSent,
+      stateUpdatedAt: new Date('2099-03-20'),
+      ourReference: 'TXN-0044',
+      counterpartyName: null,
+      correlationId: null,
+    });
+    await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'q1:wise-landed',
+      txDate: new Date('2099-03-20'),
+      amountMinor: 450_000n,
+      currency: 'EUR',
+      counterpartyName: 'Wise',
+      counterpartyIban: null,
+      description: 'TXN-0044',
+      rawPayload: {},
+      matchedTransferId: transfer.id,
+      matchedAt: new Date('2099-03-20'),
+    });
 
-    // Q2 invoice that must NOT count toward Q1 totals.
-    await invoiceRepo.issue({
+    // Invoice issued in Q1 but paid in Q2 — must NOT count toward Q1 income.
+    const unpaidInvoice = await invoiceRepo.issue({
       year: 2099,
       invoice: {
         clientId: domestic.id,
-        issuedAt: new Date('2099-04-05'),
+        issuedAt: new Date('2099-03-30'),
         currency: 'EUR',
-        totalMinor: 100n,
+        totalMinor: 50_000n,
         btwRateBps: 2100,
-        btwMinor: 17n,
+        btwMinor: 8678n,
         sourceEventId: null,
       },
-      lines: [{ ordinal: 0, description: 'Services', lineTotalMinor: 100n, unitLabel: null, quantity: null }],
+      lines: [{ ordinal: 0, description: 'Late', lineTotalMinor: 50_000n, unitLabel: null, quantity: null }],
+    });
+    await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'q2:domestic-late',
+      txDate: new Date('2099-04-05'),
+      amountMinor: 50_000n,
+      currency: 'EUR',
+      counterpartyName: 'Acme Studio',
+      counterpartyIban: null,
+      description: `Payment for ${unpaidInvoice.number}`,
+      rawPayload: {},
+      matchedInvoiceId: unpaidInvoice.id,
+      matchedAt: new Date('2099-04-05'),
     });
 
     const result = await aggregator.aggregate(2099, 1);
