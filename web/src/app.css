@@ -1,0 +1,33 @@
+@import 'tailwindcss';
+@import '@immich/ui/theme/default.css';
+@source "../node_modules/@immich/ui";
+
+@custom-variant dark (&:where(.dark, .dark *):not(.light));
+
+:root {
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+:root:not(.dark) {
+  color-scheme: light;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  @apply bg-light text-dark;
+}

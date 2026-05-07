@@ -1,0 +1,17 @@
+{
+  "data": {
+    "resource": {
+      "type": "transfer",
+      "id": 9999999999,
+      "profile_id": 88888888,
+      "account_id": 77777777
+    },
+    "current_state": "outgoing_payment_sent",
+    "previous_state": "processing",
+    "occurred_at": "2099-01-15T14:45:35Z"
+  },
+  "subscription_id": "00000000-0000-0000-0000-000000000000",
+  "event_type": "transfers#state-change",
+  "schema_version": "2.0.0",
+  "sent_at": "2099-01-15T14:45:36Z"
+}

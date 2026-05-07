@@ -1,0 +1,17 @@
+{
+  "data": {
+    "resource": {
+      "type": "balance-account",
+      "id": 99999999,
+      "profile_id": 88888888
+    },
+    "amount": 4791.0,
+    "currency": "USD",
+    "transaction_type": "credit",
+    "occurred_at": "2099-01-15T13:26:00Z"
+  },
+  "subscription_id": "00000000-0000-0000-0000-000000000000",
+  "event_type": "balances#credit",
+  "schema_version": "2.0.0",
+  "sent_at": "2099-01-15T13:26:01Z"
+}
