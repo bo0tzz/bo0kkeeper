@@ -93,3 +93,18 @@ export enum MatchConfidence {
   AutoLow = 'auto_low',
   Manual = 'manual',
 }
+
+/** Lifecycle of a paperless-extracted expense row. */
+export enum ExpenseStatus {
+  PendingReview = 'pending_review',
+  Approved = 'approved',
+  Rejected = 'rejected',
+}
+
+/** Tax-treatment classification of an expense, parallel to ClientClass. */
+export enum ExpenseLocationClass {
+  Domestic = 'domestic',
+  Eu = 'eu',
+  EuReverseCharge = 'eu_reverse_charge',
+  NonEu = 'non_eu',
+}
