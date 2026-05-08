@@ -2,13 +2,18 @@ import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Authenticated } from 'src/decorators';
 import { DraftFromEventDto, WiseTransferResponseDto } from 'src/dtos/wise.dto';
+import { JobName } from 'src/enum';
 import { WiseTransferRow } from 'src/repositories/wise-transfer.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { WiseDraftService } from 'src/services/wise-draft.service';
 
 @ApiTags('Wise')
 @Controller('/api/wise')
 export class WiseController {
-  constructor(private readonly wiseDraftService: WiseDraftService) {}
+  constructor(
+    private readonly wiseDraftService: WiseDraftService,
+    private readonly jobRepository: JobRepository,
+  ) {}
 
   /**
    * Draft a USD→EUR transfer in Wise from the given inbound credit event.
@@ -26,6 +31,18 @@ export class WiseController {
       ourReference: dto.ourReference,
     });
     return mapWiseTransfer(row);
+  }
+
+  /**
+   * Trigger an immediate Wise reconcile — pulls non-terminal wise_transfer
+   * rows from the Wise API and reapplies their state. Same job pg-boss runs
+   * on the 4h cron; this just enqueues an out-of-band tick.
+   */
+  @Post('reconcile')
+  @Authenticated()
+  async reconcileNow(): Promise<{ enqueued: true }> {
+    await this.jobRepository.queue(JobName.WiseReconcile, {});
+    return { enqueued: true };
   }
 }
 

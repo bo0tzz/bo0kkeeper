@@ -18,3 +18,6 @@ export type WiseTransferResponse = {
 
 export const draftFromEvent = (eventId: string, ourReference?: string, fetchFn?: typeof fetch) =>
   apiPost<WiseTransferResponse>(`/api/wise/draft-from-event/${eventId}`, { ourReference }, { fetch: fetchFn });
+
+export const reconcileWise = (fetchFn?: typeof fetch) =>
+  apiPost<{ enqueued: true }>('/api/wise/reconcile', {}, { fetch: fetchFn });

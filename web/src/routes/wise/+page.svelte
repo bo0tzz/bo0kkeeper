@@ -1,6 +1,6 @@
 <script lang="ts">
   import { listEvents, type EventResponse, type ListEventsResponse } from '$lib/services/events.service';
-  import { draftFromEvent, type WiseTransferResponse } from '$lib/services/wise.service';
+  import { draftFromEvent, reconcileWise, type WiseTransferResponse } from '$lib/services/wise.service';
   import {
     Alert,
     Badge,
@@ -26,6 +26,8 @@
   let drafting = $state<string | null>(null);
   let drafts = $state<Record<string, string>>({});
   let lastDrafted = $state<WiseTransferResponse | null>(null);
+  let reconciling = $state(false);
+  let reconcileInfo = $state<string | null>(null);
 
   async function load() {
     loading = true;
@@ -72,19 +74,42 @@
       drafting = null;
     }
   }
+
+  async function reconcile() {
+    reconciling = true;
+    error = null;
+    reconcileInfo = null;
+    try {
+      await reconcileWise();
+      reconcileInfo = 'Reconcile queued. Transfer states will refresh in a moment.';
+    } catch (error_) {
+      error = (error_ as Error).message;
+    } finally {
+      reconciling = false;
+    }
+  }
 </script>
 
 <main class="mx-auto max-w-6xl px-6 py-10">
   <Stack gap={6}>
     <div class="flex items-center justify-between">
       <Heading size="large" tag="h1">Wise inbound credits</Heading>
-      <Text size="small" color="muted">
-        {data ? `${data.total} pending` : ''}
-      </Text>
+      <div class="flex items-center gap-3">
+        <Text size="small" color="muted">
+          {data ? `${data.total} pending` : ''}
+        </Text>
+        <Button size="small" variant="ghost" disabled={reconciling} onclick={reconcile}>
+          {reconciling ? 'Reconciling…' : 'Reconcile transfers'}
+        </Button>
+      </div>
     </div>
 
     {#if error}
       <Alert color="danger">Failed: {error}</Alert>
+    {/if}
+
+    {#if reconcileInfo}
+      <Alert color="success">{reconcileInfo}</Alert>
     {/if}
 
     {#if lastDrafted}
