@@ -124,6 +124,42 @@
         </Alert>
       {/if}
 
+      {#if counts.bankingSession?.accounts?.some((a) => a.balance)}
+        <Stack gap={3}>
+          <Heading size="small" tag="h2">Balances</Heading>
+          <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {#each counts.bankingSession.accounts as account (account.uid)}
+              {#if account.balance}
+                {@const drift =
+                  account.balanceDiscrepancyMinor && account.balanceDiscrepancyMinor !== '0'
+                    ? account.balanceDiscrepancyMinor
+                    : null}
+                <Card>
+                  <CardBody>
+                    <Stack gap={1}>
+                      <Text size="small" color="muted">
+                        {account.name ?? account.uid}{account.iban ? ` · ${account.iban}` : ''}
+                      </Text>
+                      <Heading size="medium" tag="h3">
+                        {eur(account.balance.amountMinor)}
+                      </Heading>
+                      <Text size="small" color="muted">
+                        as of {new Date(account.balance.asOf).toLocaleString()}
+                      </Text>
+                      {#if drift}
+                        <Text size="small" color="warning">
+                          Drift {eur(drift)} vs expected — open /banking to review.
+                        </Text>
+                      {/if}
+                    </Stack>
+                  </CardBody>
+                </Card>
+              {/if}
+            {/each}
+          </div>
+        </Stack>
+      {/if}
+
       <Stack gap={4}>
         <Heading size="small" tag="h2">Inbox</Heading>
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
