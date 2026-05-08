@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, Selectable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { BankTxCategory } from 'src/enum';
+import { BankSource, BankTxCategory } from 'src/enum';
 import { DB } from 'src/schema';
 import { BankTransactionTable } from 'src/schema/tables/bank-transaction.table';
 
@@ -87,6 +87,22 @@ export class BankTransactionRepository {
       .where('id', '=', id)
       .returningAll()
       .executeTakeFirst() as Promise<BankTransaction | undefined>;
+  }
+
+  /**
+   * Signed sum of every Enable-Banking-sourced row dated on or after `since`.
+   * Used to derive expected-balance from a baseline. Returns 0n if no rows
+   * match. V1 assumes a single bank account on the session; multi-account
+   * setups will need to filter by account uid.
+   */
+  async sumIngestedSince(since: string): Promise<bigint> {
+    const result = (await this.db
+      .selectFrom('bank_transaction')
+      .select((eb) => eb.fn.sum<string>('amountMinor').as('total'))
+      .where('source', '=', BankSource.EnableBanking)
+      .where('txDate', '>=', new Date(since))
+      .executeTakeFirst()) as { total: string | null } | undefined;
+    return result?.total ? BigInt(result.total) : 0n;
   }
 
   /** Recent rows, newest first. Used by the banking UI list. */

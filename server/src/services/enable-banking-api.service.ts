@@ -93,6 +93,12 @@ export type ListTransactionsResult = {
   continuationKey: string | null;
 };
 
+export type EnableBankingBalance = {
+  balance_amount: { amount: string; currency: string };
+  balance_type: string;
+  reference_date?: string;
+};
+
 export class EnableBankingApiError extends Error {
   constructor(
     public status: number,
@@ -166,11 +172,34 @@ export class EnableBankingApiService {
     };
   }
 
-  async listBalances(accountUid: string, psuIpAddress?: string): Promise<unknown> {
-    return this.request(`/accounts/${encodeURIComponent(accountUid)}/balances`, {
+  /**
+   * Pull balances for an account and return the most useful single number,
+   * preferring "interim available" (closest to "what's spendable right now")
+   * over closing-booked or expected. Returns null when the account has no
+   * balances at all (Mock ASPSP without seeded balance data).
+   */
+  async getCurrentBalance(
+    accountUid: string,
+    psuIpAddress?: string,
+  ): Promise<{ amountMinor: bigint; currency: string; type: string; referenceDate?: string } | null> {
+    const data = (await this.request(`/accounts/${encodeURIComponent(accountUid)}/balances`, {
       method: 'GET',
       psuIpAddress,
-    });
+    })) as { balances?: EnableBankingBalance[] };
+    const balances = data.balances ?? [];
+    if (balances.length === 0) {
+      return null;
+    }
+    const preferred =
+      balances.find((b) => b.balance_type === 'ITAV') ??
+      balances.find((b) => b.balance_type === 'CLBD') ??
+      balances[0];
+    return {
+      amountMinor: BigInt(Math.round(Number.parseFloat(preferred.balance_amount.amount) * 100)),
+      currency: preferred.balance_amount.currency,
+      type: preferred.balance_type,
+      referenceDate: preferred.reference_date,
+    };
   }
 
   /**

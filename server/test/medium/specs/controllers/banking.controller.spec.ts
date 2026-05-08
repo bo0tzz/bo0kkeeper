@@ -85,7 +85,16 @@ describe('BankingController', () => {
     expect(dto!.status).toBe(BankingSessionStatus.Active);
     expect(dto!.expiresAt).toBe('2026-08-06T12:00:00.000Z');
     expect(dto!.accounts).toEqual([
-      { uid: 'acct-1', iban: 'NL01TEST', currency: 'EUR', name: 'Business', product: 'Current' },
+      {
+        uid: 'acct-1',
+        iban: 'NL01TEST',
+        currency: 'EUR',
+        name: 'Business',
+        product: 'Current',
+        balance: null,
+        expectedBalanceMinor: null,
+        balanceDiscrepancyMinor: null,
+      },
     ]);
   });
 

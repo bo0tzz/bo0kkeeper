@@ -6,6 +6,13 @@ export type BankingAccount = {
   currency: string;
   name: string | null;
   product: string | null;
+  balance: {
+    amountMinor: string;
+    currency: string;
+    asOf: string;
+  } | null;
+  expectedBalanceMinor: string | null;
+  balanceDiscrepancyMinor: string | null;
 };
 
 export type BankingSession = {
@@ -40,7 +47,7 @@ export const startBankingAuth = (body: StartAuthRequest = {}, fetchFn?: typeof f
 export const syncBankingNow = (fetchFn?: typeof fetch) =>
   apiPost<{ enqueued: true }>('/api/banking/sync', {}, { fetch: fetchFn });
 
-export type BankTxCategory = 'tax' | 'self_transfer' | 'fee' | 'ignored';
+export type BankTxCategory = 'tax' | 'drawings' | 'self_transfer' | 'fee' | 'ignored';
 
 export type BankTransaction = {
   id: string;

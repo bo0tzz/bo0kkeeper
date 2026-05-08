@@ -130,6 +130,7 @@
   const categoryOptions = [
     { value: '', label: '— Set category —' },
     { value: 'tax', label: 'Tax' },
+    { value: 'drawings', label: 'Drawings (to personal)' },
     { value: 'self_transfer', label: 'Self-transfer' },
     { value: 'fee', label: 'Fee' },
     { value: 'ignored', label: 'Ignored' },
@@ -311,7 +312,20 @@
                       {account.name ?? account.uid}
                       {#if account.iban}<code>{account.iban}</code>{/if}
                       <span class="text-muted-foreground">· {account.currency}</span>
+                      {#if account.balance}
+                        <span class="text-muted-foreground">
+                          · balance {formatAmount(account.balance.amountMinor, account.balance.currency)}
+                        </span>
+                      {/if}
                     </Text>
+                    {#if account.balanceDiscrepancyMinor && account.balanceDiscrepancyMinor !== '0'}
+                      <Text size="small" color="warning">
+                        Drift: bank says {formatAmount(account.balance!.amountMinor, account.balance!.currency)},
+                        expected {formatAmount(account.expectedBalanceMinor!, account.currency)}
+                        (diff {formatAmount(account.balanceDiscrepancyMinor, account.currency)}). A sync may
+                        catch up; if persistent, an ingest is missing.
+                      </Text>
+                    {/if}
                   </li>
                 {/each}
               </ul>

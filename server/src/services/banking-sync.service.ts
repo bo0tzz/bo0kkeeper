@@ -18,6 +18,29 @@ import {
   EnableBankingApiService,
   EnableBankingTransaction,
 } from 'src/services/enable-banking-api.service';
+
+/**
+ * Account row as we stash it in `banking_session.accountsJson` — the API
+ * shape (uid + iban + name + …) plus tracking fields for self-reconciliation:
+ *
+ * - `balance`: most-recently-fetched API balance.
+ * - `baseline`: the first balance we fetched, frozen as a trust anchor. The
+ *   "expected" balance is derived as baseline + sum(bank_tx since baselineDate);
+ *   if it diverges from the live `balance`, something has drifted (missing
+ *   ingest, hand-edited row, etc.) and the UI surfaces it.
+ */
+type AccountWithBalance = EnableBankingAccount & {
+  balance?: {
+    amountMinor: string;
+    currency: string;
+    asOf: string;
+  };
+  baseline?: {
+    amountMinor: string;
+    currency: string;
+    asOf: string;
+  };
+};
 import { JobOf } from 'src/types';
 
 /**
@@ -93,20 +116,34 @@ export class BankingSyncService {
       this.logger.warn(`Skipping non-active session ${session.id} (status=${session.status})`);
       return { ingested: 0, matched: 0 };
     }
-    const accounts = (session.accountsJson ?? []) as EnableBankingAccount[];
+    const accounts = (session.accountsJson ?? []) as AccountWithBalance[];
     let ingested = 0;
     let matched = 0;
+    let revoked = false;
     for (const account of accounts) {
       try {
         const r = await this.syncAccount(session, account, opts);
         ingested += r.ingested;
         matched += r.matched;
+        const balance = await this.refreshBalance(account, opts);
+        if (balance) {
+          const next = {
+            amountMinor: String(balance.amountMinor),
+            currency: balance.currency,
+            asOf: balance.asOf,
+          };
+          account.balance = next;
+          // First successful balance fetch becomes the baseline — the trust
+          // anchor we measure drift against. Never overwritten afterwards.
+          account.baseline ??= next;
+        }
       } catch (error) {
         if (error instanceof EnableBankingApiError && (error.status === 401 || error.status === 403)) {
           this.logger.warn(
             `Session ${session.id} returned ${error.status}; marking revoked. Body: ${JSON.stringify(error.body)}`,
           );
           await this.sessionRepository.update(session.id, { status: BankingSessionStatus.Revoked });
+          revoked = true;
           // No point trying the remaining accounts on this revoked session.
           break;
         }
@@ -116,7 +153,14 @@ export class BankingSyncService {
         );
       }
     }
-    await this.sessionRepository.update(session.id, { lastSyncedAt: new Date() });
+    if (!revoked) {
+      // Persist the (possibly balance-updated) accounts array alongside the
+      // watermark; one write per session.
+      await this.sessionRepository.update(session.id, {
+        lastSyncedAt: new Date(),
+        accountsJson: accounts as unknown[],
+      });
+    }
     return { ingested, matched };
   }
 
@@ -164,6 +208,33 @@ export class BankingSyncService {
       );
     }
     return { ingested, matched };
+  }
+
+  /**
+   * Pull and persist the current balance for one account. Best-effort: a 429
+   * (rate cap) or a Mock ASPSP without seeded balances is shrugged off; we
+   * just don't update the cached value. Called from syncSession after the
+   * transaction pull so the displayed balance reflects the freshly-ingested
+   * tx.
+   */
+  private async refreshBalance(
+    account: EnableBankingAccount,
+    opts: { psuIpAddress?: string },
+  ): Promise<{ amountMinor: bigint; currency: string; asOf: string } | null> {
+    try {
+      const balance = await this.apiService.getCurrentBalance(account.uid, opts.psuIpAddress);
+      if (!balance) {
+        return null;
+      }
+      return {
+        amountMinor: balance.amountMinor,
+        currency: balance.currency,
+        asOf: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.warn(`balance refresh skipped for ${account.uid}: ${(error as Error).message}`);
+      return null;
+    }
   }
 
   private computeDateFrom(session: BankingSession): string | undefined {

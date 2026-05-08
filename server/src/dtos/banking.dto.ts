@@ -25,6 +25,18 @@ const SessionAccountSchema = z.object({
   currency: z.string(),
   name: z.string().nullable().optional(),
   product: z.string().nullable().optional(),
+  balance: z
+    .object({
+      amountMinor: z.string(),
+      currency: z.string(),
+      asOf: z.string(),
+    })
+    .nullable()
+    .optional(),
+  /** Sum of baseline + ingested tx since baseline; should match `balance` if all tx are accounted for. */
+  expectedBalanceMinor: z.string().nullable().optional(),
+  /** balance.amountMinor − expectedBalanceMinor. Non-zero = something drifted. */
+  balanceDiscrepancyMinor: z.string().nullable().optional(),
 });
 
 const SessionResponseSchema = z
@@ -88,7 +100,7 @@ const MatchCandidatesResponseSchema = z
   .meta({ id: 'BankTxMatchCandidatesDto' });
 export class BankTxMatchCandidatesDto extends createZodDto(MatchCandidatesResponseSchema) {}
 
-const BankTxCategoryEnum = z.enum(['tax', 'self_transfer', 'fee', 'ignored']);
+const BankTxCategoryEnum = z.enum(['tax', 'drawings', 'self_transfer', 'fee', 'ignored']);
 const BankTransactionResponseSchema = z
   .object({
     id: z.uuid(),

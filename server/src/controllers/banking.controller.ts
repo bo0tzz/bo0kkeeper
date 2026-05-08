@@ -91,7 +91,23 @@ export class BankingController {
   @Authenticated()
   async getLatestSession(): Promise<BankingSessionResponseDto | null> {
     const row = await this.sessionRepository.findLatest();
-    return row ? toDto(row) : null;
+    if (!row) {
+      return null;
+    }
+    // Earliest baseline across the session's accounts → drift sum window.
+    // V1 carries one account in practice, so we compute one shared sum and
+    // apply it to every account that has a baseline. Multi-account setups
+    // would need a per-account-uid sum (and bank_transaction → account FK,
+    // which we don't have today).
+    const accounts = (row.accountsJson ?? []) as Array<{ baseline?: { asOf: string } }>;
+    const earliestBaselineDate = accounts
+      .map((a) => a.baseline?.asOf)
+      .filter((d): d is string => typeof d === 'string')
+      .sort()[0];
+    const ingestedSinceBaseline = earliestBaselineDate
+      ? await this.bankTransactionRepository.sumIngestedSince(earliestBaselineDate.slice(0, 10))
+      : 0n;
+    return toDto(row, ingestedSinceBaseline);
   }
 
   /**
@@ -217,7 +233,17 @@ function toBankTransactionDto(row: BankTransaction): BankTransactionResponseDto 
   };
 }
 
-function toDto(row: BankingSession): BankingSessionResponseDto {
+type AccountJsonShape = {
+  uid: string;
+  iban?: string | null;
+  currency: string;
+  name?: string | null;
+  product?: string | null;
+  balance?: { amountMinor: string; currency: string; asOf: string } | null;
+  baseline?: { amountMinor: string; currency: string; asOf: string } | null;
+};
+
+function toDto(row: BankingSession, ingestedSinceBaseline = 0n): BankingSessionResponseDto {
   return {
     id: row.id,
     status: row.status,
@@ -226,19 +252,27 @@ function toDto(row: BankingSession): BankingSessionResponseDto {
     psuType: row.psuType,
     expiresAt: row.expiresAt ? new Date(row.expiresAt).toISOString() : null,
     lastSyncedAt: row.lastSyncedAt ? new Date(row.lastSyncedAt).toISOString() : null,
-    accounts: ((row.accountsJson ?? []) as Array<{
-      uid: string;
-      iban?: string | null;
-      currency: string;
-      name?: string | null;
-      product?: string | null;
-    }>).map((a) => ({
-      uid: a.uid,
-      iban: a.iban ?? null,
-      currency: a.currency,
-      name: a.name ?? null,
-      product: a.product ?? null,
-    })),
+    accounts: ((row.accountsJson ?? []) as AccountJsonShape[]).map((a) => {
+      let expectedBalanceMinor: string | null = null;
+      let balanceDiscrepancyMinor: string | null = null;
+      if (a.baseline) {
+        const expected = BigInt(a.baseline.amountMinor) + ingestedSinceBaseline;
+        expectedBalanceMinor = String(expected);
+        if (a.balance) {
+          balanceDiscrepancyMinor = String(BigInt(a.balance.amountMinor) - expected);
+        }
+      }
+      return {
+        uid: a.uid,
+        iban: a.iban ?? null,
+        currency: a.currency,
+        name: a.name ?? null,
+        product: a.product ?? null,
+        balance: a.balance ?? null,
+        expectedBalanceMinor,
+        balanceDiscrepancyMinor,
+      };
+    }),
     createdAt: new Date(row.createdAt).toISOString(),
   };
 }

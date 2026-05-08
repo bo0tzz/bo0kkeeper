@@ -123,15 +123,21 @@ export enum MatchConfidence {
 
 /**
  * Manual category for bank rows that aren't a real income/expense — tax
- * remittances, internal transfers, Wise/SNS fees, etc. Setting one removes
- * the row from the "unmatched" warning surface so it stops counting as
- * outstanding work; the row stays visible on /banking with the category
- * shown alongside the match badge.
+ * remittances, internal transfers, Wise/SNS fees, owner drawings, etc.
+ * Setting one removes the row from the "unmatched" warning surface so it
+ * stops counting as outstanding work; the row stays visible on /banking
+ * with the category shown alongside the match badge.
  */
 export enum BankTxCategory {
-  /** Belastingdienst remittances + refunds (BTW-aangifte, IB, etc.). */
+  /** Belastingdienst remittances + refunds (BTW-aangifte, IB, ZVW, etc.). */
   Tax = 'tax',
-  /** Movement between the user's own accounts. */
+  /**
+   * Owner drawing money from the business (zzp profit to personal). Distinct
+   * from a self-transfer between business accounts: drawings affect personal
+   * IB next year, not the current period's books.
+   */
+  Drawings = 'drawings',
+  /** Movement between the user's own business accounts. */
   SelfTransfer = 'self_transfer',
   /** Wise / bank fees, SNS-side processing of a Wise transfer, etc. */
   Fee = 'fee',
