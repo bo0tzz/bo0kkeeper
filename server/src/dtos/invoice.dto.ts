@@ -12,7 +12,7 @@ const InvoiceLineInputSchema = z.object({
 
 const InvoiceComposeSchema = z
   .object({
-    clientId: z.uuidv4(),
+    clientId: z.uuid(),
     issuedAt: isoDateToDate,
     periodStart: isoDateToDate.optional(),
     periodEnd: isoDateToDate.optional(),
@@ -21,7 +21,7 @@ const InvoiceComposeSchema = z
     /** Decimal-string FX rate, e.g. "0.846991". */
     fxRate: z.string().optional(),
     btwRateBps: z.number().int().min(0).max(10_000).optional(),
-    sourceEventId: z.uuidv4().optional(),
+    sourceEventId: z.uuid().optional(),
     lines: z.array(InvoiceLineInputSchema).min(1),
   })
   .meta({ id: 'InvoiceComposeDto' });

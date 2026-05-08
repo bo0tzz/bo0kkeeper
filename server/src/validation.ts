@@ -72,7 +72,9 @@ export class ParseMeUUIDPipe extends ParseUUIDPipe {
 }
 
 const UUIDParamSchema = z.object({
-  id: z.uuidv4(),
+  // Accept any UUID version. The DB defaults to uuidv7 (uuidv7() in migrations);
+  // strict v4 validation rejects every real id we hand out.
+  id: z.uuid(),
 });
 
 export class UUIDParamDto extends createZodDto(UUIDParamSchema) {}
