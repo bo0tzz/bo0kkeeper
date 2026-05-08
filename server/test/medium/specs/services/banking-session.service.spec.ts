@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { BankingSessionStatus, JobName } from 'src/enum';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
+import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
 import { BankingSessionService } from 'src/services/banking-session.service';
@@ -48,7 +49,7 @@ describe('BankingSessionService', () => {
     jobRepo = {
       queue: vi.fn().mockResolvedValue('fake-job-id'),
     } as unknown as JobRepository & { queue: ReturnType<typeof vi.fn> };
-    service = new BankingSessionService(repo, api, jobRepo);
+    service = new BankingSessionService(repo, api, jobRepo, new EventRepository(db));
   });
 
   afterEach(async () => {

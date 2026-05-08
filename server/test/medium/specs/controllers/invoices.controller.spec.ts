@@ -4,6 +4,7 @@ import { InvoicesController } from 'src/controllers/invoices.controller';
 import { InvoiceComposeDto } from 'src/dtos/invoice.dto';
 import { ClientClass, TradeName } from 'src/enum';
 import { ClientRepository } from 'src/repositories/client.repository';
+import { EventRepository } from 'src/repositories/event.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
@@ -44,7 +45,7 @@ describe('InvoicesController', () => {
       queueAll: vi.fn(),
       setup: vi.fn(),
     } as unknown as JobRepository;
-    composer = new InvoiceComposerService(clientRepo, invoiceRepo, render, paperless, jobs);
+    composer = new InvoiceComposerService(clientRepo, invoiceRepo, render, paperless, jobs, new EventRepository(db));
     controller = new InvoicesController(composer, invoiceRepo);
 
     const client = await clientRepo.create({

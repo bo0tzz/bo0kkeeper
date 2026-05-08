@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnJob } from 'src/decorators';
-import { JobName, QueueName, WiseTransferState } from 'src/enum';
+import { EventSource, JobName, QueueName, WiseTransferState } from 'src/enum';
+import { EventRepository } from 'src/repositories/event.repository';
 import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
 import { WiseApiError, WiseApiService } from 'src/services/wise-api.service';
 
@@ -25,6 +26,7 @@ export class WiseReconcileService {
   constructor(
     private readonly wiseTransferRepository: WiseTransferRepository,
     private readonly wiseApi: WiseApiService,
+    private readonly eventRepository: EventRepository,
   ) {}
 
   @OnJob({ name: JobName.WiseReconcile, queue: QueueName.Default })
@@ -45,6 +47,11 @@ export class WiseReconcileService {
       }
     }
     this.logger.log(`wise reconcile: ${rows.length} checked, ${updated} updated, ${missing} missing`);
+    await this.eventRepository.recordAction({
+      source: EventSource.System,
+      eventType: 'wise.reconcile.completed',
+      payload: { checked: rows.length, updated, missing },
+    });
     return { checked: rows.length, updated, missing };
   }
 

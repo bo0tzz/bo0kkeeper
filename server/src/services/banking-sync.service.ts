@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Config, loadConfig } from 'src/config';
 import { OnJob } from 'src/decorators';
-import { BankingSessionStatus, BankSource, JobName, QueueName } from 'src/enum';
+import { BankingSessionStatus, BankSource, EventSource, JobName, QueueName } from 'src/enum';
 import {
   BankTransactionRepository,
   NewBankTransaction,
@@ -10,6 +10,7 @@ import {
   BankingSession,
   BankingSessionRepository,
 } from 'src/repositories/banking-session.repository';
+import { EventRepository } from 'src/repositories/event.repository';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import {
   EnableBankingAccount,
@@ -46,6 +47,7 @@ export class BankingSyncService {
     private readonly bankTransactionRepository: BankTransactionRepository,
     private readonly apiService: EnableBankingApiService,
     private readonly matcher: BankMatcherService,
+    private readonly eventRepository: EventRepository,
   ) {
     this.config = loadConfig().enableBanking;
   }
@@ -71,6 +73,11 @@ export class BankingSyncService {
     this.logger.log(
       `banking sync: ${sessions.length} session(s), ${ingested} new tx, ${matched} matched`,
     );
+    await this.eventRepository.recordAction({
+      source: EventSource.System,
+      eventType: 'banking.sync.completed',
+      payload: { sessions: sessions.length, ingested, matched, psuOnline: !!opts.psuIpAddress },
+    });
     return { sessions: sessions.length, ingested, matched };
   }
 

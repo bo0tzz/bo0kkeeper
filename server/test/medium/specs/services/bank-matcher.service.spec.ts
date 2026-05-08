@@ -9,6 +9,8 @@ import {
 } from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
+import { EventRepository } from 'src/repositories/event.repository';
+import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
@@ -41,7 +43,7 @@ describe('BankMatcherService', () => {
     sheetWriter = {
       writeIncomeRow: vi.fn().mockResolvedValue(void 0),
     } as unknown as SheetWriterService & { writeIncomeRow: ReturnType<typeof vi.fn> };
-    matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter);
+    matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, new EventRepository(db));
   });
 
   afterEach(async () => {
@@ -305,5 +307,133 @@ describe('BankMatcherService', () => {
     const summary = await matcher.matchAllUnmatched();
     expect(summary.matched).toBe(1);
     expect(summary.unmatched).toBe(1);
+  });
+
+  describe('heuristic fallback (auto_low)', () => {
+    let expenseRepo: ExpenseRepository;
+    beforeEach(() => {
+      expenseRepo = new ExpenseRepository(db);
+    });
+
+    it('matches an outflow to an expense by amount + date proximity + vendor substring', async () => {
+      const ingestedExpense = await expenseRepo.ingest({
+        paperlessDocId: 'pp-acme-cables-1',
+        vendor: 'Acme Cables',
+        expenseDate: new Date('2099-03-10'),
+        amountMinor: 8_500n,
+        currency: 'EUR',
+        btwRateBps: 2100,
+        btwMinor: 1_475n,
+        locationClass: 'domestic',
+        category: '',
+        notes: null,
+        sourceEventId: null,
+      });
+      if (!ingestedExpense.ingested) {
+        throw new Error('precondition');
+      }
+
+      const ingest = await bankRepo.ingest({
+        source: BankSource.SnsCsv,
+        externalId: 'heuristic:1',
+        txDate: new Date('2099-03-12'),
+        amountMinor: -8_500n,
+        currency: 'EUR',
+        counterpartyName: 'Acme Cables via PSP',
+        counterpartyIban: null,
+        description: 'opaque payment id with no TXN ref',
+        rawPayload: {},
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+
+      const result = await matcher.tryMatch(ingest.row);
+      expect(result.matched).toBe(true);
+      if (result.matched && result.type === 'expense') {
+        expect(result.expenseId).toBe(ingestedExpense.row.id);
+        expect(result.confidence).toBe(MatchConfidence.AutoLow);
+      }
+      // Sheet write must NOT happen for auto_low — the user confirms first.
+      expect(sheetWriter.writeIncomeRow).not.toHaveBeenCalled();
+    });
+
+    it('declines when there are multiple plausible expense candidates (ambiguous)', async () => {
+      // Two expenses with the same vendor + amount + close dates → ambiguous.
+      await expenseRepo.ingest({
+        paperlessDocId: 'pp-amb-1',
+        vendor: 'Online Cable Shop',
+        expenseDate: new Date('2099-03-10'),
+        amountMinor: 9_500n,
+        currency: 'EUR',
+        btwRateBps: 2100,
+        btwMinor: 1_649n,
+        locationClass: 'domestic',
+        category: '',
+        notes: null,
+        sourceEventId: null,
+      });
+      await expenseRepo.ingest({
+        paperlessDocId: 'pp-amb-2',
+        vendor: 'Online Cable Shop',
+        expenseDate: new Date('2099-03-12'),
+        amountMinor: 9_500n,
+        currency: 'EUR',
+        btwRateBps: 2100,
+        btwMinor: 1_649n,
+        locationClass: 'domestic',
+        category: '',
+        notes: null,
+        sourceEventId: null,
+      });
+      const ingest = await bankRepo.ingest({
+        source: BankSource.SnsCsv,
+        externalId: 'heuristic:2',
+        txDate: new Date('2099-03-11'),
+        amountMinor: -9_500n,
+        currency: 'EUR',
+        counterpartyName: 'Online Cable Shop BV',
+        counterpartyIban: null,
+        description: 'no TXN ref',
+        rawPayload: {},
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+      const result = await matcher.tryMatch(ingest.row);
+      expect(result.matched).toBe(false);
+    });
+
+    it('does not match across the date window (≥7 days apart)', async () => {
+      await expenseRepo.ingest({
+        paperlessDocId: 'pp-old-1',
+        vendor: 'Email Provider',
+        expenseDate: new Date('2099-01-01'),
+        amountMinor: 7_680n,
+        currency: 'EUR',
+        btwRateBps: 2100,
+        btwMinor: 1_333n,
+        locationClass: 'domestic',
+        category: '',
+        notes: null,
+        sourceEventId: null,
+      });
+      const ingest = await bankRepo.ingest({
+        source: BankSource.SnsCsv,
+        externalId: 'heuristic:3',
+        txDate: new Date('2099-03-11'),
+        amountMinor: -7_680n,
+        currency: 'EUR',
+        counterpartyName: 'Email Provider',
+        counterpartyIban: null,
+        description: 'no TXN ref',
+        rawPayload: {},
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+      const result = await matcher.tryMatch(ingest.row);
+      expect(result.matched).toBe(false);
+    });
   });
 });

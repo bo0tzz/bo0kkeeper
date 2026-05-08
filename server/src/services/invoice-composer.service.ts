@@ -1,8 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Config, loadConfig } from 'src/config';
 import { OnJob } from 'src/decorators';
-import { ClientClass, JobName, QueueName, TradeName } from 'src/enum';
+import { ClientClass, EventSource, JobName, QueueName, TradeName } from 'src/enum';
 import { Client, ClientRepository } from 'src/repositories/client.repository';
+import { EventRepository } from 'src/repositories/event.repository';
 import { InvoiceRepository, InvoiceWithLines } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { PaperlessService } from 'src/services/paperless.service';
@@ -71,6 +72,7 @@ export class InvoiceComposerService {
     private readonly renderService: RenderService,
     private readonly paperlessService: PaperlessService,
     private readonly jobRepository: JobRepository,
+    private readonly eventRepository: EventRepository,
   ) {}
 
   /**
@@ -158,6 +160,19 @@ export class InvoiceComposerService {
     // memory" failure mode — the invoice is fully reproducible from the row,
     // so the job re-renders before each upload attempt.
     await this.jobRepository.queue(JobName.ArchiveInvoiceToPaperless, { invoiceId: issued.id });
+
+    await this.eventRepository.recordAction({
+      source: EventSource.Manual,
+      eventType: 'invoice.issued',
+      payload: {
+        invoiceId: issued.id,
+        number: issued.number,
+        clientId: client.id,
+        clientName: client.name,
+        currency: issued.currency,
+        totalMinor: String(issued.totalMinor),
+      },
+    });
 
     return { invoice: issued, pdf };
   }

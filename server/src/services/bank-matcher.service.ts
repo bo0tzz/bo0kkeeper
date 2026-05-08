@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { ClientClass, MatchConfidence } from 'src/enum';
+import { ClientClass, EventSource, MatchConfidence } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
+import { EventRepository } from 'src/repositories/event.repository';
 import { DB } from 'src/schema';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 
@@ -13,7 +14,15 @@ const INVOICE_NUMBER_PATTERN = /\b\d{4}\/\d{3}\b/;
 export type MatchResult =
   | { matched: true; type: 'wise_transfer'; transferId: string; confidence: MatchConfidence }
   | { matched: true; type: 'invoice'; invoiceId: string; confidence: MatchConfidence }
+  | { matched: true; type: 'expense'; expenseId: string; confidence: MatchConfidence }
   | { matched: false; reason: string };
+
+/** Substring fuzzy-match cutoff — names shorter than this don't qualify. */
+const FUZZY_MIN_LENGTH = 4;
+/** Days of slack on either side of an expense's expenseDate for heuristic match. */
+const EXPENSE_DATE_TOLERANCE_DAYS = 7;
+/** Max days from invoice issue to bank tx for the heuristic to consider it. */
+const INVOICE_PAYMENT_WINDOW_DAYS = 60;
 
 export type TransferCandidate = {
   id: string;
@@ -61,10 +70,14 @@ export type MatchCandidates = {
  *   2. YYYY/NNN invoice number in description → invoice (auto_high). Used
  *      by domestic clients paying via SEPA/iDEAL who include the invoice
  *      number as the payment reference.
- *
- * Lower-confidence heuristics (amount + counterparty + date proximity) are
- * future work — they map to MatchConfidence.AutoLow with a Manual override
- * path in the admin UI.
+ *   3. Heuristic match (auto_low). For outflows, looks for an unmatched
+ *      expense with the same amount + currency, within a 7-day window of
+ *      the bank tx, and a counterparty/vendor substring match. For inflows,
+ *      looks for an unmatched invoice with matching amount + currency, paid
+ *      within 60 days of issue, and a counterparty/client substring match.
+ *      Auto-low matches do NOT trigger sheet writes — the user confirms or
+ *      rejects via the /banking link UI before they hit the accountant
+ *      sheet.
  */
 @Injectable()
 export class BankMatcherService {
@@ -75,6 +88,7 @@ export class BankMatcherService {
     private readonly bankTransactionRepository: BankTransactionRepository,
     private readonly clientRepository: ClientRepository,
     private readonly sheetWriter: SheetWriterService,
+    private readonly eventRepository: EventRepository,
   ) {}
 
   async tryMatch(bankTx: BankTransaction): Promise<MatchResult> {
@@ -114,7 +128,110 @@ export class BankMatcherService {
       }
     }
 
+    // No high-confidence signal — fall through to heuristics. Outflows look
+    // for an expense, inflows look for an invoice. Sheet-write deliberately
+    // skipped on auto_low; promotion to manual via the link UI handles that.
+    const isOutflow = BigInt(bankTx.amountMinor as bigint | number | string) < 0n;
+    const heuristic = isOutflow
+      ? await this.tryExpenseHeuristic(bankTx)
+      : await this.tryInvoiceHeuristic(bankTx);
+    if (heuristic) {
+      return heuristic;
+    }
+
     return { matched: false, reason: 'no high-confidence signal' };
+  }
+
+  private async tryExpenseHeuristic(bankTx: BankTransaction): Promise<MatchResult | null> {
+    const counterparty = bankTx.counterpartyName?.trim();
+    if (!counterparty || counterparty.length < FUZZY_MIN_LENGTH) {
+      return null;
+    }
+    const absMinor = absBigInt(BigInt(bankTx.amountMinor as bigint | number | string));
+    const txDate = toDate(bankTx.txDate);
+    const dateLow = isoDate(addDays(txDate, -EXPENSE_DATE_TOLERANCE_DAYS));
+    const dateHigh = isoDate(addDays(txDate, EXPENSE_DATE_TOLERANCE_DAYS));
+
+    const candidates = await this.db
+      .selectFrom('expense')
+      .selectAll()
+      .where('amountMinor', '=', absMinor)
+      .where('currency', '=', bankTx.currency)
+      .where('expenseDate', '>=', dateLow)
+      .where('expenseDate', '<=', dateHigh)
+      .where(({ not, exists, selectFrom }) =>
+        not(
+          exists(
+            selectFrom('bank_transaction')
+              .select('id')
+              .whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
+          ),
+        ),
+      )
+      .execute();
+
+    const matches = candidates.filter((e) => fuzzyContains(counterparty, e.vendor));
+    if (matches.length !== 1) {
+      return null;
+    }
+    const expense = matches[0];
+    await this.persistExpenseMatch(bankTx.id, expense.id, MatchConfidence.AutoLow);
+    this.logger.log(
+      `bank_tx ${bankTx.id} → expense ${expense.id} via heuristic (vendor "${expense.vendor}", amount ${absMinor})`,
+    );
+    return { matched: true, type: 'expense', expenseId: expense.id, confidence: MatchConfidence.AutoLow };
+  }
+
+  private async tryInvoiceHeuristic(bankTx: BankTransaction): Promise<MatchResult | null> {
+    const counterparty = bankTx.counterpartyName?.trim();
+    if (!counterparty || counterparty.length < FUZZY_MIN_LENGTH) {
+      return null;
+    }
+    const absMinor = absBigInt(BigInt(bankTx.amountMinor as bigint | number | string));
+    const txDate = toDate(bankTx.txDate);
+    const issuedAfter = isoDate(addDays(txDate, -INVOICE_PAYMENT_WINDOW_DAYS));
+    const issuedBefore = isoDate(addDays(txDate, 1));
+
+    // For non-EUR invoices we'd need a currency conversion to compare against
+    // the EUR-denominated bank row; that's a meaningful slice of false-negatives
+    // for the OverseasClientCo/USD flow, but those are already TXN-NNNN-matched (auto_high)
+    // so the heuristic skipping them is fine.
+    const candidates = await this.db
+      .selectFrom('invoice')
+      .innerJoin('client', 'client.id', 'invoice.clientId')
+      .select([
+        'invoice.id as invoiceId',
+        'invoice.number',
+        'invoice.totalMinor',
+        'invoice.currency',
+        'invoice.issuedAt',
+        'client.name as clientName',
+      ])
+      .where('invoice.totalMinor', '=', absMinor)
+      .where('invoice.currency', '=', bankTx.currency)
+      .where('invoice.issuedAt', '>=', issuedAfter)
+      .where('invoice.issuedAt', '<', issuedBefore)
+      .where(({ not, exists, selectFrom }) =>
+        not(
+          exists(
+            selectFrom('bank_transaction')
+              .select('id')
+              .whereRef('bank_transaction.matchedInvoiceId', '=', 'invoice.id'),
+          ),
+        ),
+      )
+      .execute();
+
+    const matches = candidates.filter((i) => i.clientName && fuzzyContains(counterparty, i.clientName));
+    if (matches.length !== 1) {
+      return null;
+    }
+    const invoice = matches[0];
+    await this.persistInvoiceMatch(bankTx.id, invoice.invoiceId, MatchConfidence.AutoLow);
+    this.logger.log(
+      `bank_tx ${bankTx.id} → invoice ${invoice.number} via heuristic (client "${invoice.clientName}", amount ${absMinor})`,
+    );
+    return { matched: true, type: 'invoice', invoiceId: invoice.invoiceId, confidence: MatchConfidence.AutoLow };
   }
 
   /**
@@ -349,6 +466,15 @@ export class BankMatcherService {
     if (!refreshed) {
       throw new Error(`bank_transaction ${bankTxId} disappeared after match`);
     }
+    await this.eventRepository.recordAction({
+      source: EventSource.Manual,
+      eventType: 'banking.tx.linked',
+      payload: {
+        bankTxId,
+        targetType: target.type,
+        targetId: target.targetId,
+      },
+    });
     return refreshed;
   }
 
@@ -371,6 +497,11 @@ export class BankMatcherService {
       throw new Error(`bank_transaction ${bankTxId} not found`);
     }
     this.logger.log(`bank_tx ${bankTxId} → match cleared`);
+    await this.eventRepository.recordAction({
+      source: EventSource.Manual,
+      eventType: 'banking.tx.unlinked',
+      payload: { bankTxId },
+    });
     return refreshed;
   }
 
@@ -438,3 +569,34 @@ export class BankMatcherService {
 
 // Reference sql to avoid unused-import warning if Kysely's strict-mode trips.
 void sql;
+
+/**
+ * "Either name contains the other" — handles "Online Cable Shop BV" vs the
+ * paperless-ingested "Online Cable Shop", or "Acme Cables via Stichting Mollie
+ * Payments" vs "Acme Cables". Case-insensitive, with a length floor enforced by
+ * the caller so generic names like "Wise" don't match overly-broadly.
+ */
+function fuzzyContains(a: string, b: string): boolean {
+  const al = a.trim().toLowerCase();
+  const bl = b.trim().toLowerCase();
+  if (al.length < FUZZY_MIN_LENGTH || bl.length < FUZZY_MIN_LENGTH) {
+    return false;
+  }
+  return al.includes(bl) || bl.includes(al);
+}
+
+function absBigInt(value: bigint): bigint {
+  return value < 0n ? -value : value;
+}
+
+function toDate(value: Date | string | number): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
+function addDays(d: Date, days: number): Date {
+  return new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}

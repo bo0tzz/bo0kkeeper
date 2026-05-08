@@ -6,6 +6,7 @@ import { BankingSessionStatus, BankSource, JobName } from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
+import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
@@ -53,7 +54,7 @@ describe('BankingController', () => {
     } as unknown as JobRepository & { queue: ReturnType<typeof vi.fn> };
     const clientRepo = new ClientRepository(db);
     const sheetWriter = { writeIncomeRow: vi.fn().mockResolvedValue() } as unknown as SheetWriterService;
-    const matcher = new BankMatcherService(db, bankTxRepo, clientRepo, sheetWriter);
+    const matcher = new BankMatcherService(db, bankTxRepo, clientRepo, sheetWriter, new EventRepository(db));
     controller = new BankingController(service, repo, jobRepo, bankTxRepo, matcher);
   });
 

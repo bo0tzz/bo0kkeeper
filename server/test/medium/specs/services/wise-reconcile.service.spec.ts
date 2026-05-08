@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { WiseTransferState } from 'src/enum';
+import { EventRepository } from 'src/repositories/event.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { WiseApiError, WiseApiService, WiseTransfer } from 'src/services/wise-api.service';
@@ -42,7 +43,7 @@ describe('WiseReconcileService', () => {
     api = { getTransfer: vi.fn() } as unknown as WiseApiService & {
       getTransfer: ReturnType<typeof vi.fn>;
     };
-    service = new WiseReconcileService(repo, api);
+    service = new WiseReconcileService(repo, api, new EventRepository(db));
   });
 
   afterEach(async () => {

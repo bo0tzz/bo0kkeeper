@@ -91,7 +91,22 @@ export class WiseDraftService {
       counterpartyName: null,
       correlationId: event.correlationId,
     };
-    return this.wiseTransferRepository.create(row);
+    const created = await this.wiseTransferRepository.create(row);
+    await this.eventRepository.recordAction({
+      source: EventSource.Manual,
+      eventType: 'wise.drafted',
+      payload: {
+        wiseTransferId: created.wiseTransferId,
+        ourReference: created.ourReference,
+        sourceCurrency: created.sourceCurrency,
+        sourceAmountMinor: String(created.sourceAmountMinor),
+        targetCurrency: created.targetCurrency,
+        targetAmountMinor: String(created.targetAmountMinor),
+        sourceEventId: event.id,
+      },
+      correlationId: event.correlationId ?? undefined,
+    });
+    return created;
   }
 }
 

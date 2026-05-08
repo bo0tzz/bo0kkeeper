@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, Selectable, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { EventStatus } from 'src/enum';
+import { randomUUID } from 'node:crypto';
+import { EventSource, EventStatus } from 'src/enum';
 import { DB } from 'src/schema';
 import { EventTable } from 'src/schema/tables/event.table';
 
@@ -43,6 +44,36 @@ export class EventRepository {
 
   findById(id: string): Promise<Event | undefined> {
     return this.db.selectFrom('event').selectAll().where('id', '=', id).executeTakeFirst();
+  }
+
+  /**
+   * Record an internal action (manual user click or scheduled system run) as
+   * an event row, marked processed at write time — these don't go through the
+   * worker pipeline, they're audit-trail entries. `externalId` defaults to a
+   * fresh UUID since there's no upstream system to dedup against.
+   */
+  async recordAction(input: {
+    source: EventSource.Manual | EventSource.System;
+    eventType: string;
+    payload: Record<string, unknown>;
+    correlationId?: string;
+  }): Promise<Event> {
+    const externalId = randomUUID();
+    const now = new Date();
+    return this.db
+      .insertInto('event')
+      .values({
+        source: input.source,
+        eventType: input.eventType,
+        externalId,
+        occurredAt: now,
+        payload: input.payload,
+        correlationId: input.correlationId ?? null,
+        status: EventStatus.Processed,
+        processedAt: now,
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow() as Promise<Event>;
   }
 
   /** Pending events, oldest first. Worker pulls from this stream. */

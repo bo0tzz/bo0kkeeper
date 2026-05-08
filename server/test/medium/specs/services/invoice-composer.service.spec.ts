@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { ClientClass, JobName, TradeName } from 'src/enum';
 import { ClientRepository } from 'src/repositories/client.repository';
+import { EventRepository } from 'src/repositories/event.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
@@ -42,7 +43,7 @@ describe('InvoiceComposerService', () => {
     paperless.waitForDocumentId = vi.fn().mockResolvedValue('paperless-doc-42');
 
     jobs = fakeJobRepo();
-    composer = new InvoiceComposerService(clientRepo, invoiceRepo, render, paperless, jobs);
+    composer = new InvoiceComposerService(clientRepo, invoiceRepo, render, paperless, jobs, new EventRepository(db));
 
     const client = await clientRepo.create({
       name: 'FAKECO',
