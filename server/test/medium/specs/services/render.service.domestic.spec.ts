@@ -26,18 +26,21 @@ describe('RenderService — domestic variant', () => {
           city: '5678CD Otherville',
         },
         invoice: {
-          class: 'domestic',
-          currency: 'EUR',
           number: '2099/006',
           dateFormatted: '5 March 2099',
-          subtotal: '197,50',
-          btwRate: '21%',
-          btwAmount: '41,48',
-          total: '238,98',
         },
-        lines: [
-          { description: 'Design, Rock 5B modular enclosure', unit: '€15/hr', quantity: '11 hours', total: '165,-' },
-          { description: '3D printing', unit: '€25/kg', quantity: '1.3kg', total: '32,50' },
+        table: {
+          headers: ['Description', 'Unit', 'Amount', 'Total'],
+          aligns: ['left', 'right', 'right', 'right'],
+          rows: [
+            ['Design, Rock 5B modular enclosure', '€15/hr', '11 hours', '€ 165,-'],
+            ['3D printing', '€25/kg', '1.3kg', '€ 32,50'],
+          ],
+        },
+        summary: [
+          { label: 'Subtotal', value: '€ 197,50' },
+          { label: 'BTW (21%)', value: '€ 41,48' },
+          { label: 'Total', value: '€ 238,98', emphasised: true },
         ],
         payment: {
           iban: 'NL00 BANK 0000 0000 00',

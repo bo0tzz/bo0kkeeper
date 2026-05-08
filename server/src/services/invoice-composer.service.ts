@@ -260,17 +260,17 @@ function formatDateDutch(date: Date | string): string {
 }
 
 /**
- * Build the data object handed to `invoice.typ`. The shape is uniform across
- * client classes; the template branches on `invoice.class`. Per-class
- * specifics:
+ * Build the data object handed to `invoice.typ`. The composer fully describes
+ * the line-items table (headers + per-row cells) and the totals section, so
+ * the template is a generic renderer rather than a class-specific switch.
  *
- *   - non_eu: USD primary with EUR-equivalent in parens (or EUR-only if the
- *     invoice was issued in EUR). No BTW, no payment block. "Per email:"
- *     recipient label, US date format.
- *   - eu_reverse_charge: similar simple amount column, EUR currency, no BTW.
- *     IBAN payment block; "Via email:" recipient label, Dutch date.
- *   - domestic / eu (BTW-charged): full Dutch BTW breakdown (subtotal /
- *     BTW / total) with per-line unit + quantity + total, IBAN payment.
+ * Per-class differences:
+ *   - non_eu / reverse_charge: 2-column table (description + amount), single
+ *     "Amount" total row. Non-EU shows USD with EUR equivalent inline; no
+ *     payment block, "NO VAT because non EU" footer (or reverse-charge note).
+ *   - domestic / eu (BTW-charged): 4-column table (description / unit /
+ *     amount / total) and a 3-line summary (subtotal, BTW, total). IBAN
+ *     payment block.
  */
 function buildInvoiceData(client: Client, invoice: InvoiceWithLines): Record<string, unknown> {
   const issuer = loadConfig().issuer;
@@ -279,64 +279,22 @@ function buildInvoiceData(client: Client, invoice: InvoiceWithLines): Record<str
   const isReverseCharge = client.class === ClientClass.EuReverseCharge;
   const hasBtw = !(isNonEu || isReverseCharge);
 
-  const baseInvoice: Record<string, unknown> = {
-    class: client.class,
-    currency: invoice.currency,
-    number: invoice.number,
-    dateFormatted: isNonEu ? formatDateLong(invoice.issuedAt) : formatDateDutch(invoice.issuedAt),
-  };
-
-  let invoiceFields: Record<string, unknown>;
-  let lines: Record<string, unknown>[];
-
-  if (hasBtw) {
-    const btwMinor =
-      invoice.btwMinor === null || invoice.btwMinor === undefined ? 0n : BigInt(invoice.btwMinor as unknown as string);
-    const subtotalMinor = totalMinor - btwMinor;
-    const btwRatePercent =
-      invoice.btwRateBps === null || invoice.btwRateBps === undefined
-        ? '0%'
-        : `${(invoice.btwRateBps / 100).toFixed(0)}%`;
-    invoiceFields = {
-      ...baseInvoice,
-      subtotal: formatMinorDutch(subtotalMinor),
-      btwRate: btwRatePercent,
-      btwAmount: formatMinorDutch(btwMinor),
-      total: formatMinorDutch(totalMinor),
-    };
-    lines = invoice.lines.map((line) => ({
-      description: line.description,
-      unit: line.unitLabel ?? '',
-      quantity: line.quantity ?? '',
-      total: formatMinorDutch(BigInt(line.lineTotalMinor as unknown as string)),
-    }));
-  } else {
-    const eurTotalMinor =
-      invoice.eurTotalMinor === null || invoice.eurTotalMinor === undefined
-        ? totalMinor
-        : BigInt(invoice.eurTotalMinor as unknown as string);
-    const formatPrimary = (minor: bigint) =>
-      invoice.currency === 'USD' ? formatMinorWhole(minor) : formatMinor(minor);
-    invoiceFields = {
-      ...baseInvoice,
-      totalLine: {
-        usdAmount: formatPrimary(totalMinor),
-        eurAmount: formatMinor(eurTotalMinor),
-      },
-    };
-    lines = invoice.lines.map((line) => ({
-      description: line.description,
-      usdAmount: formatPrimary(BigInt(line.lineTotalMinor as unknown as string)),
-      eurAmount: eurFromMinor(BigInt(line.lineTotalMinor as unknown as string), invoice.fxRate),
-    }));
-  }
-
   const data: Record<string, unknown> = {
     issuer: buildIssuer(client, issuer),
     client: buildClientBlock(client),
-    invoice: invoiceFields,
-    lines,
+    invoice: {
+      number: invoice.number,
+      dateFormatted: isNonEu ? formatDateLong(invoice.issuedAt) : formatDateDutch(invoice.issuedAt),
+    },
+    table: hasBtw ? domesticTable(invoice) : nonEuTable(invoice),
+    summary: hasBtw ? domesticSummary(invoice, totalMinor) : nonEuSummary(invoice, totalMinor),
   };
+
+  if (isNonEu) {
+    data.footer = 'NO VAT because non EU';
+  } else if (isReverseCharge) {
+    data.footer = 'VAT reverse-charged (intra-EU services, customer accounts for VAT)';
+  }
 
   // EUR-paid invoices include the IBAN payment block. Non-EU (USD-paid via
   // Wise) doesn't need it on the invoice itself.
@@ -349,4 +307,77 @@ function buildInvoiceData(client: Client, invoice: InvoiceWithLines): Record<str
   }
 
   return data;
+}
+
+type Align = 'left' | 'right';
+type Table = { headers: string[]; aligns: Align[]; rows: string[][] };
+type SummaryRow = { label: string; value: string; emphasised?: boolean };
+
+function domesticTable(invoice: InvoiceWithLines): Table {
+  return {
+    headers: ['Description', 'Unit', 'Amount', 'Total'],
+    aligns: ['left', 'right', 'right', 'right'],
+    rows: invoice.lines.map((line) => [
+      line.description,
+      line.unitLabel ?? '',
+      line.quantity ?? '',
+      `€ ${formatMinorDutch(BigInt(line.lineTotalMinor as unknown as string))}`,
+    ]),
+  };
+}
+
+function nonEuTable(invoice: InvoiceWithLines): Table {
+  const formatPrimary = (minor: bigint) => (invoice.currency === 'USD' ? formatMinorWhole(minor) : formatMinor(minor));
+  return {
+    headers: ['Description', 'Amount'],
+    aligns: ['left', 'right'],
+    rows: invoice.lines.map((line) => {
+      const lineMinor = BigInt(line.lineTotalMinor as unknown as string);
+      return [
+        line.description,
+        formatLineAmount(invoice, formatPrimary(lineMinor), eurFromMinor(lineMinor, invoice.fxRate)),
+      ];
+    }),
+  };
+}
+
+function domesticSummary(invoice: InvoiceWithLines, totalMinor: bigint): SummaryRow[] {
+  const btwMinor =
+    invoice.btwMinor === null || invoice.btwMinor === undefined ? 0n : BigInt(invoice.btwMinor as unknown as string);
+  const subtotalMinor = totalMinor - btwMinor;
+  const btwRatePercent =
+    invoice.btwRateBps === null || invoice.btwRateBps === undefined
+      ? '0%'
+      : `${(invoice.btwRateBps / 100).toFixed(0)}%`;
+  return [
+    { label: 'Subtotal', value: `€ ${formatMinorDutch(subtotalMinor)}` },
+    { label: `BTW (${btwRatePercent})`, value: `€ ${formatMinorDutch(btwMinor)}` },
+    { label: 'Total', value: `€ ${formatMinorDutch(totalMinor)}`, emphasised: true },
+  ];
+}
+
+function nonEuSummary(invoice: InvoiceWithLines, totalMinor: bigint): SummaryRow[] {
+  const eurTotalMinor =
+    invoice.eurTotalMinor === null || invoice.eurTotalMinor === undefined
+      ? totalMinor
+      : BigInt(invoice.eurTotalMinor as unknown as string);
+  const formatPrimary = invoice.currency === 'USD' ? formatMinorWhole : formatMinor;
+  return [
+    {
+      label: 'Amount',
+      value: formatLineAmount(invoice, formatPrimary(totalMinor), formatMinor(eurTotalMinor)),
+      emphasised: true,
+    },
+  ];
+}
+
+/**
+ * Currency-aware amount string for non-EU invoices. USD shows "$ X (€ Y)";
+ * EUR-only (e.g. OverseasClientCo reimbursements) just shows "€ Y".
+ */
+function formatLineAmount(invoice: InvoiceWithLines, primary: string, eur: string): string {
+  if (invoice.currency === 'USD') {
+    return `$ ${primary} (€ ${eur})`;
+  }
+  return `€ ${eur}`;
 }

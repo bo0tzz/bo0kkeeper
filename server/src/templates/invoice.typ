@@ -1,12 +1,14 @@
-// Single invoice template covering all client classes:
-//   - "domestic" / "eu" → Dutch BTW breakdown, IBAN payment block.
-//   - "eu_reverse_charge" → no BTW, "VAT reverse-charged" footer.
-//   - "non_eu" → bilingual USD+EUR (or EUR-only) totals, no VAT, no payment.
+// Invoice template — generic. Composer hands us:
+//   - issuer, client: header blocks (right + left)
+//   - invoice: { number, dateFormatted }
+//   - table: { headers[], aligns[], rows[][] } (each row's first cell gets
+//     italic emphasis by convention)
+//   - summary: [{ label, value, emphasised? }] rendered after the table
+//   - footer (optional): trailing note like "NO VAT because non EU"
+//   - payment (optional): { iban, name, paymentLink? } for EUR-paid invoices
 //
-// `data.invoice.class` selects the variant. The composer pre-formats every
-// numeric field so the template doesn't reason about money.
-//
-// Data is loaded from `data.json` co-located with this file at compile time.
+// Per-class differences live entirely in the composer; this file just
+// renders whatever shape it's handed.
 
 #let data = json("data.json")
 
@@ -14,24 +16,9 @@
 #let muted = rgb("#666666")
 #let rule-color = rgb("#cfd6df")
 
-#let cls = data.invoice.class
-#let is-non-eu = cls == "non_eu"
-#let is-reverse-charge = cls == "eu_reverse_charge"
-#let has-btw = not (is-non-eu or is-reverse-charge)
-#let has-payment = not is-non-eu
-
-// Currency-aware amount renderer for non-EU lines/totals. USD invoices show
-// the dollar value with the EUR equivalent in parens; EUR-only invoices
-// (e.g. FOSDEM reimbursements) just show the EUR figure.
-#let format-amount(line) = if data.invoice.currency == "USD" [
-  \$ #line.usdAmount #text(fill: muted, style: "italic")[(€ #line.eurAmount)]
-] else [
-  € #line.eurAmount
-]
-
 #set page(paper: "a4", margin: (x: 2.5cm, y: 2.5cm))
-// Liberation Sans is a metric-compatible Arial substitute and ships with the
-// typst container; real Arial/Helvetica wins when the renderer has them.
+// Liberation Sans is metric-compatible with Arial and ships on the runtime
+// container; real Arial wins where the renderer has it.
 #set text(size: 11pt, font: ("Arial", "Liberation Sans", "DejaVu Sans"))
 #set par(justify: false, leading: 0.65em)
 #show link: it => text(fill: rgb("#1155cc"), underline(it))
@@ -73,89 +60,50 @@
 
 #v(1.5em)
 
-// Line items.
-#if has-btw [
-  // BTW breakdown wants per-line unit + quantity + total in € (Dutch format).
-  #table(
-    columns: (1fr, auto, auto, auto),
-    align: (left, right, right, right),
-    inset: (x: 6pt, y: 7pt),
-    stroke: none,
-    fill: (_, y) => if y == 0 { accent } else if calc.odd(y) { rgb("#f4f6fa") } else { none },
-    table.header(
-      text(fill: white, weight: "bold")[Description],
-      text(fill: white, weight: "bold")[Unit],
-      text(fill: white, weight: "bold")[Amount],
-      text(fill: white, weight: "bold")[Total],
-    ),
-    ..data.lines.map(line => (
-      [#emph(line.description)],
-      [#line.unit],
-      [#line.quantity],
-      [€ #line.total],
-    )).flatten()
-  )
-] else [
-  // Non-EU and reverse-charge: simple description + amount per line.
-  #text(fill: accent, weight: "bold", size: 9pt, upper("Description"))
-  #v(0.6em)
-  #for line in data.lines [
+// Line items — column count + alignment + cell content all from the composer.
+// Convention: first column is the description and gets italic emphasis.
+#table(
+  columns: data.table.headers.map(_ => auto).slice(0, data.table.headers.len() - 1) + (1fr,),
+  align: data.table.aligns.map(a => if a == "right" { right } else { left }),
+  inset: (x: 6pt, y: 7pt),
+  stroke: none,
+  fill: (_, y) => if y == 0 { accent } else if calc.odd(y) { rgb("#f4f6fa") } else { none },
+  table.header(..data.table.headers.map(h => text(fill: white, weight: "bold")[#h])),
+  ..data.table.rows.map(row => row.enumerate().map(((i, cell)) => if i == 0 { emph(cell) } else { [#cell] })).flatten()
+)
+
+#v(1em)
+
+// Summary — last entry usually `emphasised: true` and renders as the big
+// total. Earlier entries are plain right-aligned label/value rows.
+#for (i, item) in data.summary.enumerate() [
+  #if item.at("emphasised", default: false) [
+    #v(0.3em)
+    #line(length: 100%, stroke: 1pt + accent)
+    #v(0.4em)
     #grid(
       columns: (1fr, auto),
-      column-gutter: 1em,
       align: (left, right),
-      [#emph(line.description)],
-      format-amount(line),
+      text(weight: "bold", size: 13pt, fill: accent)[#item.label],
+      text(weight: "bold", size: 13pt, fill: accent)[#item.value],
+    )
+  ] else [
+    #grid(
+      columns: (1fr, auto),
+      align: (left, right),
+      [#item.label],
+      [#item.value],
     )
     #v(0.4em)
   ]
 ]
 
-#v(1em)
-
-// Totals area.
-#if has-btw [
-  #grid(
-    columns: (1fr, auto, auto),
-    column-gutter: 1em,
-    row-gutter: 0.6em,
-    align: (left, right, right),
-    [Subtotal], [], [€ #data.invoice.subtotal],
-    [BTW], [#data.invoice.btwRate], [€ #data.invoice.btwAmount],
-  )
-  #v(0.5em)
-  #line(length: 100%, stroke: 1pt + accent)
-  #v(0.4em)
-  #grid(
-    columns: (1fr, auto),
-    column-gutter: 1em,
-    align: (left, right),
-    text(weight: "bold", size: 13pt, fill: accent)[Total],
-    text(weight: "bold", size: 13pt, fill: accent)[€ #data.invoice.total],
-  )
-] else [
-  #line(length: 100%, stroke: 1pt + accent)
-  #v(0.4em)
-  #grid(
-    columns: (1fr, auto),
-    column-gutter: 1em,
-    align: (left, right),
-    text(weight: "bold", size: 13pt, fill: accent)[Amount],
-    text(weight: "bold", size: 13pt, fill: accent, format-amount(data.invoice.totalLine)),
-  )
+#if "footer" in data [
+  #v(1.5em)
+  #text(fill: muted, style: "italic")[#data.footer]
 ]
 
-#v(1.5em)
-
-// Footer notes per class.
-#if is-non-eu [
-  #text(fill: muted, style: "italic")[NO VAT because non EU]
-] else if is-reverse-charge [
-  #text(fill: muted, style: "italic")[VAT reverse-charged (intra-EU services, customer accounts for VAT)]
-]
-
-// Payment block — only on EUR-paid invoices.
-#if has-payment [
+#if "payment" in data [
   #v(2em)
   #text(fill: accent, weight: "bold", size: 9pt, upper("Payment to"))
   #v(0.4em)

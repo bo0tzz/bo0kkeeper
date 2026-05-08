@@ -27,19 +27,16 @@ describe('RenderService — typst integration', () => {
           city: 'Nowhere, Nullstate, USA',
         },
         invoice: {
-          class: 'non_eu',
-          currency: 'USD',
           number: '2099/001',
           dateFormatted: 'January 15, 2099',
-          totalLine: { usdAmount: '4791', eurAmount: '4045.72' },
         },
-        lines: [
-          {
-            description: 'Provided services, January 1 - January 15',
-            usdAmount: '4791',
-            eurAmount: '4045.72',
-          },
-        ],
+        table: {
+          headers: ['Description', 'Amount'],
+          aligns: ['left', 'right'],
+          rows: [['Provided services, January 1 - January 15', '$ 4791 (€ 4045.72)']],
+        },
+        summary: [{ label: 'Amount', value: '$ 4791 (€ 4045.72)', emphasised: true }],
+        footer: 'NO VAT because non EU',
       },
     });
 
