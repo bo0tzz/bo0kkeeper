@@ -10,6 +10,7 @@ import {
   BankingSessionRepository,
 } from 'src/repositories/banking-session.repository';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { BankingSessionService } from 'src/services/banking-session.service';
 import {
   EnableBankingAccount,
   EnableBankingApiError,
@@ -44,10 +45,14 @@ export class BankingSyncService {
     private readonly bankTransactionRepository: BankTransactionRepository,
     private readonly apiService: EnableBankingApiService,
     private readonly matcher: BankMatcherService,
+    private readonly sessionService: BankingSessionService,
   ) {}
 
   @OnJob({ name: JobName.BankingSyncAll, queue: QueueName.Default })
   async handleSyncAll(data: JobOf<JobName.BankingSyncAll>): Promise<void> {
+    // GC abandoned-auth pendings (>1h old) before syncing. Cheap call; piggybacks
+    // on the same cron tick so we don't need a separate scheduled job.
+    await this.sessionService.sweepStalePending();
     await this.syncAllActive({ psuIpAddress: data?.psuIpAddress });
   }
 
