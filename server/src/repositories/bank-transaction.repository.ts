@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, Selectable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
+import { BankTxCategory } from 'src/enum';
 import { DB } from 'src/schema';
 import { BankTransactionTable } from 'src/schema/tables/bank-transaction.table';
 
@@ -59,9 +60,23 @@ export class BankTransactionRepository {
       .selectFrom('bank_transaction')
       .selectAll()
       .where('matchedAt', 'is', null)
+      .where('category', 'is', null)
       .orderBy('txDate', 'desc')
       .limit(limit)
       .execute() as Promise<BankTransaction[]>;
+  }
+
+  /**
+   * Set the manual category for a row (or clear it with null). Returns the
+   * refreshed row so the API can echo back the canonical state.
+   */
+  async setCategory(id: string, category: BankTxCategory | null): Promise<BankTransaction | undefined> {
+    return this.db
+      .updateTable('bank_transaction')
+      .set({ category, updatedAt: new Date() })
+      .where('id', '=', id)
+      .returningAll()
+      .executeTakeFirst() as Promise<BankTransaction | undefined>;
   }
 
   /** Recent rows, newest first. Used by the banking UI list. */

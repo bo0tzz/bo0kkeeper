@@ -88,6 +88,7 @@ const MatchCandidatesResponseSchema = z
   .meta({ id: 'BankTxMatchCandidatesDto' });
 export class BankTxMatchCandidatesDto extends createZodDto(MatchCandidatesResponseSchema) {}
 
+const BankTxCategoryEnum = z.enum(['tax', 'self_transfer', 'fee', 'ignored']);
 const BankTransactionResponseSchema = z
   .object({
     id: z.uuid(),
@@ -104,6 +105,14 @@ const BankTransactionResponseSchema = z
     matchedExpenseId: z.uuid().nullable(),
     matchedAt: z.string().nullable(),
     matchConfidence: z.string().nullable(),
+    category: BankTxCategoryEnum.nullable(),
   })
   .meta({ id: 'BankTransactionResponseDto' });
 export class BankTransactionResponseDto extends createZodDto(BankTransactionResponseSchema) {}
+
+const SetCategoryBodySchema = z
+  .object({
+    category: BankTxCategoryEnum.nullable(),
+  })
+  .meta({ id: 'BankTxSetCategoryDto' });
+export class BankTxSetCategoryDto extends createZodDto(SetCategoryBodySchema) {}

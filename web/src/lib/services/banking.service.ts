@@ -40,6 +40,8 @@ export const startBankingAuth = (body: StartAuthRequest = {}, fetchFn?: typeof f
 export const syncBankingNow = (fetchFn?: typeof fetch) =>
   apiPost<{ enqueued: true }>('/api/banking/sync', {}, { fetch: fetchFn });
 
+export type BankTxCategory = 'tax' | 'self_transfer' | 'fee' | 'ignored';
+
 export type BankTransaction = {
   id: string;
   source: string;
@@ -55,6 +57,7 @@ export type BankTransaction = {
   matchedExpenseId: string | null;
   matchedAt: string | null;
   matchConfidence: string | null;
+  category: BankTxCategory | null;
 };
 
 export const listBankTransactions = (fetchFn?: typeof fetch) =>
@@ -107,3 +110,9 @@ export const setBankTxMatch = (
 
 export const clearBankTxMatch = (bankTxId: string, fetchFn?: typeof fetch) =>
   apiDelete<BankTransaction>(`/api/banking/transactions/${bankTxId}/match`, { fetch: fetchFn });
+
+export const setBankTxCategory = (
+  bankTxId: string,
+  category: BankTxCategory | null,
+  fetchFn?: typeof fetch,
+) => apiPut<BankTransaction>(`/api/banking/transactions/${bankTxId}/category`, { category }, { fetch: fetchFn });

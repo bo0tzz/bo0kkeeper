@@ -59,7 +59,9 @@
       counts = {
         pendingWiseCredits: wise.total,
         pendingExpenseReviews: expenses.total,
-        unmatchedBankTx: bankTx.filter((tx) => !tx.matchedTransferId && !tx.matchedInvoiceId && !tx.matchedExpenseId).length,
+        unmatchedBankTx: bankTx.filter(
+          (tx) => !tx.matchedTransferId && !tx.matchedInvoiceId && !tx.matchedExpenseId && !tx.category,
+        ).length,
         bankingSession,
         aggregate: agg,
         aggregateYear: year,

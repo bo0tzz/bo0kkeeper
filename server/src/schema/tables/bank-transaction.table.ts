@@ -10,7 +10,7 @@ import {
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { ColumnType } from 'kysely';
-import { BankSource, MatchConfidence } from 'src/enum';
+import { BankSource, BankTxCategory, MatchConfidence } from 'src/enum';
 import { InvoiceTable } from 'src/schema/tables/invoice.table';
 import { WiseTransferTable } from 'src/schema/tables/wise-transfer.table';
 
@@ -80,6 +80,15 @@ export class BankTransactionTable {
 
   @Column({ type: 'character varying', nullable: true })
   matchConfidence!: MatchConfidence | null;
+
+  /**
+   * Operator-set category for rows that aren't a real income/expense (tax,
+   * self-transfer, fee, etc). Mutually independent from matchedAt — a row
+   * can have one, the other, neither, or both. When set, the row is
+   * excluded from the "unmatched" warning surface.
+   */
+  @Column({ type: 'character varying', nullable: true })
+  category!: BankTxCategory | null;
 
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;

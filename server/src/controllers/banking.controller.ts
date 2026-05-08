@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Ip,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -21,9 +22,10 @@ import {
   BankingStartAuthResponseDto,
   BankTransactionResponseDto,
   BankTxMatchCandidatesDto,
+  BankTxSetCategoryDto,
   BankTxSetMatchDto,
 } from 'src/dtos/banking.dto';
-import { JobName } from 'src/enum';
+import { BankTxCategory, JobName } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { JobRepository } from 'src/repositories/job.repository';
@@ -161,6 +163,24 @@ export class BankingController {
     return toBankTransactionDto(row);
   }
 
+  /**
+   * Tag a row with a manual category (tax / self_transfer / fee / ignored)
+   * — or pass `null` to clear. Categorized rows are excluded from the
+   * unmatched warning surface.
+   */
+  @Put('transactions/:id/category')
+  @Authenticated()
+  async setCategory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: BankTxSetCategoryDto,
+  ): Promise<BankTransactionResponseDto> {
+    const row = await this.bankTransactionRepository.setCategory(id, body.category as BankTxCategory | null);
+    if (!row) {
+      throw new NotFoundException();
+    }
+    return toBankTransactionDto(row);
+  }
+
   /** Operator unlink — clears all match fields. */
   @Delete('transactions/:id/match')
   @Authenticated()
@@ -186,6 +206,7 @@ function toBankTransactionDto(row: BankTransaction): BankTransactionResponseDto 
     matchedExpenseId: row.matchedExpenseId,
     matchedAt: row.matchedAt ? new Date(row.matchedAt).toISOString() : null,
     matchConfidence: row.matchConfidence,
+    category: row.category,
   };
 }
 

@@ -5,11 +5,13 @@
     getLatestBankingSession,
     listBankTransactions,
     listMatchCandidates,
+    setBankTxCategory,
     setBankTxMatch,
     startBankingAuth,
     syncBankingNow,
     type BankingSession,
     type BankTransaction,
+    type BankTxCategory,
     type MatchCandidates,
   } from '$lib/services/banking.service';
   import {
@@ -22,6 +24,7 @@
     Input,
     Modal,
     ModalBody,
+    Select,
     Stack,
     Table,
     TableBody,
@@ -119,6 +122,24 @@
 
   function isMatched(tx: BankTransaction): boolean {
     return tx.matchedTransferId !== null || tx.matchedInvoiceId !== null || tx.matchedExpenseId !== null;
+  }
+
+  const categoryOptions = [
+    { value: '', label: '— Set category —' },
+    { value: 'tax', label: 'Tax' },
+    { value: 'self_transfer', label: 'Self-transfer' },
+    { value: 'fee', label: 'Fee' },
+    { value: 'ignored', label: 'Ignored' },
+  ];
+
+  async function changeCategory(tx: BankTransaction, value: string) {
+    const next = (value || null) as BankTxCategory | null;
+    try {
+      const updated = await setBankTxCategory(tx.id, next);
+      transactions = transactions.map((row) => (row.id === updated.id ? updated : row));
+    } catch (error_) {
+      error = (error_ as Error).message;
+    }
   }
 
   async function openLinkModal(tx: BankTransaction) {
@@ -344,6 +365,7 @@
               <TableHeading>Counterparty</TableHeading>
               <TableHeading>Description</TableHeading>
               <TableHeading>Match</TableHeading>
+              <TableHeading>Category</TableHeading>
               <TableHeading></TableHeading>
             </TableRow>
           </TableHeader>
@@ -366,6 +388,14 @@
                 </TableCell>
                 <TableCell class="whitespace-normal break-words">{tx.description || '—'}</TableCell>
                 <TableCell><Badge color={label.color}>{label.text}</Badge></TableCell>
+                <TableCell>
+                  <Select
+                    size="small"
+                    value={tx.category ?? ''}
+                    options={categoryOptions}
+                    onChange={(value) => changeCategory(tx, value)}
+                  />
+                </TableCell>
                 <TableCell>
                   {#if matched && tx.matchConfidence === 'auto_low'}
                     <HStack gap={2}>

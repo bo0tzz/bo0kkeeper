@@ -121,6 +121,24 @@ export enum MatchConfidence {
   Manual = 'manual',
 }
 
+/**
+ * Manual category for bank rows that aren't a real income/expense — tax
+ * remittances, internal transfers, Wise/SNS fees, etc. Setting one removes
+ * the row from the "unmatched" warning surface so it stops counting as
+ * outstanding work; the row stays visible on /banking with the category
+ * shown alongside the match badge.
+ */
+export enum BankTxCategory {
+  /** Belastingdienst remittances + refunds (BTW-aangifte, IB, etc.). */
+  Tax = 'tax',
+  /** Movement between the user's own accounts. */
+  SelfTransfer = 'self_transfer',
+  /** Wise / bank fees, SNS-side processing of a Wise transfer, etc. */
+  Fee = 'fee',
+  /** Catch-all manual dismissal. */
+  Ignored = 'ignored',
+}
+
 /** Lifecycle of an Enable Banking PSD2 session. */
 export enum BankingSessionStatus {
   /** Auth started; awaiting callback from bank. Garbage-collected after 1h. */
