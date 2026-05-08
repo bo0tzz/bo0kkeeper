@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
   import { listClients, type ClientResponse } from '$lib/services/clients.service';
   import { composeInvoice, type InvoiceComposeResponse } from '$lib/services/invoices.service';
   import { Alert, Button, Field, Heading, HStack, Input, Select, Stack, Text } from '@immich/ui';
@@ -24,7 +25,13 @@
 
   let submitting = $state(false);
   let error = $state<string | null>(null);
+  let issues = $state<ApiFieldIssue[]>([]);
   let result = $state<InvoiceComposeResponse | null>(null);
+
+  /** Lookup helper: any issue paths starting with `<prefix>` (so `lines.0.amount` matches `lines.0`). */
+  function hasIssue(prefix: string): boolean {
+    return issues.some((issue) => formatIssuePath(issue.path).startsWith(prefix));
+  }
 
   async function loadClients() {
     try {
@@ -83,6 +90,7 @@
     }
     submitting = true;
     error = null;
+    issues = [];
     try {
       result = await composeInvoice({
         clientId,
@@ -101,7 +109,12 @@
           })),
       });
     } catch (error_) {
-      error = (error_ as Error).message;
+      if (error_ instanceof ApiError) {
+        error = error_.message;
+        issues = error_.issues;
+      } else {
+        error = (error_ as Error).message;
+      }
     } finally {
       submitting = false;
     }
@@ -117,7 +130,23 @@
     {/if}
 
     {#if error}
-      <Alert color="danger">{error}</Alert>
+      <Alert color="danger">
+        <Stack gap={1}>
+          <Text>{error}</Text>
+          {#if issues.length > 0}
+            <ul class="list-disc pl-6 text-sm">
+              {#each issues as issue, i (i)}
+                {@const path = formatIssuePath(issue.path)}
+                <li>
+                  {#if path}<code class="font-medium">{path}</code>:
+                  {/if}
+                  {issue.message}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </Stack>
+      </Alert>
     {/if}
 
     {#if result}
@@ -141,25 +170,25 @@
 
     <Stack gap={4}>
       <HStack gap={3}>
-        <Field label="Client">
+        <Field label="Client" invalid={hasIssue('clientId')}>
           <Select bind:value={clientId} options={clientOptions} />
         </Field>
-        <Field label="Currency">
+        <Field label="Currency" invalid={hasIssue('currency')}>
           <Input bind:value={currency} placeholder="EUR" />
         </Field>
-        <Field label="BTW rate (%)">
+        <Field label="BTW rate (%)" invalid={hasIssue('btwRateBps')}>
           <Input bind:value={btwRatePercent} placeholder="21" />
         </Field>
       </HStack>
 
       <HStack gap={3}>
-        <Field label="Issued (YYYY-MM-DD)">
+        <Field label="Issued (YYYY-MM-DD)" invalid={hasIssue('issuedAt')}>
           <Input bind:value={issuedAt} />
         </Field>
-        <Field label="Period start (optional)">
+        <Field label="Period start (optional)" invalid={hasIssue('periodStart')}>
           <Input bind:value={periodStart} placeholder="YYYY-MM-DD" />
         </Field>
-        <Field label="Period end (optional)">
+        <Field label="Period end (optional)" invalid={hasIssue('periodEnd')}>
           <Input bind:value={periodEnd} placeholder="YYYY-MM-DD" />
         </Field>
       </HStack>
@@ -167,16 +196,16 @@
       <Heading size="small" tag="h2">Lines</Heading>
       {#each lines as _, index (index)}
         <HStack gap={3}>
-          <Field label="Description">
+          <Field label="Description" invalid={hasIssue(`lines[${index}].description`)}>
             <Input bind:value={lines[index].description} />
           </Field>
-          <Field label="Unit (€/hr)">
+          <Field label="Unit (€/hr)" invalid={hasIssue(`lines[${index}].unitLabel`)}>
             <Input bind:value={lines[index].unitLabel} placeholder="" />
           </Field>
-          <Field label="Quantity">
+          <Field label="Quantity" invalid={hasIssue(`lines[${index}].quantity`)}>
             <Input bind:value={lines[index].quantity} placeholder="" />
           </Field>
-          <Field label="Amount">
+          <Field label="Amount" invalid={hasIssue(`lines[${index}].lineTotalMinor`)}>
             <Input bind:value={lines[index].amount} placeholder="0.00" />
           </Field>
           <Button variant="ghost" color="danger" onclick={() => removeLine(index)} disabled={lines.length === 1}>

@@ -9,13 +9,46 @@ type ApiOptions = {
   query?: Record<string, string | number | undefined>;
 };
 
+/** Per-field issue from the backend's Zod validation (matches ZodError.issues). */
+export type ApiFieldIssue = {
+  path: (string | number)[];
+  message: string;
+  code?: string;
+};
+
+/**
+ * Pretty-print a ZodIssue path like ['lines', 0, 'amount'] → 'lines[0].amount',
+ * matching how Immich renders backend errors.
+ */
+export function formatIssuePath(path: (string | number)[]): string {
+  return path
+    .map((segment, i) => (typeof segment === 'number' ? `[${segment}]` : i === 0 ? segment : `.${segment}`))
+    .join('');
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
     public body: unknown,
     message: string,
+    public issues: ApiFieldIssue[] = [],
   ) {
     super(message);
+  }
+
+  /** Return all issues for the given dotted path (e.g. 'currency'). */
+  issuesFor(path: string): ApiFieldIssue[] {
+    return this.issues.filter((issue) => formatIssuePath(issue.path) === path);
+  }
+
+  /** Render `field: message` lines, joined — useful for a single-line summary. */
+  formattedIssues(): string {
+    return this.issues
+      .map((issue) => {
+        const path = formatIssuePath(issue.path);
+        return path ? `${path}: ${issue.message}` : issue.message;
+      })
+      .join('\n');
   }
 }
 
@@ -50,11 +83,19 @@ async function parse<T>(res: Response): Promise<T> {
   const text = await res.text();
   const data: unknown = text ? safeParseJson(text) : undefined;
   if (!res.ok) {
-    const message =
-      (data && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
-        ? data.message
-        : null) ?? `HTTP ${res.status}`;
-    throw new ApiError(res.status, data, message);
+    // 401 mid-session typically means the ID-token cookie expired. Bounce the
+    // user through /api/auth/login → IDP → callback so we get a fresh cookie
+    // and they end up back where they were. Skip if we're already in the auth
+    // flow, otherwise we'd loop.
+    if (res.status === 401 && globalThis.location && !globalThis.location.pathname.startsWith('/api/auth/')) {
+      const returnTo = globalThis.location.pathname + globalThis.location.search;
+      globalThis.location.replace(`/api/auth/login?return_to=${encodeURIComponent(returnTo)}`);
+      // Fall through and throw so the awaiting code unwinds — the navigation may not be instant.
+    }
+    const obj = (data && typeof data === 'object' ? (data as Record<string, unknown>) : null) ?? null;
+    const message = (obj && typeof obj.message === 'string' ? obj.message : null) ?? `HTTP ${res.status}`;
+    const issues = Array.isArray(obj?.errors) ? (obj.errors as ApiFieldIssue[]) : [];
+    throw new ApiError(res.status, data, message, issues);
   }
   return data as T;
 }
