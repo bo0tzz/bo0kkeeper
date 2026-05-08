@@ -186,15 +186,18 @@ export class BankMatcherService {
    * Returns the updated row so the UI can refresh in place.
    */
   /**
-   * Recent things the user might want to manually link a bank tx to. Each
-   * group is filtered by an optional free-text query (case-insensitive
-   * substring match against the most useful identifier of that type) and
-   * capped to keep the response small. The UI groups them by type for the
-   * link modal.
+   * Things the user might want to manually link a bank tx to. With a free-
+   * text query, this is a substring match on the most useful identifier per
+   * type. Without one, we exclude candidates that are already matched to
+   * another bank_transaction — there's no reason to surface a transfer or
+   * invoice that's already accounted for elsewhere. With a query the user
+   * is searching on purpose, so we include matched rows too (they might be
+   * looking at a wrong existing match).
    */
   async findMatchCandidates(query: string | undefined, limit = 20): Promise<MatchCandidates> {
     const q = query?.trim().toLowerCase();
     const like = q ? `%${q}%` : null;
+    const excludeAlreadyMatched = !like;
 
     const transfers = await (() => {
       let qb = this.db
@@ -218,6 +221,17 @@ export class BankMatcherService {
             eb(eb.fn<string>('lower', ['ourReference']), 'like', like),
             eb(eb.fn<string>('lower', ['wiseTransferId']), 'like', like),
           ]),
+        );
+      }
+      if (excludeAlreadyMatched) {
+        qb = qb.where(({ not, exists, selectFrom }) =>
+          not(
+            exists(
+              selectFrom('bank_transaction')
+                .select('id')
+                .whereRef('bank_transaction.matchedTransferId', '=', 'wise_transfer.id'),
+            ),
+          ),
         );
       }
       return qb.execute();
@@ -245,6 +259,17 @@ export class BankMatcherService {
           ]),
         );
       }
+      if (excludeAlreadyMatched) {
+        qb = qb.where(({ not, exists, selectFrom }) =>
+          not(
+            exists(
+              selectFrom('bank_transaction')
+                .select('id')
+                .whereRef('bank_transaction.matchedInvoiceId', '=', 'invoice.id'),
+            ),
+          ),
+        );
+      }
       return qb.execute();
     })();
 
@@ -255,7 +280,18 @@ export class BankMatcherService {
         .orderBy('expenseDate', 'desc')
         .limit(limit);
       if (like) {
-        qb = qb.where(eb => eb(eb.fn<string>('lower', ['vendor']), 'like', like));
+        qb = qb.where((eb) => eb(eb.fn<string>('lower', ['vendor']), 'like', like));
+      }
+      if (excludeAlreadyMatched) {
+        qb = qb.where(({ not, exists, selectFrom }) =>
+          not(
+            exists(
+              selectFrom('bank_transaction')
+                .select('id')
+                .whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
+            ),
+          ),
+        );
       }
       return qb.execute();
     })();
