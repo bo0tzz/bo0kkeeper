@@ -149,8 +149,8 @@ export class BankMatcherService {
     }
     const absMinor = absBigInt(BigInt(bankTx.amountMinor as bigint | number | string));
     const txDate = toDate(bankTx.txDate);
-    const dateLow = isoDate(addDays(txDate, -EXPENSE_DATE_TOLERANCE_DAYS));
-    const dateHigh = isoDate(addDays(txDate, EXPENSE_DATE_TOLERANCE_DAYS));
+    const dateLow = addDays(txDate, -EXPENSE_DATE_TOLERANCE_DAYS);
+    const dateHigh = addDays(txDate, EXPENSE_DATE_TOLERANCE_DAYS);
 
     const candidates = await this.db
       .selectFrom('expense')
@@ -189,8 +189,8 @@ export class BankMatcherService {
     }
     const absMinor = absBigInt(BigInt(bankTx.amountMinor as bigint | number | string));
     const txDate = toDate(bankTx.txDate);
-    const issuedAfter = isoDate(addDays(txDate, -INVOICE_PAYMENT_WINDOW_DAYS));
-    const issuedBefore = isoDate(addDays(txDate, 1));
+    const issuedAfter = addDays(txDate, -INVOICE_PAYMENT_WINDOW_DAYS);
+    const issuedBefore = addDays(txDate, 1);
 
     // For non-EUR invoices we'd need a currency conversion to compare against
     // the EUR-denominated bank row; that's a meaningful slice of false-negatives
@@ -597,6 +597,3 @@ function addDays(d: Date, days: number): Date {
   return new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}

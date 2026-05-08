@@ -106,8 +106,8 @@ export class BookkeepingExportService {
         'client.defaultDescription',
         'invoice_line.description as lineDescription',
       ])
-      .where('invoice.issuedAt', '>=', periodStart.toISOString().slice(0, 10))
-      .where('invoice.issuedAt', '<', periodEnd.toISOString().slice(0, 10))
+      .where('invoice.issuedAt', '>=', periodStart)
+      .where('invoice.issuedAt', '<', periodEnd)
       .orderBy('invoice.issuedAt', 'asc')
       .execute();
 
@@ -133,8 +133,8 @@ export class BookkeepingExportService {
       .selectFrom('expense')
       .selectAll()
       .where('status', '=', ExpenseStatus.Approved)
-      .where('expenseDate', '>=', periodStart.toISOString().slice(0, 10))
-      .where('expenseDate', '<', periodEnd.toISOString().slice(0, 10))
+      .where('expenseDate', '>=', periodStart)
+      .where('expenseDate', '<', periodEnd)
       .orderBy('expenseDate', 'asc')
       .execute();
 

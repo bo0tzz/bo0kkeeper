@@ -14,6 +14,7 @@ import { resolve } from 'node:path';
 import { loadConfig } from 'src/config';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
+import { EventRepository } from 'src/repositories/event.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
@@ -39,7 +40,8 @@ async function main() {
     const bankRepo = new BankTransactionRepository(db);
     const clientRepo = new ClientRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsService());
-    const matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter);
+    const eventRepo = new EventRepository(db);
+    const matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, eventRepo);
 
     let ingested = 0;
     let duplicates = 0;
