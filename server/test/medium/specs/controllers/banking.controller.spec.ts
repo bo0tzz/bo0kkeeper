@@ -2,8 +2,9 @@ import { BadRequestException } from '@nestjs/common';
 import type { Response } from 'express';
 import { Kysely } from 'kysely';
 import { BankingController } from 'src/controllers/banking.controller';
-import { BankingSessionStatus } from 'src/enum';
+import { BankingSessionStatus, JobName } from 'src/enum';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
 import { BankingSessionService } from 'src/services/banking-session.service';
 import { getKyselyDB } from 'test/utils';
@@ -30,6 +31,7 @@ describe('BankingController', () => {
   let db: Kysely<DB>;
   let repo: BankingSessionRepository;
   let service: BankingSessionService;
+  let jobRepo: JobRepository & { queue: ReturnType<typeof vi.fn> };
   let controller: BankingController;
 
   beforeEach(async () => {
@@ -40,7 +42,10 @@ describe('BankingController', () => {
       completeCallback: vi.fn(),
       sweepStalePending: vi.fn(),
     } as unknown as BankingSessionService;
-    controller = new BankingController(service, repo);
+    jobRepo = {
+      queue: vi.fn().mockResolvedValue('fake-job-id'),
+    } as unknown as JobRepository & { queue: ReturnType<typeof vi.fn> };
+    controller = new BankingController(service, repo, jobRepo);
   });
 
   afterEach(async () => {
@@ -93,5 +98,11 @@ describe('BankingController', () => {
     await expect(controller.callback(undefined, undefined, undefined, res)).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  it('POST /sync enqueues BankingSyncAll with the caller IP for PSU-IP-Address', async () => {
+    const result = await controller.sync('203.0.113.42');
+    expect(result).toEqual({ enqueued: true });
+    expect(jobRepo.queue).toHaveBeenCalledWith(JobName.BankingSyncAll, { psuIpAddress: '203.0.113.42' });
   });
 });

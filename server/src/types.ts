@@ -21,6 +21,8 @@ type JobItemMap = {
   [JobName.WiseTransferStateChange]: { eventId: string };
   [JobName.ProcessPaperlessDocument]: { eventId: string };
   [JobName.ArchiveInvoiceToPaperless]: { invoiceId: string };
+  /** Optional PSU-IP-Address for on-demand syncs to bypass the PSD2 background cap. */
+  [JobName.BankingSyncAll]: { psuIpAddress?: string };
 };
 
 /** Producer-side: `data` shape for a given job name. */

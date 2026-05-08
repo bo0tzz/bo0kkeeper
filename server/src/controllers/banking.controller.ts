@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Post, Query, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Ip, Post, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { Authenticated } from 'src/decorators';
@@ -7,7 +7,9 @@ import {
   BankingStartAuthDto,
   BankingStartAuthResponseDto,
 } from 'src/dtos/banking.dto';
+import { JobName } from 'src/enum';
 import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { BankingSessionService } from 'src/services/banking-session.service';
 
 /**
@@ -28,6 +30,7 @@ export class BankingController {
   constructor(
     private readonly sessionService: BankingSessionService,
     private readonly sessionRepository: BankingSessionRepository,
+    private readonly jobRepository: JobRepository,
   ) {}
 
   @Post('auth/start')
@@ -65,6 +68,18 @@ export class BankingController {
   async getLatestSession(): Promise<BankingSessionResponseDto | null> {
     const row = await this.sessionRepository.findLatest();
     return row ? toDto(row) : null;
+  }
+
+  /**
+   * Admin "Sync now" — enqueue an immediate banking-sync job. We pass the
+   * caller's IP through as PSU-IP-Address so Enable Banking marks the call
+   * as user-online (exempt from the 4/day PSD2 background cap).
+   */
+  @Post('sync')
+  @Authenticated()
+  async sync(@Ip() ip: string): Promise<{ enqueued: true }> {
+    await this.jobRepository.queue(JobName.BankingSyncAll, { psuIpAddress: ip });
+    return { enqueued: true };
   }
 }
 

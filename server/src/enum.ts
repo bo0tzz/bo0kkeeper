@@ -49,6 +49,12 @@ export enum JobName {
    * archive eventually completes once paperless is reachable again.
    */
   ArchiveInvoiceToPaperless = 'invoice.archive_to_paperless',
+  /**
+   * Pull new transactions from every active Enable Banking session, dedupe,
+   * and run the matcher. Cron-scheduled (every 6h, the PSD2 background cap)
+   * and also enqueueable on demand from the admin "Sync now" button.
+   */
+  BankingSyncAll = 'banking.sync_all',
 }
 
 /** Tax/billing classification of a client; drives BTW treatment + invoice template selection. */
