@@ -1,7 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Config, loadConfig } from 'src/config';
-import { BankingSessionStatus, JobName } from 'src/enum';
+import { OnJob } from 'src/decorators';
+import { BankingSessionStatus, JobName, QueueName } from 'src/enum';
 import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { EnableBankingAccount, EnableBankingApiService } from 'src/services/enable-banking-api.service';
@@ -114,6 +115,11 @@ export class BankingSessionService {
       this.logger.log(`Swept ${n} stale pending banking session(s)`);
     }
     return n;
+  }
+
+  @OnJob({ name: JobName.BankingSweepStalePending, queue: QueueName.Default })
+  async handleSweepStalePending(): Promise<void> {
+    await this.sweepStalePending();
   }
 
   private requireRedirectUri(): string {

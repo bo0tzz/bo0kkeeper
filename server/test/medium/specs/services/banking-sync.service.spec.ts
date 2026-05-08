@@ -6,7 +6,6 @@ import { ClientRepository } from 'src/repositories/client.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
-import { BankingSessionService } from 'src/services/banking-session.service';
 import { BankingSyncService, mapTransaction } from 'src/services/banking-sync.service';
 import {
   EnableBankingAccount,
@@ -114,10 +113,7 @@ describe('BankingSyncService', () => {
     const sheetWriter = { append: vi.fn().mockResolvedValue() } as unknown as SheetWriterService;
     matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter);
     api = fakeApi([]);
-    const sessionService = new BankingSessionService(sessionRepo, api, {
-      queue: vi.fn().mockResolvedValue('fake'),
-    } as never);
-    service = new BankingSyncService(sessionRepo, bankRepo, api, matcher, sessionService);
+    service = new BankingSyncService(sessionRepo, bankRepo, api, matcher);
   });
 
   afterEach(async () => {

@@ -50,5 +50,8 @@ export class AppModule implements OnModuleInit {
     // access cap (4 calls/day/account). On-demand syncs from the admin UI
     // pass PSU-IP-Address and are exempt.
     await this.jobRepository.schedule(JobName.BankingSyncAll, '0 */6 * * *', {});
+    // GC abandoned auths once a day; cheap, doesn't need to run with the
+    // sync — they're independent concerns.
+    await this.jobRepository.schedule(JobName.BankingSweepStalePending, '0 4 * * *', {});
   }
 }

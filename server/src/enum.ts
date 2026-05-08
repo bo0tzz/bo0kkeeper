@@ -55,6 +55,12 @@ export enum JobName {
    * and also enqueueable on demand from the admin "Sync now" button.
    */
   BankingSyncAll = 'banking.sync_all',
+  /**
+   * GC banking_session rows stuck in `pending` past their TTL — abandoned
+   * "Connect bank" attempts where the user never finished SCA at the bank.
+   * Daily cron is plenty.
+   */
+  BankingSweepStalePending = 'banking.sweep_stale_pending',
 }
 
 /** Tax/billing classification of a client; drives BTW treatment + invoice template selection. */
