@@ -1,6 +1,18 @@
 import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 
+const ListTransactionsQuerySchema = z
+  .object({
+    /** ISO YYYY-MM-DD; rows on or after this date. */
+    dateFrom: z.iso.date().optional(),
+    /** ISO YYYY-MM-DD; rows on or before this date. */
+    dateTo: z.iso.date().optional(),
+    /** 'bank' | 'wise' | undefined (all). */
+    source: z.enum(['bank', 'wise']).optional(),
+  })
+  .meta({ id: 'ListTransactionsQueryDto' });
+export class ListTransactionsQueryDto extends createZodDto(ListTransactionsQuerySchema) {}
+
 /**
  * Unified row shape for the all-transactions view. Bank rows and Wise
  * transfer rows share columns where possible (date, amount, counterparty);

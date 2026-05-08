@@ -23,5 +23,18 @@ export type ListTransactionsResponse = {
   total: number;
 };
 
-export const listAllTransactions = (fetchFn?: typeof fetch) =>
-  apiGet<ListTransactionsResponse>('/api/transactions', { fetch: fetchFn });
+export type ListTransactionsParams = {
+  dateFrom?: string;
+  dateTo?: string;
+  source?: 'bank' | 'wise';
+};
+
+export const listAllTransactions = (params: ListTransactionsParams = {}, fetchFn?: typeof fetch) =>
+  apiGet<ListTransactionsResponse>('/api/transactions', {
+    fetch: fetchFn,
+    query: {
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
+      source: params.source,
+    },
+  });

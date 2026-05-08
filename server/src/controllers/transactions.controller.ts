@@ -1,9 +1,12 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { Authenticated } from 'src/decorators';
-import { ListTransactionsResponseDto } from 'src/dtos/transactions.dto';
+import { ApiQueryFromDto, Authenticated } from 'src/decorators';
+import {
+  ListTransactionsQueryDto,
+  ListTransactionsResponseDto,
+} from 'src/dtos/transactions.dto';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
@@ -30,10 +33,16 @@ export class TransactionsController {
 
   @Get()
   @Authenticated()
-  async list(): Promise<ListTransactionsResponseDto> {
+  @ApiQueryFromDto(ListTransactionsQueryDto)
+  async list(@Query() query: ListTransactionsQueryDto): Promise<ListTransactionsResponseDto> {
+    // The merge is in-memory, so we either fetch generously or accept that
+    // the date filter trims things on the way out. Bumped to 500 each which
+    // covers a single-zzp's whole year of activity comfortably.
+    const wantBank = query.source === undefined || query.source === 'bank';
+    const wantWise = query.source === undefined || query.source === 'wise';
     const [bankRows, wiseRows] = await Promise.all([
-      this.bankTransactionRepository.findRecent(200),
-      this.wiseTransferRepository.findRecent(200),
+      wantBank ? this.bankTransactionRepository.findRecent(500) : Promise.resolve([] as BankTransaction[]),
+      wantWise ? this.wiseTransferRepository.findRecent(500) : Promise.resolve([] as WiseTransferRow[]),
     ]);
 
     // Resolve the labels we'll need for matched bank rows in one round trip
@@ -45,12 +54,21 @@ export class TransactionsController {
     const invoiceNumbers = await this.lookupInvoiceNumbers(matchedInvoiceIds);
     const expenseVendors = await this.lookupExpenseVendors(matchedExpenseIds);
 
-    const items = [
+    const all = [
       ...bankRows.map((r) => mapBankRow(r, { transferRefs, invoiceNumbers, expenseVendors })),
       ...wiseRows.map((r) => mapWiseRow(r)),
-    ].sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0));
-
-    return { items, total: items.length };
+    ];
+    const filtered = all.filter((r) => {
+      if (query.dateFrom && r.date < query.dateFrom) {
+        return false;
+      }
+      if (query.dateTo && r.date > query.dateTo) {
+        return false;
+      }
+      return true;
+    });
+    filtered.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0));
+    return { items: filtered, total: filtered.length };
   }
 
   private async lookupTransferRefs(ids: string[]): Promise<Map<string, string | null>> {

@@ -7,7 +7,12 @@
   import {
     Alert,
     Badge,
+    Button,
+    Field,
     Heading,
+    HStack,
+    Input,
+    Select,
     Stack,
     Table,
     TableBody,
@@ -22,11 +27,25 @@
   let loading = $state(false);
   let error = $state<string | null>(null);
 
+  let dateFrom = $state('');
+  let dateTo = $state('');
+  let source = $state<'' | 'bank' | 'wise'>('');
+
+  const sourceOptions = [
+    { value: '', label: 'All sources' },
+    { value: 'bank', label: 'Bank' },
+    { value: 'wise', label: 'Wise' },
+  ];
+
   async function load() {
     loading = true;
     error = null;
     try {
-      data = await listAllTransactions();
+      data = await listAllTransactions({
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        source: source || undefined,
+      });
     } catch (error_) {
       error = (error_ as Error).message;
     } finally {
@@ -37,6 +56,13 @@
   $effect(() => {
     void load();
   });
+
+  function clearFilters() {
+    dateFrom = '';
+    dateTo = '';
+    source = '';
+    void load();
+  }
 
   function formatAmount(minor: string, currency: string): string {
     const negative = minor.startsWith('-');
@@ -57,6 +83,20 @@
       <Heading size="large" tag="h1">All transactions</Heading>
       <Text size="small" color="muted">{data ? `${data.total} rows` : ''}</Text>
     </div>
+
+    <HStack gap={3} class="items-end">
+      <Field label="From">
+        <Input type="date" bind:value={dateFrom} />
+      </Field>
+      <Field label="To">
+        <Input type="date" bind:value={dateTo} />
+      </Field>
+      <Field label="Source">
+        <Select bind:value={source} options={sourceOptions} />
+      </Field>
+      <Button size="small" onclick={() => load()}>Apply</Button>
+      <Button size="small" variant="ghost" onclick={clearFilters}>Clear</Button>
+    </HStack>
 
     {#if error}
       <Alert color="danger">{error}</Alert>
