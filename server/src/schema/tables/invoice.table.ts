@@ -71,6 +71,13 @@ export class InvoiceTable {
   @Column({ type: 'text', nullable: true })
   paperlessDocId!: string | null;
 
+  /**
+   * Per-invoice payment link (e.g. SNS bank betaalverzoek). Domestic invoices
+   * surface it under "Or via …" so the customer can pay one-click.
+   */
+  @Column({ type: 'text', nullable: true })
+  paymentLink!: string | null;
+
   /** Wise transfer event that triggered this invoice (for Wise income flow). */
   @ForeignKeyColumn(() => EventTable, { nullable: true, onDelete: 'SET NULL' })
   sourceEventId!: string | null;

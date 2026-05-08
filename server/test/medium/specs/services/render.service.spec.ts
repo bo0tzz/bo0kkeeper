@@ -10,7 +10,7 @@ describe('RenderService — typst integration', () => {
 
   it('renders a non-EU OverseasClientCo invoice as a non-empty PDF', async () => {
     const pdf = await service.render({
-      template: 'overseas-non-eu',
+      template: 'invoice',
       data: {
         issuer: {
           name: 'de Willigen IT Services',
@@ -27,10 +27,11 @@ describe('RenderService — typst integration', () => {
           city: 'Nowhere, Nullstate, USA',
         },
         invoice: {
+          class: 'non_eu',
+          currency: 'USD',
           number: '2099/001',
           dateFormatted: 'January 15, 2099',
-          totalUsd: '4791',
-          totalEur: '4045.72',
+          totalLine: { usdAmount: '4791', eurAmount: '4045.72' },
         },
         lines: [
           {

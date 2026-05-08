@@ -55,6 +55,19 @@ const ConfigSchema = z.object({
    */
   PAPERLESS_WEBHOOK_TOKEN: z.string().optional(),
 
+  /**
+   * Issuer details printed on every invoice. KvK + VAT id are required by Dutch
+   * tax law; address gets formatted into the right-aligned header block.
+   */
+  ISSUER_KVK: z.string().default('CONFIGURE'),
+  ISSUER_VAT_ID: z.string().default('CONFIGURE'),
+  ISSUER_ADDRESS_LINE1: z.string().default('Example Street 1'),
+  ISSUER_POSTAL_CODE: z.string().default('1234 AB'),
+  ISSUER_CITY: z.string().default('Exampletown'),
+  ISSUER_COUNTRY: z.string().default('The Netherlands'),
+  /** IBAN printed in the "Payment to:" block on domestic invoices. */
+  ISSUER_IBAN: z.string().default('CONFIGURE'),
+
   /** Google Sheets service-account email (e.g. `bookkeeper@project.iam.gserviceaccount.com`). */
   SHEETS_SERVICE_ACCOUNT_EMAIL: z.email().optional(),
   /** PEM-encoded RSA private key for the service account. */
@@ -99,6 +112,15 @@ export type Config = {
     baseUrl?: string;
     token?: string;
     webhookToken?: string;
+  };
+  issuer: {
+    kvk: string;
+    vatId: string;
+    addressLine1: string;
+    postalCode: string;
+    city: string;
+    country: string;
+    iban: string;
   };
   sheets: {
     serviceAccountEmail?: string;
@@ -153,6 +175,15 @@ export function loadConfig(): Config {
       baseUrl: result.data.PAPERLESS_BASE_URL,
       token: result.data.PAPERLESS_TOKEN,
       webhookToken: result.data.PAPERLESS_WEBHOOK_TOKEN,
+    },
+    issuer: {
+      kvk: result.data.ISSUER_KVK,
+      vatId: result.data.ISSUER_VAT_ID,
+      addressLine1: result.data.ISSUER_ADDRESS_LINE1,
+      postalCode: result.data.ISSUER_POSTAL_CODE,
+      city: result.data.ISSUER_CITY,
+      country: result.data.ISSUER_COUNTRY,
+      iban: result.data.ISSUER_IBAN,
     },
     sheets: {
       serviceAccountEmail: result.data.SHEETS_SERVICE_ACCOUNT_EMAIL,

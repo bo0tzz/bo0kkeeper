@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 const TEMPLATES_DIR = resolve(process.cwd(), 'src/templates');
 
-describe('RenderService — domestic template', () => {
+describe('RenderService — domestic variant', () => {
   const service = new RenderService(TEMPLATES_DIR);
 
   it('renders a domestic invoice with subtotal/BTW/total + payment block', async () => {
     const pdf = await service.render({
-      template: 'domestic',
+      template: 'invoice',
       data: {
         issuer: {
           name: 'de Willigen IT Services',
@@ -26,12 +26,14 @@ describe('RenderService — domestic template', () => {
           city: '5678CD Otherville',
         },
         invoice: {
+          class: 'domestic',
+          currency: 'EUR',
           number: '2099/006',
           dateFormatted: '5 March 2099',
-          subtotal: '197.50',
+          subtotal: '197,50',
           btwRate: '21%',
-          btwAmount: '41.48',
-          total: '238.98',
+          btwAmount: '41,48',
+          total: '238,98',
         },
         lines: [
           { description: 'Design, Rock 5B modular enclosure', unit: '€15/hr', quantity: '11 hours', total: '165,-' },

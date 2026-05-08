@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Config, loadConfig } from 'src/config';
 import { OnJob } from 'src/decorators';
-import { ClientClass, JobName, QueueName } from 'src/enum';
+import { ClientClass, JobName, QueueName, TradeName } from 'src/enum';
 import { Client, ClientRepository } from 'src/repositories/client.repository';
 import { InvoiceRepository, InvoiceWithLines } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
@@ -34,6 +35,8 @@ export type InvoiceCompositionInput = {
   btwRateBps?: number;
   /** Optional source event id (Wise outgoing transfer that triggered the invoice). */
   sourceEventId?: string;
+  /** Optional per-invoice payment link (e.g. SNS bank betaalverzoek URL). */
+  paymentLink?: string;
   lines: InvoiceLineInput[];
 };
 
@@ -42,12 +45,8 @@ export type ComposeResult = {
   pdf: Buffer;
 };
 
-const TEMPLATE_BY_CLASS: Record<ClientClass, 'overseas-non-eu' | 'domestic'> = {
-  [ClientClass.NonEu]: 'overseas-non-eu',
-  [ClientClass.Domestic]: 'domestic',
-  [ClientClass.Eu]: 'domestic',
-  [ClientClass.EuReverseCharge]: 'domestic',
-};
+/** Single template covers every client class; the data shape carries the variant. */
+const INVOICE_TEMPLATE = 'invoice' as const;
 
 /**
  * Orchestrates invoice composition.
@@ -93,9 +92,8 @@ export class InvoiceComposerService {
     if (!client) {
       throw new Error(`Client not found for invoice ${invoice.number}: ${invoice.clientId}`);
     }
-    const template = TEMPLATE_BY_CLASS[client.class];
-    const data = template === 'overseas-non-eu' ? buildNonEuData(client, invoice) : buildDomesticData(client, invoice);
-    const pdf = await this.renderService.render({ template, data });
+    const data = buildInvoiceData(client, invoice);
+    const pdf = await this.renderService.render({ template: INVOICE_TEMPLATE, data });
 
     const issuedAt = invoice.issuedAt instanceof Date ? invoice.issuedAt : new Date(invoice.issuedAt);
     const upload = await this.paperlessService.uploadDocument({
@@ -131,6 +129,7 @@ export class InvoiceComposerService {
         btwRateBps: input.btwRateBps ?? null,
         btwMinor: input.btwRateBps ? (totalMinor * BigInt(input.btwRateBps)) / 10_000n : null,
         sourceEventId: input.sourceEventId ?? null,
+        paymentLink: input.paymentLink ?? null,
       },
       lines: input.lines.map((line, index) => ({
         ordinal: index,
@@ -141,9 +140,8 @@ export class InvoiceComposerService {
       })),
     });
 
-    const template = TEMPLATE_BY_CLASS[client.class];
-    const data = template === 'overseas-non-eu' ? buildNonEuData(client, issued) : buildDomesticData(client, issued);
-    const pdf = await this.renderService.render({ template, data });
+    const data = buildInvoiceData(client, issued);
+    const pdf = await this.renderService.render({ template: INVOICE_TEMPLATE, data });
 
     // Paperless archive runs async via pg-boss. Keeps compose fast, retries
     // automatically if paperless is unreachable, and avoids a "PDF lost in
@@ -169,9 +167,8 @@ export class InvoiceComposerService {
     if (!client) {
       throw new Error(`Client not found for invoice ${invoice.number}: ${invoice.clientId}`);
     }
-    const template = TEMPLATE_BY_CLASS[client.class];
-    const data = template === 'overseas-non-eu' ? buildNonEuData(client, invoice) : buildDomesticData(client, invoice);
-    const pdf = await this.renderService.render({ template, data });
+    const data = buildInvoiceData(client, invoice);
+    const pdf = await this.renderService.render({ template: INVOICE_TEMPLATE, data });
     return {
       filename: `${invoice.number.replaceAll('/', '-')}.pdf`,
       pdf,
@@ -179,8 +176,8 @@ export class InvoiceComposerService {
   }
 }
 
+/** Period decimals, e.g. 4155.12 — used for OverseasClientCo non-EU invoices. */
 function formatMinor(minor: bigint): string {
-  // Format bigint cents as a decimal string with two fractional digits.
   const negative = minor < 0n;
   const abs = negative ? -minor : minor;
   const major = abs / 100n;
@@ -189,26 +186,50 @@ function formatMinor(minor: bigint): string {
   return `${negative ? '-' : ''}${major.toString()}.${fractional}`;
 }
 
+/** Same value but drop ".00" for whole amounts: "4791" not "4791.00". */
+function formatMinorWhole(minor: bigint): string {
+  if (minor % 100n === 0n) {
+    const major = minor / 100n;
+    return major.toString();
+  }
+  return formatMinor(minor);
+}
+
+/**
+ * Dutch number format used on domestic invoices: "165,-" for whole amounts,
+ * "32,50" for fractional. Matches the user's existing Acme Studio invoices.
+ */
+function formatMinorDutch(minor: bigint): string {
+  const negative = minor < 0n;
+  const abs = negative ? -minor : minor;
+  const major = abs / 100n;
+  const cents = abs % 100n;
+  const sign = negative ? '-' : '';
+  if (cents === 0n) {
+    return `${sign}${major.toString()},-`;
+  }
+  return `${sign}${major.toString()},${cents.toString().padStart(2, '0')}`;
+}
+
 function eurFromMinor(minor: bigint, fxRate: string | null): string {
   if (fxRate === null) {
     return formatMinor(minor);
   }
   // Multiply minor by fxRate as a decimal — string math to avoid float drift.
-  // Naive approach: convert to number; precision is fine for invoice scale.
   const eur = (Number(minor) / 100) * Number.parseFloat(fxRate);
   return eur.toFixed(2);
 }
 
-function buildIssuer(client: Client): Record<string, string> {
-  const name = client.tradeName === 'it_services' ? 'de Willigen IT Services' : 'de Willigen 3D';
+function buildIssuer(client: Client, issuer: Config['issuer']): Record<string, string> {
+  const name = client.tradeName === TradeName.ItServices ? 'de Willigen IT Services' : 'de Willigen 3D';
   return {
     name,
-    addressLine1: 'Example Street 1',
-    postalCode: '1234 AB',
-    city: 'Exampletown',
-    country: 'The Netherlands',
-    kvk: 'CONFIGURE',
-    vatId: 'CONFIGURE',
+    addressLine1: issuer.addressLine1,
+    postalCode: issuer.postalCode,
+    city: issuer.city,
+    country: issuer.country,
+    kvk: issuer.kvk,
+    vatId: issuer.vatId,
   };
 }
 
@@ -220,67 +241,112 @@ function buildClientBlock(client: Client): Record<string, string> {
   };
 }
 
-function buildNonEuData(client: Client, invoice: InvoiceWithLines): Record<string, unknown> {
-  const totalMinor = BigInt(invoice.totalMinor as unknown as string);
-  const eurTotalMinor =
-    invoice.eurTotalMinor === null || invoice.eurTotalMinor === undefined
-      ? totalMinor
-      : BigInt(invoice.eurTotalMinor as unknown as string);
-
-  return {
-    issuer: buildIssuer(client),
-    client: buildClientBlock(client),
-    invoice: {
-      number: invoice.number,
-      dateFormatted: formatDate(invoice.issuedAt),
-      totalUsd: formatMinor(totalMinor),
-      totalEur: formatMinor(eurTotalMinor),
-    },
-    lines: invoice.lines.map((line) => ({
-      description: line.description,
-      usdAmount: formatMinor(BigInt(line.lineTotalMinor as unknown as string)),
-      eurAmount: eurFromMinor(BigInt(line.lineTotalMinor as unknown as string), invoice.fxRate),
-    })),
-  };
-}
-
-function buildDomesticData(client: Client, invoice: InvoiceWithLines): Record<string, unknown> {
-  const totalMinor = BigInt(invoice.totalMinor as unknown as string);
-  const btwMinor =
-    invoice.btwMinor === null || invoice.btwMinor === undefined ? 0n : BigInt(invoice.btwMinor as unknown as string);
-  const subtotalMinor = totalMinor - btwMinor;
-  const btwRatePercent =
-    invoice.btwRateBps === null || invoice.btwRateBps === undefined
-      ? '0%'
-      : `${(invoice.btwRateBps / 100).toFixed(0)}%`;
-
-  return {
-    issuer: buildIssuer(client),
-    client: buildClientBlock(client),
-    invoice: {
-      number: invoice.number,
-      dateFormatted: formatDate(invoice.issuedAt),
-      subtotal: formatMinor(subtotalMinor),
-      btwRate: btwRatePercent,
-      btwAmount: formatMinor(btwMinor),
-      total: formatMinor(totalMinor),
-    },
-    lines: invoice.lines.map((line) => ({
-      description: line.description,
-      // Domestic template wants per-line unit + quantity + total. The composer
-      // input uses unitLabel/quantity/lineTotalMinor; surface those here.
-      unit: line.unitLabel ?? '',
-      quantity: line.quantity ?? '',
-      total: formatMinor(BigInt(line.lineTotalMinor as unknown as string)),
-    })),
-    payment: {
-      iban: 'CONFIGURE',
-      name: client.tradeName === 'it_services' ? 'de Willigen IT Services' : 'de Willigen 3D',
-    },
-  };
-}
-
-function formatDate(date: Date | string): string {
+/**
+ * Format a date as "March 15, 2026" — month name in English, US convention.
+ * Matches the existing OverseasClientCo invoice layout.
+ */
+function formatDateLong(date: Date | string): string {
   const d = date instanceof Date ? date : new Date(date);
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+/**
+ * Format a date as "5 March 2026" — day-month-year, no comma. Matches the
+ * existing Acme Studio (domestic) invoice layout.
+ */
+function formatDateDutch(date: Date | string): string {
+  const d = date instanceof Date ? date : new Date(date);
+  return d.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+/**
+ * Build the data object handed to `invoice.typ`. The shape is uniform across
+ * client classes; the template branches on `invoice.class`. Per-class
+ * specifics:
+ *
+ *   - non_eu: USD primary with EUR-equivalent in parens (or EUR-only if the
+ *     invoice was issued in EUR). No BTW, no payment block. "Per email:"
+ *     recipient label, US date format.
+ *   - eu_reverse_charge: similar simple amount column, EUR currency, no BTW.
+ *     IBAN payment block; "Via email:" recipient label, Dutch date.
+ *   - domestic / eu (BTW-charged): full Dutch BTW breakdown (subtotal /
+ *     BTW / total) with per-line unit + quantity + total, IBAN payment.
+ */
+function buildInvoiceData(client: Client, invoice: InvoiceWithLines): Record<string, unknown> {
+  const issuer = loadConfig().issuer;
+  const totalMinor = BigInt(invoice.totalMinor as unknown as string);
+  const isNonEu = client.class === ClientClass.NonEu;
+  const isReverseCharge = client.class === ClientClass.EuReverseCharge;
+  const hasBtw = !(isNonEu || isReverseCharge);
+
+  const baseInvoice: Record<string, unknown> = {
+    class: client.class,
+    currency: invoice.currency,
+    number: invoice.number,
+    dateFormatted: isNonEu ? formatDateLong(invoice.issuedAt) : formatDateDutch(invoice.issuedAt),
+  };
+
+  let invoiceFields: Record<string, unknown>;
+  let lines: Record<string, unknown>[];
+
+  if (hasBtw) {
+    const btwMinor =
+      invoice.btwMinor === null || invoice.btwMinor === undefined ? 0n : BigInt(invoice.btwMinor as unknown as string);
+    const subtotalMinor = totalMinor - btwMinor;
+    const btwRatePercent =
+      invoice.btwRateBps === null || invoice.btwRateBps === undefined
+        ? '0%'
+        : `${(invoice.btwRateBps / 100).toFixed(0)}%`;
+    invoiceFields = {
+      ...baseInvoice,
+      subtotal: formatMinorDutch(subtotalMinor),
+      btwRate: btwRatePercent,
+      btwAmount: formatMinorDutch(btwMinor),
+      total: formatMinorDutch(totalMinor),
+    };
+    lines = invoice.lines.map((line) => ({
+      description: line.description,
+      unit: line.unitLabel ?? '',
+      quantity: line.quantity ?? '',
+      total: formatMinorDutch(BigInt(line.lineTotalMinor as unknown as string)),
+    }));
+  } else {
+    const eurTotalMinor =
+      invoice.eurTotalMinor === null || invoice.eurTotalMinor === undefined
+        ? totalMinor
+        : BigInt(invoice.eurTotalMinor as unknown as string);
+    const formatPrimary = (minor: bigint) =>
+      invoice.currency === 'USD' ? formatMinorWhole(minor) : formatMinor(minor);
+    invoiceFields = {
+      ...baseInvoice,
+      totalLine: {
+        usdAmount: formatPrimary(totalMinor),
+        eurAmount: formatMinor(eurTotalMinor),
+      },
+    };
+    lines = invoice.lines.map((line) => ({
+      description: line.description,
+      usdAmount: formatPrimary(BigInt(line.lineTotalMinor as unknown as string)),
+      eurAmount: eurFromMinor(BigInt(line.lineTotalMinor as unknown as string), invoice.fxRate),
+    }));
+  }
+
+  const data: Record<string, unknown> = {
+    issuer: buildIssuer(client, issuer),
+    client: buildClientBlock(client),
+    invoice: invoiceFields,
+    lines,
+  };
+
+  // EUR-paid invoices include the IBAN payment block. Non-EU (USD-paid via
+  // Wise) doesn't need it on the invoice itself.
+  if (!isNonEu) {
+    data.payment = {
+      iban: issuer.iban,
+      name: client.tradeName === TradeName.ItServices ? 'de Willigen IT Services' : 'de Willigen 3D',
+      ...(invoice.paymentLink ? { paymentLink: invoice.paymentLink } : {}),
+    };
+  }
+
+  return data;
 }

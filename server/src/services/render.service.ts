@@ -8,7 +8,8 @@ import { join, resolve } from 'node:path';
 export const TEMPLATES_DIR = resolve(process.cwd(), 'dist/templates');
 
 export type RenderInput = {
-  template: 'overseas-non-eu' | 'overseas-non-eu-bonus' | 'domestic';
+  /** Bare name, no extension — looks up `<templatesDir>/<template>.typ`. */
+  template: 'invoice';
   data: Record<string, unknown>;
 };
 
