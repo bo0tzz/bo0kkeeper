@@ -33,7 +33,7 @@
 
   const PAGE_SIZE = 50;
 
-  let status = $state<ExpenseStatus | ''>('pending_review');
+  let status = $state<ExpenseStatus | ''>('');
   let offset = $state(0);
   let data = $state<ListExpensesResponse | null>(null);
   let loading = $state(false);
