@@ -79,6 +79,23 @@ const ConfigSchema = z.object({
   /** IBAN printed in the "Payment to:" block on domestic invoices. */
   ISSUER_IBAN: z.string().default('CONFIGURE'),
 
+  /**
+   * Enable Banking application id (UUID, registered at enablebanking.com/cp).
+   * Used as JWT `kid`. Optional in dev — services that need it throw at call time.
+   */
+  ENABLE_BANKING_APP_ID: z.uuid().optional(),
+  /** RSA private key (PEM) downloaded at app registration; signs request JWTs. */
+  ENABLE_BANKING_PRIVATE_KEY: z.string().optional(),
+  /** API base. Same host serves prod + sandbox; environments differ by registered ASPSPs. */
+  ENABLE_BANKING_API_BASE_URL: z.url().default('https://api.enablebanking.com'),
+  /** Public callback URL the bank redirects back to after PSU consent. */
+  ENABLE_BANKING_REDIRECT_URI: z.url().optional(),
+  /**
+   * Days of consent validity to request (PSD2 caps at 90; some ASPSPs are lower).
+   * The bank may grant less than we ask for; we trust the response's `valid_until`.
+   */
+  ENABLE_BANKING_CONSENT_DAYS: z.coerce.number().int().min(1).max(180).default(90),
+
   /** Google Sheets service-account email (e.g. `bookkeeper@project.iam.gserviceaccount.com`). */
   SHEETS_SERVICE_ACCOUNT_EMAIL: z.email().optional(),
   /** PEM-encoded RSA private key for the service account. */
@@ -136,6 +153,17 @@ export type Config = {
     city: string;
     country: string;
     iban: string;
+  };
+  enableBanking: {
+    /** Application id (used as JWT `kid`). Required at call-time, optional at boot. */
+    appId?: string;
+    /** PEM-encoded RSA private key. Required at call-time. */
+    privateKey?: string;
+    apiBaseUrl: string;
+    /** Public callback URL bank redirects to. Required to start auth. */
+    redirectUri?: string;
+    /** Days of consent validity to request from the bank. */
+    consentDays: number;
   };
   sheets: {
     serviceAccountEmail?: string;
@@ -201,6 +229,13 @@ export function loadConfig(): Config {
       city: result.data.ISSUER_CITY,
       country: result.data.ISSUER_COUNTRY,
       iban: result.data.ISSUER_IBAN,
+    },
+    enableBanking: {
+      appId: result.data.ENABLE_BANKING_APP_ID,
+      privateKey: result.data.ENABLE_BANKING_PRIVATE_KEY,
+      apiBaseUrl: result.data.ENABLE_BANKING_API_BASE_URL,
+      redirectUri: result.data.ENABLE_BANKING_REDIRECT_URI,
+      consentDays: result.data.ENABLE_BANKING_CONSENT_DAYS,
     },
     sheets: {
       serviceAccountEmail: result.data.SHEETS_SERVICE_ACCOUNT_EMAIL,

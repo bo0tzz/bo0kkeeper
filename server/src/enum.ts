@@ -102,6 +102,18 @@ export enum MatchConfidence {
   Manual = 'manual',
 }
 
+/** Lifecycle of an Enable Banking PSD2 session. */
+export enum BankingSessionStatus {
+  /** Auth started; awaiting callback from bank. Garbage-collected after 1h. */
+  Pending = 'pending',
+  /** Session created; PSU consent valid through `expiresAt`. */
+  Active = 'active',
+  /** Past `expiresAt` or PSD2-mandated reauth needed. */
+  Expired = 'expired',
+  /** User revoked at the bank, or we hit a 401 from the API. */
+  Revoked = 'revoked',
+}
+
 /** Lifecycle of a paperless-extracted expense row. */
 export enum ExpenseStatus {
   PendingReview = 'pending_review',

@@ -1,5 +1,6 @@
 import { Database, Extensions, Generated, Int8 } from '@immich/sql-tools';
 import { BankTransactionTable } from 'src/schema/tables/bank-transaction.table';
+import { BankingSessionTable } from 'src/schema/tables/banking-session.table';
 import { ClientTable } from 'src/schema/tables/client.table';
 import { EventTable } from 'src/schema/tables/event.table';
 import { ExpenseTable } from 'src/schema/tables/expense.table';
@@ -20,6 +21,7 @@ export class Bo0kkeeperDatabase {
     InvoiceNumberSequenceTable,
     BankTransactionTable,
     ExpenseTable,
+    BankingSessionTable,
   ];
   functions = [];
   enum = [];
@@ -44,4 +46,5 @@ export interface DB {
   invoice_number_sequence: InvoiceNumberSequenceTable;
   bank_transaction: BankTransactionTable;
   expense: ExpenseTable;
+  banking_session: BankingSessionTable;
 }
