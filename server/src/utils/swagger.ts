@@ -1,12 +1,9 @@
 import { type INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule, type SwaggerDocumentOptions } from '@nestjs/swagger';
-import { patchNestJsSwagger } from 'nestjs-zod';
+import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { APP_NAME } from 'src/constants';
-
-// Make NestJS Swagger understand Zod DTOs natively. Idempotent.
-patchNestJsSwagger();
 
 /**
  * Mount the Swagger UI at /api/docs and (optionally) write the generated OpenAPI
@@ -25,7 +22,9 @@ export function useSwagger(app: INestApplication, { write }: { write: boolean })
     operationIdFactory: (_controllerKey: string, methodKey: string) => methodKey,
   };
 
-  const document = SwaggerModule.createDocument(app, config, options);
+  const rawDocument = SwaggerModule.createDocument(app, config, options);
+  // nestjs-zod 5: post-process the doc to inline Zod DTO schemas correctly.
+  const document = cleanupOpenApiDoc(rawDocument);
 
   SwaggerModule.setup('/api/docs', app, document);
 

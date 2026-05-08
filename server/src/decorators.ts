@@ -1,7 +1,7 @@
 import { applyDecorators, createParamDecorator, ExecutionContext, SetMetadata } from '@nestjs/common';
 import { ApiQuery } from '@nestjs/swagger';
 import { Request } from 'express';
-import { type ZodDto, zodToOpenAPI } from 'nestjs-zod';
+import { type ZodDto } from 'nestjs-zod';
 import { MetadataKey } from 'src/constants';
 import { JobName, QueueName } from 'src/enum';
 import { AuthUser } from 'src/types';
@@ -61,12 +61,15 @@ export const ApiQueryFromDto = (dto: ZodDto): MethodDecorator & ClassDecorator =
 
   const decorators: (MethodDecorator & ClassDecorator)[] = [];
   for (const [name, field] of Object.entries(shape)) {
-    const openApi = zodToOpenAPI(field as Parameters<typeof zodToOpenAPI>[0]);
     decorators.push(
       ApiQuery({
         name,
         required: !isOptionalField(field),
-        schema: openApi,
+        // We don't translate Zod v4 schemas to OpenAPI types here — the SDK
+        // ends up with `any` for query params, which is fine for our use.
+        // The point of this decorator is to surface the param NAMES so they
+        // appear in the spec at all (without it, parameters[] is empty).
+        schema: { type: 'string' },
       }) as MethodDecorator & ClassDecorator,
     );
   }

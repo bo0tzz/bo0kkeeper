@@ -24,11 +24,12 @@ export class GlobalExceptionFilter implements ExceptionFilter<Error> {
 
   private fromError(error: Error, correlationId: string | undefined) {
     if (error instanceof ZodValidationException || error instanceof ZodSerializationException) {
+      const zodError = error.getZodError() as { issues?: unknown[] };
       return {
         status: error instanceof ZodSerializationException ? 500 : 400,
         body: {
           message: error instanceof ZodSerializationException ? 'Response serialization failed' : 'Validation failed',
-          errors: error.getZodError().issues,
+          errors: zodError.issues ?? [],
         },
       };
     }
