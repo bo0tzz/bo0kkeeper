@@ -121,4 +121,17 @@ export class JobRepository implements OnModuleInit, OnModuleDestroy {
     }
     await Promise.all(items.map((item) => this.boss!.send(item.name as unknown as string, item.data as object)));
   }
+
+  /**
+   * Register a cron schedule for `name`. Idempotent — calling with the same
+   * (name, cron) replaces the existing entry. Used at boot for periodic jobs
+   * like banking-sync; ad-hoc enqueues still go through `queue()`.
+   */
+  async schedule<T extends JobName>(name: T, cron: string, data: JobOf<T>): Promise<void> {
+    if (!this.boss) {
+      throw new Error('JobRepository.schedule called before pg-boss started');
+    }
+    await this.boss.schedule(name as unknown as string, cron, data as object);
+    this.logger.log(`Scheduled ${name as unknown as string} on cron "${cron}"`);
+  }
 }

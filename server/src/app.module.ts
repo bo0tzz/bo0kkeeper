@@ -10,6 +10,7 @@ import { AuthGuard } from 'src/middleware/auth.guard';
 import { ErrorInterceptor } from 'src/middleware/error.interceptor';
 import { GlobalExceptionFilter } from 'src/middleware/global-exception.filter';
 import { LoggingInterceptor } from 'src/middleware/logging.interceptor';
+import { JobName } from 'src/enum';
 import { repositories } from 'src/repositories';
 import { JobRepository } from 'src/repositories/job.repository';
 import { services } from 'src/services';
@@ -44,5 +45,10 @@ export class AppModule implements OnModuleInit {
     // Discover @OnJob handlers across all registered services and register them
     // with pg-boss. Throws StartupError if any JobName lacks a handler.
     await this.jobRepository.setup(services);
+
+    // Periodic banking sync: every 6h matches the typical PSD2 background-
+    // access cap (4 calls/day/account). On-demand syncs from the admin UI
+    // pass PSU-IP-Address and are exempt.
+    await this.jobRepository.schedule(JobName.BankingSyncAll, '0 */6 * * *', {});
   }
 }
