@@ -101,14 +101,18 @@
   }
 
   function matchLabel(tx: BankTransaction): { color: 'success' | 'warning' | 'secondary'; text: string } {
+    // auto_low matches are heuristic guesses — surfaced with a warning badge so
+    // they read as "needs your eye" rather than "done".
+    const color = tx.matchConfidence === 'auto_low' ? 'warning' : 'success';
+    const suffix = tx.matchConfidence ? ` · ${tx.matchConfidence}` : '';
     if (tx.matchedTransferId) {
-      return { color: 'success', text: `Wise · ${tx.matchConfidence ?? ''}`.trim() };
+      return { color, text: `Wise${suffix}` };
     }
     if (tx.matchedInvoiceId) {
-      return { color: 'success', text: `Invoice · ${tx.matchConfidence ?? ''}`.trim() };
+      return { color, text: `Invoice${suffix}` };
     }
     if (tx.matchedExpenseId) {
-      return { color: 'success', text: `Expense · ${tx.matchConfidence ?? ''}`.trim() };
+      return { color, text: `Expense${suffix}` };
     }
     return { color: 'warning', text: 'unmatched' };
   }
@@ -159,6 +163,31 @@
   async function unlink(tx: BankTransaction) {
     try {
       const updated = await clearBankTxMatch(tx.id);
+      transactions = transactions.map((row) => (row.id === updated.id ? updated : row));
+    } catch (error_) {
+      error = (error_ as Error).message;
+    }
+  }
+
+  /**
+   * Promote an auto_low match to manual. Re-uses the same target (whichever
+   * matched* FK is set) and PUTs the existing endpoint, which writes the
+   * sheet row this time (auto_low skips it; manual + auto_high don't).
+   */
+  async function confirmMatch(tx: BankTransaction) {
+    let target: { type: 'wise_transfer' | 'invoice' | 'expense'; targetId: string } | null = null;
+    if (tx.matchedTransferId) {
+      target = { type: 'wise_transfer', targetId: tx.matchedTransferId };
+    } else if (tx.matchedInvoiceId) {
+      target = { type: 'invoice', targetId: tx.matchedInvoiceId };
+    } else if (tx.matchedExpenseId) {
+      target = { type: 'expense', targetId: tx.matchedExpenseId };
+    }
+    if (!target) {
+      return;
+    }
+    try {
+      const updated = await setBankTxMatch(tx.id, target);
       transactions = transactions.map((row) => (row.id === updated.id ? updated : row));
     } catch (error_) {
       error = (error_ as Error).message;
@@ -338,7 +367,12 @@
                 <TableCell class="whitespace-normal break-words">{tx.description || '—'}</TableCell>
                 <TableCell><Badge color={label.color}>{label.text}</Badge></TableCell>
                 <TableCell>
-                  {#if matched}
+                  {#if matched && tx.matchConfidence === 'auto_low'}
+                    <HStack gap={2}>
+                      <Button size="small" color="primary" onclick={() => confirmMatch(tx)}>Confirm</Button>
+                      <Button size="small" variant="ghost" onclick={() => unlink(tx)}>Unlink</Button>
+                    </HStack>
+                  {:else if matched}
                     <Button size="small" variant="ghost" onclick={() => unlink(tx)}>Unlink</Button>
                   {:else}
                     <Button size="small" onclick={() => openLinkModal(tx)}>Link</Button>
