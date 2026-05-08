@@ -90,7 +90,7 @@ describe('BookkeepingExportService', () => {
       },
       lines: [
         {
-          ordinal: 1,
+          ordinal: 0,
           description: '3D design & print services',
           lineTotalMinor: 23_898n,
           unitLabel: null,
@@ -111,7 +111,7 @@ describe('BookkeepingExportService', () => {
         sourceEventId: null,
       },
       lines: [
-        { ordinal: 1, description: 'Immich development', lineTotalMinor: 300_000n, unitLabel: null, quantity: null },
+        { ordinal: 0, description: 'Immich development', lineTotalMinor: 300_000n, unitLabel: null, quantity: null },
       ],
     });
 
@@ -190,7 +190,7 @@ describe('BookkeepingExportService', () => {
         },
         lines: [
           {
-            ordinal: 1,
+            ordinal: 0,
             description: `Invoice ${i + 1}`,
             lineTotalMinor: 10_000n + BigInt(i),
             unitLabel: null,
@@ -256,7 +256,7 @@ describe('BookkeepingExportService', () => {
         btwMinor: 2100n,
         sourceEventId: null,
       },
-      lines: [{ ordinal: 1, description: 'Out of range', lineTotalMinor: 12_100n, unitLabel: null, quantity: null }],
+      lines: [{ ordinal: 0, description: 'Out of range', lineTotalMinor: 12_100n, unitLabel: null, quantity: null }],
     });
     const { buffer } = await service.exportQuarter(2099, 1);
     const cells = await readXlsxStrings(buffer);

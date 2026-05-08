@@ -88,8 +88,10 @@ export class BookkeepingExportService {
     const rows = await this.db
       .selectFrom('invoice')
       .innerJoin('client', 'client.id', 'invoice.clientId')
+      // invoice_line ordinals are 0-indexed (set by invoice-composer.service);
+      // the first line carries the canonical description for the accountant.
       .leftJoin('invoice_line', (join_) =>
-        join_.onRef('invoice_line.invoiceId', '=', 'invoice.id').on('invoice_line.ordinal', '=', 1),
+        join_.onRef('invoice_line.invoiceId', '=', 'invoice.id').on('invoice_line.ordinal', '=', 0),
       )
       .select([
         'invoice.number',
