@@ -56,7 +56,7 @@ export class BankingSessionTable {
 
   /** Full accounts[] from POST /sessions. Null while `status = pending`. */
   @Column({ type: 'jsonb', nullable: true })
-  accountsJson!: ColumnType<Record<string, unknown> | null>;
+  accountsJson!: ColumnType<unknown[] | null>;
 
   /** PSU consent expiry (PSD2 caps at 90 days). Null while pending. */
   @Column({ type: 'timestamp with time zone', nullable: true })

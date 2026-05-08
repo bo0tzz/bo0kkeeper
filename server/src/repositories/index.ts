@@ -1,4 +1,5 @@
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
+import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
@@ -8,6 +9,7 @@ import { WiseTransferRepository } from 'src/repositories/wise-transfer.repositor
 
 export const repositories = [
   BankTransactionRepository,
+  BankingSessionRepository,
   ClientRepository,
   EventRepository,
   ExpenseRepository,

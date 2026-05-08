@@ -1,5 +1,7 @@
 import { AuthService } from 'src/services/auth.service';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { BankingSessionService } from 'src/services/banking-session.service';
+import { EnableBankingApiService } from 'src/services/enable-banking-api.service';
 import { ExpensePipelineService } from 'src/services/expense-pipeline.service';
 import { InvoiceComposerService } from 'src/services/invoice-composer.service';
 import { PaperlessService } from 'src/services/paperless.service';
@@ -14,7 +16,9 @@ import { WiseEventService } from 'src/services/wise-event.service';
 
 export const services = [
   AuthService,
+  BankingSessionService,
   BankMatcherService,
+  EnableBankingApiService,
   ExpensePipelineService,
   InvoiceComposerService,
   PaperlessService,
