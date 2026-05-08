@@ -231,6 +231,40 @@ describe('QuarterlyAggregatorService', () => {
     expect(result.netBtwEurMinor).toBe(-2100n);
   });
 
+  it('warning count matches the sample (regression: count was filtered to period-only)', async () => {
+    // Invoice issued in Q1, viewed from Q2's rollup. The sample query picks it
+    // up (issued before Q2 end, unmatched). The count must too — a previous
+    // bug filtered the count by `>= periodStart`, returning 0 even when
+    // sampleNumbers had entries.
+    const domestic = await clientRepo.create({
+      name: 'Acme Studio',
+      class: ClientClass.Domestic,
+      tradeName: TradeName.ItServices,
+      address: { line1: 'X', city: 'Y' },
+    });
+    await invoiceRepo.issue({
+      year: 2099,
+      invoice: {
+        clientId: domestic.id,
+        issuedAt: new Date('2099-02-15'),
+        currency: 'EUR',
+        totalMinor: 100n,
+        btwRateBps: 2100,
+        btwMinor: 17n,
+        sourceEventId: null,
+      },
+      lines: [{ ordinal: 0, description: 'X', lineTotalMinor: 100n, unitLabel: null, quantity: null }],
+    });
+
+    const result = await aggregator.aggregate(2099, 2);
+    const unmatched = result.warnings.find((w) => w.kind === 'invoice_unmatched');
+    expect(unmatched).toBeDefined();
+    if (unmatched && unmatched.kind === 'invoice_unmatched') {
+      expect(unmatched.count).toBe(1);
+      expect(unmatched.sampleNumbers).toHaveLength(1);
+    }
+  });
+
   it('flags unmatched invoices and pending-review expenses as warnings', async () => {
     const domestic = await clientRepo.create({
       name: 'Acme Studio',

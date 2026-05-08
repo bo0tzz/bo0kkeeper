@@ -127,6 +127,30 @@ export class InvoiceComposerService {
 
     return { invoice: issued, pdf, paperlessTaskId, paperlessDocId };
   }
+
+  /**
+   * Re-render an issued invoice to PDF using its stored fields. Used by the
+   * download endpoint so the user can grab the same file the system pushed
+   * to paperless (or would have, if paperless wasn't reachable at compose
+   * time).
+   */
+  async renderInvoicePdf(invoiceId: string): Promise<{ filename: string; pdf: Buffer }> {
+    const invoice = await this.invoiceRepository.findById(invoiceId);
+    if (!invoice) {
+      throw new Error(`Invoice not found: ${invoiceId}`);
+    }
+    const client = await this.clientRepository.findById(invoice.clientId);
+    if (!client) {
+      throw new Error(`Client not found for invoice ${invoice.number}: ${invoice.clientId}`);
+    }
+    const template = TEMPLATE_BY_CLASS[client.class];
+    const data = template === 'overseas-non-eu' ? buildNonEuData(client, invoice) : buildDomesticData(client, invoice);
+    const pdf = await this.renderService.render({ template, data });
+    return {
+      filename: `${invoice.number.replaceAll('/', '-')}.pdf`,
+      pdf,
+    };
+  }
 }
 
 function formatMinor(minor: bigint): string {

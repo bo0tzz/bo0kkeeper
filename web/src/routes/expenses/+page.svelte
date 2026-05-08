@@ -231,11 +231,12 @@
             <TableHeading>Class</TableHeading>
             <TableHeading>Status</TableHeading>
             <TableHeading>Paperless</TableHeading>
+            <TableHeading></TableHeading>
           </TableRow>
         </TableHeader>
         <TableBody>
           {#each data.items as expense (expense.id)}
-            <TableRow onclick={() => expand(expense)}>
+            <TableRow>
               <TableCell>{expense.expenseDate}</TableCell>
               <TableCell>
                 {#if expense.vendor}
@@ -251,6 +252,15 @@
               <TableCell><code class="text-xs">{expense.locationClass}</code></TableCell>
               <TableCell><Badge color={statusColor(expense.status)}>{expense.status}</Badge></TableCell>
               <TableCell><code class="text-xs">{expense.paperlessDocId}</code></TableCell>
+              <TableCell>
+                <Button
+                  variant={expense.status === 'pending_review' ? 'outline' : 'ghost'}
+                  size="small"
+                  onclick={() => expand(expense)}
+                >
+                  {expense.status === 'pending_review' ? 'Review' : 'Edit'}
+                </Button>
+              </TableCell>
             </TableRow>
           {/each}
         </TableBody>

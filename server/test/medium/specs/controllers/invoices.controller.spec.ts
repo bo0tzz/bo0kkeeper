@@ -94,4 +94,42 @@ describe('InvoicesController', () => {
       NotFoundException,
     );
   });
+
+  it('getInvoicePdf streams a PDF for the issued invoice', async () => {
+    const composed = await controller.composeInvoice({
+      clientId,
+      issuedAt: new Date('2099-05-01'),
+      currency: 'EUR',
+      btwRateBps: 2100,
+      lines: [{ description: 'Services', lineTotalMinor: 12_100n }],
+    } as unknown as InvoiceComposeDto);
+
+    const headers: Record<string, string> = {};
+    let body: Buffer | undefined;
+    const res = {
+      setHeader(name: string, value: string) {
+        headers[name] = value;
+      },
+      end(payload: Buffer) {
+        body = payload;
+      },
+    } as unknown as import('express').Response;
+
+    await controller.getInvoicePdf(composed.invoice.id, res);
+
+    expect(headers['content-type']).toBe('application/pdf');
+    expect(headers['content-disposition']).toContain('2099-001.pdf');
+    expect(body).toBeInstanceOf(Buffer);
+    expect(body!.subarray(0, 5).toString('utf8')).toBe('%PDF-');
+  });
+
+  it('getInvoicePdf 404s for missing invoices', async () => {
+    const res = {
+      setHeader: vi.fn(),
+      end: vi.fn(),
+    } as unknown as import('express').Response;
+    await expect(controller.getInvoicePdf('00000000-0000-0000-0000-000000000000', res)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
 });

@@ -1,5 +1,6 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { Authenticated } from 'src/decorators';
 import { InvoiceComposeDto, InvoiceComposeResponseDto, InvoiceResponseDto, mapInvoice } from 'src/dtos/invoice.dto';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
@@ -53,5 +54,24 @@ export class InvoicesController {
       paperlessTaskId: result.paperlessTaskId,
       paperlessDocId: result.paperlessDocId,
     } as InvoiceComposeResponseDto;
+  }
+
+  /**
+   * Re-render an issued invoice's PDF on demand. Same template + data the
+   * compose flow would have used; useful for downloading the file before
+   * sending it manually, or when paperless wasn't reachable at compose time.
+   */
+  @Get(':id/pdf')
+  @Authenticated()
+  async getInvoicePdf(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response): Promise<void> {
+    const invoice = await this.invoiceRepository.findById(id);
+    if (!invoice) {
+      throw new NotFoundException();
+    }
+    const { filename, pdf } = await this.composer.renderInvoicePdf(id);
+    res.setHeader('content-type', 'application/pdf');
+    res.setHeader('content-disposition', `attachment; filename="${filename}"`);
+    res.setHeader('content-length', String(pdf.byteLength));
+    res.end(pdf);
   }
 }

@@ -202,11 +202,15 @@ export class QuarterlyAggregatorService {
 
     const warnings: AggregatorWarning[] = [];
     if (unmatchedSample.length > 0) {
+      // Match the sample's filter exactly: any invoice issued before period end
+      // that has no bank-tx match. A previous version filtered the count by
+      // `>= periodStart` while the sample filtered only by `< periodEnd`,
+      // which produced a non-zero sample but a count of 0 when the unmatched
+      // invoice was issued in a prior quarter.
       const unmatchedCountRow = await this.db
         .selectFrom('invoice')
         .leftJoin('bank_transaction', 'bank_transaction.matchedInvoiceId', 'invoice.id')
         .select((eb) => eb.fn.countAll().as('total'))
-        .where('invoice.issuedAt', '>=', periodStart)
         .where('invoice.issuedAt', '<', periodEnd)
         .where('bank_transaction.id', 'is', null)
         .executeTakeFirstOrThrow();

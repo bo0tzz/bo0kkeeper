@@ -64,6 +64,18 @@
     ...clients.map((c) => ({ value: c.id, label: `${c.name} (${c.class})` })),
   ]);
 
+  function downloadPdf(invoiceId: string) {
+    // Programmatic anchor click bypasses SvelteKit's typed-routing — these
+    // are server endpoints, not SvelteKit pages, so the typed router doesn't
+    // know about them.
+    const a = document.createElement('a');
+    a.href = `/api/invoices/${invoiceId}/pdf`;
+    a.download = '';
+    document.body.append(a);
+    a.click();
+    a.remove();
+  }
+
   async function submit() {
     if (!clientId) {
       error = 'Pick a client first.';
@@ -110,12 +122,20 @@
 
     {#if result}
       <Alert color="success">
-        Issued invoice <strong>{result.invoice.number}</strong>
-        {#if result.paperlessDocId}
-          — archived as paperless doc <code>{result.paperlessDocId}</code>.
-        {:else}
-          — paperless archive pending or unconfigured.
-        {/if}
+        <Stack gap={2}>
+          <Text>
+            Issued invoice <strong>{result.invoice.number}</strong>
+            {#if result.paperlessDocId}
+              — archived as paperless doc <code>{result.paperlessDocId}</code>.
+            {:else}
+              — paperless archive failed or unconfigured (the invoice is still persisted; you can download the PDF below
+              and upload manually).
+            {/if}
+          </Text>
+          <HStack>
+            <Button variant="outline" onclick={() => downloadPdf(result!.invoice.id)}>Download PDF</Button>
+          </HStack>
+        </Stack>
       </Alert>
     {/if}
 
