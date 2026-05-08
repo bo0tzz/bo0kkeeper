@@ -95,6 +95,17 @@ const ConfigSchema = z.object({
    * The bank may grant less than we ask for; we trust the response's `valid_until`.
    */
   ENABLE_BANKING_CONSENT_DAYS: z.coerce.number().int().min(1).max(180).default(90),
+  /**
+   * Cutover date — bank transactions with a bookingDate before this are
+   * silently dropped at sync time. AISP returns ~90 days of history and we
+   * don't want pre-cutover txns to (a) clutter the queue or (b) fire the
+   * matcher against any data that happens to be in the system. ISO YYYY-MM-DD;
+   * unset = ingest everything (the dev default).
+   */
+  ENABLE_BANKING_INGEST_FROM: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Expected ISO YYYY-MM-DD' })
+    .optional(),
 
   /** Google Sheets service-account email (e.g. `bookkeeper@project.iam.gserviceaccount.com`). */
   SHEETS_SERVICE_ACCOUNT_EMAIL: z.email().optional(),
@@ -164,6 +175,8 @@ export type Config = {
     redirectUri?: string;
     /** Days of consent validity to request from the bank. */
     consentDays: number;
+    /** Cutover date as ISO YYYY-MM-DD; bank tx before this are dropped. */
+    ingestFrom?: string;
   };
   sheets: {
     serviceAccountEmail?: string;
@@ -236,6 +249,7 @@ export function loadConfig(): Config {
       apiBaseUrl: result.data.ENABLE_BANKING_API_BASE_URL,
       redirectUri: result.data.ENABLE_BANKING_REDIRECT_URI,
       consentDays: result.data.ENABLE_BANKING_CONSENT_DAYS,
+      ingestFrom: result.data.ENABLE_BANKING_INGEST_FROM,
     },
     sheets: {
       serviceAccountEmail: result.data.SHEETS_SERVICE_ACCOUNT_EMAIL,

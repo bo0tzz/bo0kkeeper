@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Config, loadConfig } from 'src/config';
 import { OnJob } from 'src/decorators';
 import { BankingSessionStatus, BankSource, JobName, QueueName } from 'src/enum';
 import {
@@ -10,7 +11,6 @@ import {
   BankingSessionRepository,
 } from 'src/repositories/banking-session.repository';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
-import { BankingSessionService } from 'src/services/banking-session.service';
 import {
   EnableBankingAccount,
   EnableBankingApiError,
@@ -39,20 +39,19 @@ export class BankingSyncService {
   private readonly logger = new Logger(BankingSyncService.name);
   /** Days of overlap on each pull to catch back-dated postings. */
   private static readonly LOOKBACK_DAYS = 3;
+  private readonly config: Config['enableBanking'];
 
   constructor(
     private readonly sessionRepository: BankingSessionRepository,
     private readonly bankTransactionRepository: BankTransactionRepository,
     private readonly apiService: EnableBankingApiService,
     private readonly matcher: BankMatcherService,
-    private readonly sessionService: BankingSessionService,
-  ) {}
+  ) {
+    this.config = loadConfig().enableBanking;
+  }
 
   @OnJob({ name: JobName.BankingSyncAll, queue: QueueName.Default })
   async handleSyncAll(data: JobOf<JobName.BankingSyncAll>): Promise<void> {
-    // GC abandoned-auth pendings (>1h old) before syncing. Cheap call; piggybacks
-    // on the same cron tick so we don't need a separate scheduled job.
-    await this.sessionService.sweepStalePending();
     await this.syncAllActive({ psuIpAddress: data?.psuIpAddress });
   }
 
@@ -120,9 +119,11 @@ export class BankingSyncService {
     opts: { psuIpAddress?: string },
   ): Promise<{ ingested: number; matched: number }> {
     const dateFrom = this.computeDateFrom(session);
+    const cutoff = this.config.ingestFrom ? new Date(this.config.ingestFrom) : null;
     let cursor: string | undefined;
     let ingested = 0;
     let matched = 0;
+    let dropped = 0;
     do {
       const page = await this.apiService.listTransactions({
         accountUid: account.uid,
@@ -133,6 +134,10 @@ export class BankingSyncService {
       for (const tx of page.transactions) {
         const newRow = mapTransaction(tx, account);
         if (!newRow) {
+          continue;
+        }
+        if (cutoff && new Date(newRow.txDate as Date) < cutoff) {
+          dropped += 1;
           continue;
         }
         const result = await this.bankTransactionRepository.ingest(newRow);
@@ -146,6 +151,11 @@ export class BankingSyncService {
       }
       cursor = page.continuationKey ?? undefined;
     } while (cursor);
+    if (dropped > 0) {
+      this.logger.log(
+        `account ${account.uid}: dropped ${dropped} tx with txDate < ${this.config.ingestFrom} (cutover guard)`,
+      );
+    }
     return { ingested, matched };
   }
 
