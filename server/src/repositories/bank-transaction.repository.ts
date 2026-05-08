@@ -63,4 +63,15 @@ export class BankTransactionRepository {
       .limit(limit)
       .execute() as Promise<BankTransaction[]>;
   }
+
+  /** Recent rows, newest first. Used by the banking UI list. */
+  findRecent(limit = 50): Promise<BankTransaction[]> {
+    return this.db
+      .selectFrom('bank_transaction')
+      .selectAll()
+      .orderBy('txDate', 'desc')
+      .orderBy('createdAt', 'desc')
+      .limit(limit)
+      .execute() as Promise<BankTransaction[]>;
+  }
 }

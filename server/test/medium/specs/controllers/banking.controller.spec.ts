@@ -2,7 +2,8 @@ import { BadRequestException } from '@nestjs/common';
 import type { Response } from 'express';
 import { Kysely } from 'kysely';
 import { BankingController } from 'src/controllers/banking.controller';
-import { BankingSessionStatus, JobName } from 'src/enum';
+import { BankingSessionStatus, BankSource, JobName } from 'src/enum';
+import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
@@ -30,6 +31,7 @@ function fakeRes(): Response & { redirected?: { status: number; url: string } } 
 describe('BankingController', () => {
   let db: Kysely<DB>;
   let repo: BankingSessionRepository;
+  let bankTxRepo: BankTransactionRepository;
   let service: BankingSessionService;
   let jobRepo: JobRepository & { queue: ReturnType<typeof vi.fn> };
   let controller: BankingController;
@@ -37,6 +39,7 @@ describe('BankingController', () => {
   beforeEach(async () => {
     db = await getKyselyDB();
     repo = new BankingSessionRepository(db);
+    bankTxRepo = new BankTransactionRepository(db);
     service = {
       startAuth: vi.fn(),
       completeCallback: vi.fn(),
@@ -45,7 +48,7 @@ describe('BankingController', () => {
     jobRepo = {
       queue: vi.fn().mockResolvedValue('fake-job-id'),
     } as unknown as JobRepository & { queue: ReturnType<typeof vi.fn> };
-    controller = new BankingController(service, repo, jobRepo);
+    controller = new BankingController(service, repo, jobRepo, bankTxRepo);
   });
 
   afterEach(async () => {
@@ -104,5 +107,29 @@ describe('BankingController', () => {
     const result = await controller.sync('203.0.113.42');
     expect(result).toEqual({ enqueued: true });
     expect(jobRepo.queue).toHaveBeenCalledWith(JobName.BankingSyncAll, { psuIpAddress: '203.0.113.42' });
+  });
+
+  it('GET /transactions returns recent rows mapped into a serializable DTO', async () => {
+    await bankTxRepo.ingest({
+      source: BankSource.EnableBanking,
+      externalId: 'ctrl-tx-1',
+      txDate: new Date('2026-05-07'),
+      amountMinor: 12_345n,
+      currency: 'EUR',
+      counterpartyName: 'ACME B.V.',
+      counterpartyIban: 'NL01TEST',
+      description: 'Test row',
+      rawPayload: {},
+    });
+    const result = await controller.listTransactions();
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      externalId: 'ctrl-tx-1',
+      amountMinor: '12345',
+      currency: 'EUR',
+      counterpartyName: 'ACME B.V.',
+      txDate: '2026-05-07',
+      matchedTransferId: null,
+    });
   });
 });

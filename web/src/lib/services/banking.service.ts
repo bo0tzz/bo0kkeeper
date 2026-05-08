@@ -39,3 +39,23 @@ export const startBankingAuth = (body: StartAuthRequest = {}, fetchFn?: typeof f
 
 export const syncBankingNow = (fetchFn?: typeof fetch) =>
   apiPost<{ enqueued: true }>('/api/banking/sync', {}, { fetch: fetchFn });
+
+export type BankTransaction = {
+  id: string;
+  source: string;
+  externalId: string;
+  txDate: string;
+  amountMinor: string;
+  currency: string;
+  counterpartyName: string | null;
+  counterpartyIban: string | null;
+  description: string;
+  matchedTransferId: string | null;
+  matchedInvoiceId: string | null;
+  matchedExpenseId: string | null;
+  matchedAt: string | null;
+  matchConfidence: string | null;
+};
+
+export const listBankTransactions = (fetchFn?: typeof fetch) =>
+  apiGet<BankTransaction[]>('/api/banking/transactions', { fetch: fetchFn });

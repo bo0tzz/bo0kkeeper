@@ -6,8 +6,10 @@ import {
   BankingSessionResponseDto,
   BankingStartAuthDto,
   BankingStartAuthResponseDto,
+  BankTransactionResponseDto,
 } from 'src/dtos/banking.dto';
 import { JobName } from 'src/enum';
+import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { BankingSessionService } from 'src/services/banking-session.service';
@@ -31,6 +33,7 @@ export class BankingController {
     private readonly sessionService: BankingSessionService,
     private readonly sessionRepository: BankingSessionRepository,
     private readonly jobRepository: JobRepository,
+    private readonly bankTransactionRepository: BankTransactionRepository,
   ) {}
 
   @Post('auth/start')
@@ -81,6 +84,33 @@ export class BankingController {
     await this.jobRepository.queue(JobName.BankingSyncAll, { psuIpAddress: ip });
     return { enqueued: true };
   }
+
+  /** Recent bank_transaction rows. Drives the list panel on /banking. */
+  @Get('transactions')
+  @Authenticated()
+  async listTransactions(): Promise<BankTransactionResponseDto[]> {
+    const rows = await this.bankTransactionRepository.findRecent(50);
+    return rows.map((row) => toBankTransactionDto(row));
+  }
+}
+
+function toBankTransactionDto(row: BankTransaction): BankTransactionResponseDto {
+  return {
+    id: row.id,
+    source: row.source,
+    externalId: row.externalId,
+    txDate: new Date(row.txDate).toISOString().slice(0, 10),
+    amountMinor: String(row.amountMinor),
+    currency: row.currency,
+    counterpartyName: row.counterpartyName,
+    counterpartyIban: row.counterpartyIban,
+    description: row.description,
+    matchedTransferId: row.matchedTransferId,
+    matchedInvoiceId: row.matchedInvoiceId,
+    matchedExpenseId: row.matchedExpenseId,
+    matchedAt: row.matchedAt ? new Date(row.matchedAt).toISOString() : null,
+    matchConfidence: row.matchConfidence,
+  };
 }
 
 function toDto(row: BankingSession): BankingSessionResponseDto {

@@ -41,3 +41,23 @@ const SessionResponseSchema = z
   })
   .meta({ id: 'BankingSessionResponseDto' });
 export class BankingSessionResponseDto extends createZodDto(SessionResponseSchema) {}
+
+const BankTransactionResponseSchema = z
+  .object({
+    id: z.uuid(),
+    source: z.string(),
+    externalId: z.string(),
+    txDate: z.string(),
+    amountMinor: z.string(),
+    currency: z.string(),
+    counterpartyName: z.string().nullable(),
+    counterpartyIban: z.string().nullable(),
+    description: z.string(),
+    matchedTransferId: z.uuid().nullable(),
+    matchedInvoiceId: z.uuid().nullable(),
+    matchedExpenseId: z.uuid().nullable(),
+    matchedAt: z.string().nullable(),
+    matchConfidence: z.string().nullable(),
+  })
+  .meta({ id: 'BankTransactionResponseDto' });
+export class BankTransactionResponseDto extends createZodDto(BankTransactionResponseSchema) {}

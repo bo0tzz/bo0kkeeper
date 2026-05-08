@@ -2,13 +2,30 @@
   import { page } from '$app/state';
   import {
     getLatestBankingSession,
+    listBankTransactions,
     startBankingAuth,
     syncBankingNow,
     type BankingSession,
+    type BankTransaction,
   } from '$lib/services/banking.service';
-  import { Alert, Badge, Button, Heading, HStack, Stack, Text } from '@immich/ui';
+  import {
+    Alert,
+    Badge,
+    Button,
+    Heading,
+    HStack,
+    Stack,
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableHeading,
+    TableRow,
+    Text,
+  } from '@immich/ui';
 
   let session = $state<BankingSession | null>(null);
+  let transactions = $state<BankTransaction[]>([]);
   let loading = $state(false);
   let starting = $state(false);
   let syncing = $state(false);
@@ -21,7 +38,7 @@
     loading = true;
     error = null;
     try {
-      session = await getLatestBankingSession();
+      [session, transactions] = await Promise.all([getLatestBankingSession(), listBankTransactions()]);
     } catch (error_) {
       error = (error_ as Error).message;
     } finally {
@@ -51,12 +68,35 @@
     info = null;
     try {
       await syncBankingNow();
-      info = 'Sync queued — refresh in a moment to see new transactions.';
+      info = 'Sync queued. Refreshing in a moment…';
+      // Give the worker a beat to pull, then re-pull the list.
+      setTimeout(() => void load(), 2500);
     } catch (error_) {
       error = (error_ as Error).message;
     } finally {
       syncing = false;
     }
+  }
+
+  function formatAmount(minor: string, currency: string): string {
+    const sign = minor.startsWith('-') ? '-' : '';
+    const abs = minor.replace(/^-/, '').padStart(3, '0');
+    const major = abs.slice(0, -2);
+    const cents = abs.slice(-2);
+    return `${sign}${major}.${cents} ${currency}`;
+  }
+
+  function matchLabel(tx: BankTransaction): { color: 'success' | 'warning' | 'secondary'; text: string } {
+    if (tx.matchedTransferId) {
+      return { color: 'success', text: `Wise · ${tx.matchConfidence ?? ''}`.trim() };
+    }
+    if (tx.matchedInvoiceId) {
+      return { color: 'success', text: `Invoice · ${tx.matchConfidence ?? ''}`.trim() };
+    }
+    if (tx.matchedExpenseId) {
+      return { color: 'success', text: `Expense · ${tx.matchConfidence ?? ''}`.trim() };
+    }
+    return { color: 'warning', text: 'unmatched' };
   }
 
   function daysUntil(iso: string | null): number | null {
@@ -190,5 +230,50 @@
         </Stack>
       </div>
     {/if}
+
+    <Stack gap={3}>
+      <HStack class="justify-between">
+        <Heading size="medium" tag="h2">Recent transactions</Heading>
+        <Text size="small" color="muted">{transactions.length} shown</Text>
+      </HStack>
+      {#if transactions.length === 0}
+        <Text color="muted">
+          No bank transactions yet. They'll appear here after the next sync.
+        </Text>
+      {:else}
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHeading>Date</TableHeading>
+              <TableHeading>Amount</TableHeading>
+              <TableHeading>Counterparty</TableHeading>
+              <TableHeading>Description</TableHeading>
+              <TableHeading>Match</TableHeading>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {#each transactions as tx (tx.id)}
+              {@const label = matchLabel(tx)}
+              <TableRow>
+                <TableCell>{tx.txDate}</TableCell>
+                <TableCell>
+                  <span class={tx.amountMinor.startsWith('-') ? 'text-red-600' : 'text-green-700'}>
+                    {formatAmount(tx.amountMinor, tx.currency)}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  {tx.counterpartyName ?? '—'}
+                  {#if tx.counterpartyIban}
+                    <div class="text-xs text-muted-foreground"><code>{tx.counterpartyIban}</code></div>
+                  {/if}
+                </TableCell>
+                <TableCell class="max-w-md truncate">{tx.description || '—'}</TableCell>
+                <TableCell><Badge color={label.color}>{label.text}</Badge></TableCell>
+              </TableRow>
+            {/each}
+          </TableBody>
+        </Table>
+      {/if}
+    </Stack>
   </Stack>
 </main>
