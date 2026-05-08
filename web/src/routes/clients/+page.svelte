@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
+  import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
   import {
     createClient,
     listClients,
@@ -9,7 +11,6 @@
     type TradeName,
   } from '$lib/services/clients.service';
   import {
-    Alert,
     Badge,
     Button,
     Field,
@@ -30,6 +31,11 @@
   let clients = $state<ClientResponse[]>([]);
   let loading = $state(false);
   let error = $state<string | null>(null);
+  let issues = $state<ApiFieldIssue[]>([]);
+
+  function hasIssue(prefix: string): boolean {
+    return issues.some((issue) => formatIssuePath(issue.path).startsWith(prefix));
+  }
 
   type Draft = {
     id: string | null;
@@ -126,6 +132,7 @@
       return;
     }
     error = null;
+    issues = [];
     try {
       const patch = buildPatch(draft);
       await (draft.id
@@ -134,7 +141,12 @@
       draft = null;
       await load();
     } catch (error_) {
-      error = (error_ as Error).message;
+      if (error_ instanceof ApiError) {
+        error = error_.message;
+        issues = error_.issues;
+      } else {
+        error = (error_ as Error).message;
+      }
     }
   }
 
@@ -176,7 +188,7 @@
     </div>
 
     {#if error}
-      <Alert color="danger">{error}</Alert>
+      <ApiErrorAlert message={error} {issues} />
     {/if}
 
     {#if loading && clients.length === 0}
@@ -219,39 +231,39 @@
         <Stack gap={4}>
           <Heading size="small" tag="h2">{draft.id ? 'Edit client' : 'New client'}</Heading>
           <HStack gap={3}>
-            <Field label="Name">
+            <Field label="Name" invalid={hasIssue('name')}>
               <Input bind:value={draft.name} />
             </Field>
-            <Field label="Class">
+            <Field label="Class" invalid={hasIssue('class')}>
               <Select bind:value={draft.class} options={classOptions} />
             </Field>
-            <Field label="Trade name">
+            <Field label="Trade name" invalid={hasIssue('tradeName')}>
               <Select bind:value={draft.tradeName} options={tradeOptions} />
             </Field>
           </HStack>
           <HStack gap={3}>
-            <Field label="VAT id">
+            <Field label="VAT id" invalid={hasIssue('vatId')}>
               <Input bind:value={draft.vatId} />
             </Field>
-            <Field label="Wise sender pattern">
+            <Field label="Wise sender pattern" invalid={hasIssue('wiseSenderPattern')}>
               <Input bind:value={draft.wiseSenderPattern} />
             </Field>
           </HStack>
           <HStack gap={3}>
-            <Field label="Address line 1">
+            <Field label="Address line 1" invalid={hasIssue('address.line1')}>
               <Input bind:value={draft.addressLine1} />
             </Field>
-            <Field label="City">
+            <Field label="City" invalid={hasIssue('address.city')}>
               <Input bind:value={draft.city} />
             </Field>
-            <Field label="Postal code">
+            <Field label="Postal code" invalid={hasIssue('address.postalCode')}>
               <Input bind:value={draft.postalCode} />
             </Field>
-            <Field label="Country">
+            <Field label="Country" invalid={hasIssue('address.countryCode')}>
               <Input bind:value={draft.countryCode} placeholder="NL" />
             </Field>
           </HStack>
-          <Field label="Default description">
+          <Field label="Default description" invalid={hasIssue('defaultDescription')}>
             <Input bind:value={draft.defaultDescription} />
           </Field>
           <HStack gap={3}>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
   import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
   import { listClients, type ClientResponse } from '$lib/services/clients.service';
   import { composeInvoice, type InvoiceComposeResponse } from '$lib/services/invoices.service';
@@ -130,23 +131,7 @@
     {/if}
 
     {#if error}
-      <Alert color="danger">
-        <Stack gap={1}>
-          <Text>{error}</Text>
-          {#if issues.length > 0}
-            <ul class="list-disc pl-6 text-sm">
-              {#each issues as issue, i (i)}
-                {@const path = formatIssuePath(issue.path)}
-                <li>
-                  {#if path}<code class="font-medium">{path}</code>:
-                  {/if}
-                  {issue.message}
-                </li>
-              {/each}
-            </ul>
-          {/if}
-        </Stack>
-      </Alert>
+      <ApiErrorAlert message={error} {issues} />
     {/if}
 
     {#if result}

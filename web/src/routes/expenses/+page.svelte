@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
+  import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
   import {
     approveExpense,
     listExpenses,
@@ -36,7 +38,24 @@
   let data = $state<ListExpensesResponse | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
+  let issues = $state<ApiFieldIssue[]>([]);
   let expandedId = $state<string | null>(null);
+
+  function hasIssue(prefix: string): boolean {
+    return issues.some((issue) => formatIssuePath(issue.path).startsWith(prefix));
+  }
+  function clearError() {
+    error = null;
+    issues = [];
+  }
+  function captureError(error_: unknown) {
+    if (error_ instanceof ApiError) {
+      error = error_.message;
+      issues = error_.issues;
+    } else {
+      error = (error_ as Error).message;
+    }
+  }
 
   type DraftFields = {
     vendor: string;
@@ -136,33 +155,36 @@
     if (!draft) {
       return;
     }
+    clearError();
     try {
       await updateExpense(expense.id, buildPatch(draft));
       await load();
     } catch (error_) {
-      error = (error_ as Error).message;
+      captureError(error_);
     }
   }
 
   async function approve(expense: ExpenseResponse) {
     const draft = drafts[expense.id];
+    clearError();
     try {
       await approveExpense(expense.id, draft ? buildPatch(draft) : {});
       collapse();
       await load();
     } catch (error_) {
-      error = (error_ as Error).message;
+      captureError(error_);
     }
   }
 
   async function reject(expense: ExpenseResponse) {
     const draft = drafts[expense.id];
+    clearError();
     try {
       await rejectExpense(expense.id, draft?.notes || undefined);
       collapse();
       await load();
     } catch (error_) {
-      error = (error_ as Error).message;
+      captureError(error_);
     }
   }
 
@@ -215,7 +237,7 @@
     </HStack>
 
     {#if error}
-      <Text color="danger">Failed: {error}</Text>
+      <ApiErrorAlert message={error} {issues} />
     {/if}
 
     {#if loading && !data}
@@ -273,33 +295,33 @@
             <Stack gap={4}>
               <Heading size="small" tag="h2">Editing {expense.vendor || expense.paperlessDocId}</Heading>
               <HStack gap={3}>
-                <Field label="Vendor">
+                <Field label="Vendor" invalid={hasIssue('vendor')}>
                   <Input bind:value={drafts[expense.id].vendor} />
                 </Field>
-                <Field label="Date">
+                <Field label="Date" invalid={hasIssue('expenseDate')}>
                   <Input bind:value={drafts[expense.id].expenseDate} placeholder="YYYY-MM-DD" />
                 </Field>
               </HStack>
               <HStack gap={3}>
-                <Field label="Amount (gross, EUR)">
+                <Field label="Amount (gross, EUR)" invalid={hasIssue('amountMinor')}>
                   <Input bind:value={drafts[expense.id].amountMajor} placeholder="0.00" />
                 </Field>
-                <Field label="BTW rate (%)">
+                <Field label="BTW rate (%)" invalid={hasIssue('btwRateBps')}>
                   <Input bind:value={drafts[expense.id].btwRatePercent} placeholder="21" />
                 </Field>
-                <Field label="BTW amount (EUR)">
+                <Field label="BTW amount (EUR)" invalid={hasIssue('btwMinor')}>
                   <Input bind:value={drafts[expense.id].btwMajor} placeholder="0.00" />
                 </Field>
               </HStack>
               <HStack gap={3}>
-                <Field label="Location class">
+                <Field label="Location class" invalid={hasIssue('locationClass')}>
                   <Select bind:value={drafts[expense.id].locationClass} options={locationOptions} />
                 </Field>
-                <Field label="Category">
+                <Field label="Category" invalid={hasIssue('category')}>
                   <Input bind:value={drafts[expense.id].category} />
                 </Field>
               </HStack>
-              <Field label="Notes">
+              <Field label="Notes" invalid={hasIssue('notes')}>
                 <Textarea bind:value={drafts[expense.id].notes} />
               </Field>
               <HStack gap={3}>
