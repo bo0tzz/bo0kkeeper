@@ -31,12 +31,33 @@ describe('WiseApiService', () => {
       okResponse({
         id: 'quote-uuid-1',
         rate: 0.846_991,
-        fee: 14.42,
-        feeBreakdown: { total: 14.42 },
         sourceAmount: 4791,
         sourceCurrency: 'USD',
-        targetAmount: 4045.72,
         targetCurrency: 'EUR',
+        // v3 quotes return per-payIn-method options; the mapper picks one,
+        // preferring BALANCE → DIRECT_DEBIT → BANK_TRANSFER.
+        paymentOptions: [
+          {
+            payIn: 'BANK_TRANSFER',
+            payOut: 'BANK_TRANSFER',
+            disabled: true,
+            sourceAmount: 4791,
+            targetAmount: 4040,
+            sourceCurrency: 'USD',
+            targetCurrency: 'EUR',
+            fee: { total: 18 },
+          },
+          {
+            payIn: 'BALANCE',
+            payOut: 'BANK_TRANSFER',
+            disabled: false,
+            sourceAmount: 4791,
+            targetAmount: 4045.72,
+            sourceCurrency: 'USD',
+            targetCurrency: 'EUR',
+            fee: { total: 14.42 },
+          },
+        ],
       }),
     );
 

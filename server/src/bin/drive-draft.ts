@@ -16,7 +16,9 @@ async function main() {
     const wiseApi = new WiseApiService();
     const draft = new WiseDraftService(eventRepo, transferRepo, wiseApi);
     const eventId = process.argv[2];
-    if (!eventId) throw new Error('usage: drive-draft <eventId>');
+    if (!eventId) {
+      throw new Error('usage: drive-draft <eventId>');
+    }
     console.log('drafting from event', eventId);
     const row = await draft.draftFromEvent({ eventId });
     console.log('drafted:', JSON.stringify(row, null, 2));
@@ -25,4 +27,8 @@ async function main() {
   }
 }
 
-void main().catch((e) => { console.error('FAIL:', e?.message); console.error(e?.stack); process.exit(1); });
+void main().catch((error) => {
+  console.error('FAIL:', error?.message);
+  console.error(error?.stack);
+  process.exit(1);
+});
