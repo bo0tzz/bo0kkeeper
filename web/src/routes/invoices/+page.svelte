@@ -97,9 +97,19 @@
                 </Badge>
               </TableCell>
               <TableCell>
-                <Button size="small" variant="ghost" href={`/api/invoices/${inv.id}/pdf`}>
-                  PDF ↓
-                </Button>
+                <HStack gap={2}>
+                  <Button size="small" variant="ghost" href={`/api/invoices/${inv.id}/pdf`}>PDF ↓</Button>
+                  {#if inv.paperlessDocId}
+                    <Button
+                      size="small"
+                      variant="ghost"
+                      href={`/api/invoices/${inv.id}/paperless`}
+                      target="_blank"
+                    >
+                      Paperless ↗
+                    </Button>
+                  {/if}
+                </HStack>
               </TableCell>
             </TableRow>
           {/each}

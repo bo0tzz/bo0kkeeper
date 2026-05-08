@@ -1,6 +1,7 @@
 import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
+import { loadConfig } from 'src/config';
 import { Authenticated } from 'src/decorators';
 import {
   InvoiceComposeDto,
@@ -98,6 +99,28 @@ export class InvoicesController {
     res.setHeader('content-disposition', `attachment; filename="${filename}"`);
     res.setHeader('content-length', String(pdf.byteLength));
     res.end(pdf);
+  }
+
+  /**
+   * Redirect to the paperless document UI for this invoice. 404 when the
+   * invoice was never archived (paperless was unreachable at compose time
+   * and the retry job hasn't completed yet).
+   */
+  @Get(':id/paperless')
+  @Authenticated()
+  async paperlessRedirect(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response): Promise<void> {
+    const invoice = await this.invoiceRepository.findById(id);
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+    if (!invoice.paperlessDocId) {
+      throw new NotFoundException('Invoice not yet archived in paperless');
+    }
+    const baseUrl = loadConfig().paperless.baseUrl;
+    if (!baseUrl) {
+      throw new NotFoundException('Paperless not configured');
+    }
+    res.redirect(302, `${baseUrl.replace(/\/$/, '')}/documents/${invoice.paperlessDocId}/`);
   }
 }
 

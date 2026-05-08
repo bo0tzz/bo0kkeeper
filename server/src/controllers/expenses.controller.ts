@@ -1,5 +1,7 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
+import { loadConfig } from 'src/config';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import {
   ExpenseApproveDto,
@@ -78,6 +80,25 @@ export class ExpensesController {
       throw new NotFoundException();
     }
     return mapExpense(row);
+  }
+
+  /**
+   * Redirect to the paperless document UI for this expense's source receipt.
+   * Every expense has a paperlessDocId by construction (created from a
+   * paperless workflow webhook), so this should never 404 in normal use.
+   */
+  @Get(':id/paperless')
+  @Authenticated()
+  async paperlessRedirect(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response): Promise<void> {
+    const expense = await this.expenseRepository.findById(id);
+    if (!expense) {
+      throw new NotFoundException('Expense not found');
+    }
+    const baseUrl = loadConfig().paperless.baseUrl;
+    if (!baseUrl) {
+      throw new NotFoundException('Paperless not configured');
+    }
+    res.redirect(302, `${baseUrl.replace(/\/$/, '')}/documents/${expense.paperlessDocId}/`);
   }
 
   /** Reject the expense (paperless doc was misclassified, isn't a business expense, etc). */
