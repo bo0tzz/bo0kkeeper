@@ -1,4 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
+import { WiseTransferState } from 'src/enum';
 import z from 'zod';
 
 const DraftFromEventBodySchema = z
@@ -33,3 +34,23 @@ const WiseTransferResponseSchema = z
   })
   .meta({ id: 'WiseTransferResponseDto' });
 export class WiseTransferResponseDto extends createZodDto(WiseTransferResponseSchema) {}
+
+const ListWiseTransfersQuerySchema = z
+  .object({
+    /** Filter to a specific Wise state. */
+    state: z.enum(WiseTransferState).optional(),
+    /** 1-indexed page; defaults to 1. */
+    page: z.coerce.number().int().min(1).default(1),
+    /** Page size; capped at 100. */
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .meta({ id: 'ListWiseTransfersQueryDto' });
+export class ListWiseTransfersQueryDto extends createZodDto(ListWiseTransfersQuerySchema) {}
+
+const ListWiseTransfersResponseSchema = z
+  .object({
+    items: z.array(WiseTransferResponseSchema),
+    total: z.number().int(),
+  })
+  .meta({ id: 'ListWiseTransfersResponseDto' });
+export class ListWiseTransfersResponseDto extends createZodDto(ListWiseTransfersResponseSchema) {}

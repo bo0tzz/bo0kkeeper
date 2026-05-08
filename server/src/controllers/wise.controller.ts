@@ -1,8 +1,13 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Authenticated } from 'src/decorators';
-import { DraftFromEventDto, WiseTransferResponseDto } from 'src/dtos/wise.dto';
-import { JobName } from 'src/enum';
+import { ApiQueryFromDto, Authenticated } from 'src/decorators';
+import {
+  DraftFromEventDto,
+  ListWiseTransfersQueryDto,
+  ListWiseTransfersResponseDto,
+  WiseTransferResponseDto,
+} from 'src/dtos/wise.dto';
+import { JobName, WiseTransferState } from 'src/enum';
 import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { WiseDraftService } from 'src/services/wise-draft.service';
@@ -16,12 +21,17 @@ export class WiseController {
     private readonly wiseTransferRepository: WiseTransferRepository,
   ) {}
 
-  /** Recent wise_transfer rows, newest first. */
+  /** Paginated wise_transfer list with optional state filter, newest first. */
   @Get('transfers')
   @Authenticated()
-  async listTransfers(): Promise<WiseTransferResponseDto[]> {
-    const rows = await this.wiseTransferRepository.findRecent(100);
-    return rows.map((row) => mapWiseTransfer(row));
+  @ApiQueryFromDto(ListWiseTransfersQueryDto)
+  async listTransfers(@Query() query: ListWiseTransfersQueryDto): Promise<ListWiseTransfersResponseDto> {
+    const { items, total } = await this.wiseTransferRepository.findPaginated({
+      state: query.state as WiseTransferState | undefined,
+      offset: (query.page - 1) * query.limit,
+      limit: query.limit,
+    });
+    return { items: items.map((row) => mapWiseTransfer(row)), total };
   }
 
   /**

@@ -1,12 +1,20 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { listWiseTransfers, reconcileWise, type WiseTransferResponse } from '$lib/services/wise.service';
+  import {
+    listWiseTransfers,
+    reconcileWise,
+    type ListWiseTransfersResponse,
+    type WiseTransferResponse,
+    type WiseTransferState,
+  } from '$lib/services/wise.service';
   import {
     Alert,
     Badge,
     Button,
+    Field,
     Heading,
     HStack,
+    Select,
     Stack,
     Table,
     TableBody,
@@ -17,17 +25,36 @@
     Text,
   } from '@immich/ui';
 
-  let transfers = $state<WiseTransferResponse[]>([]);
+  const PAGE_SIZE = 50;
+
+  let data = $state<ListWiseTransfersResponse | null>(null);
   let loading = $state(false);
   let reconciling = $state(false);
   let info = $state<string | null>(null);
   let error = $state<string | null>(null);
 
+  let stateFilter = $state<'' | WiseTransferState>('');
+  let page = $state(1);
+
+  const stateOptions = [
+    { value: '', label: 'Any state' },
+    { value: 'incoming_payment_waiting', label: 'incoming_payment_waiting' },
+    { value: 'processing', label: 'processing' },
+    { value: 'funds_converted', label: 'funds_converted' },
+    { value: 'outgoing_payment_sent', label: 'outgoing_payment_sent' },
+    { value: 'cancelled', label: 'cancelled' },
+    { value: 'failed', label: 'failed' },
+  ];
+
   async function load() {
     loading = true;
     error = null;
     try {
-      transfers = await listWiseTransfers();
+      data = await listWiseTransfers({
+        state: stateFilter || undefined,
+        page,
+        limit: PAGE_SIZE,
+      });
     } catch (error_) {
       error = (error_ as Error).message;
     } finally {
@@ -38,6 +65,17 @@
   $effect(() => {
     void load();
   });
+
+  function applyFilters() {
+    page = 1;
+    void load();
+  }
+
+  function clearFilters() {
+    stateFilter = '';
+    page = 1;
+    void load();
+  }
 
   async function reconcile() {
     reconciling = true;
@@ -74,6 +112,9 @@
     }
     return 'secondary';
   }
+
+  let totalPages = $derived(data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1);
+  let transfers = $derived<WiseTransferResponse[]>(data?.items ?? []);
 </script>
 
 <main class="mx-auto max-w-6xl px-6 py-10">
@@ -88,6 +129,17 @@
       </HStack>
     </HStack>
 
+    <HStack gap={3} class="items-end">
+      <Field label="State">
+        <Select bind:value={stateFilter} options={stateOptions} />
+      </Field>
+      <Button size="small" onclick={applyFilters}>Apply</Button>
+      <Button size="small" variant="ghost" onclick={clearFilters}>Clear</Button>
+      {#if data}
+        <Text size="small" color="muted">{data.total} total</Text>
+      {/if}
+    </HStack>
+
     {#if error}
       <Alert color="danger">{error}</Alert>
     {/if}
@@ -95,10 +147,10 @@
       <Alert color="success">{info}</Alert>
     {/if}
 
-    {#if loading && transfers.length === 0}
+    {#if loading && !data}
       <Text>Loading…</Text>
     {:else if transfers.length === 0}
-      <Text color="muted">No transfers yet.</Text>
+      <Text color="muted">No transfers match these filters.</Text>
     {:else}
       <Table>
         <TableHeader>
@@ -132,6 +184,36 @@
           {/each}
         </TableBody>
       </Table>
+
+      <HStack class="justify-between">
+        <Text size="small" color="muted">
+          Page {page} of {totalPages}
+        </Text>
+        <HStack gap={2}>
+          <Button
+            size="small"
+            variant="ghost"
+            disabled={page <= 1 || loading}
+            onclick={() => {
+              page -= 1;
+              void load();
+            }}
+          >
+            ← Prev
+          </Button>
+          <Button
+            size="small"
+            variant="ghost"
+            disabled={page >= totalPages || loading}
+            onclick={() => {
+              page += 1;
+              void load();
+            }}
+          >
+            Next →
+          </Button>
+        </HStack>
+      </HStack>
     {/if}
   </Stack>
 </main>

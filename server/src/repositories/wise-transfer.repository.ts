@@ -44,7 +44,7 @@ export class WiseTransferRepository {
       .execute();
   }
 
-  /** Recent transfers, newest first. Drives the /wise/transfers list. */
+  /** Recent transfers, newest first. Drives the /transactions all-flows view. */
   findRecent(limit = 100): Promise<WiseTransferRow[]> {
     return this.db
       .selectFrom('wise_transfer')
@@ -52,6 +52,36 @@ export class WiseTransferRepository {
       .orderBy('createdAt', 'desc')
       .limit(limit)
       .execute() as Promise<WiseTransferRow[]>;
+  }
+
+  /**
+   * Paginated transfers with optional state filter, newest first. Returns
+   * the page slice plus the unsliced total so the UI can size the pager
+   * without a second round trip.
+   */
+  async findPaginated(input: {
+    state?: WiseTransferState;
+    offset: number;
+    limit: number;
+  }): Promise<{ items: WiseTransferRow[]; total: number }> {
+    let query = this.db.selectFrom('wise_transfer');
+    if (input.state) {
+      query = query.where('state', '=', input.state);
+    }
+
+    const totalRow = (await query
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .executeTakeFirst()) as { count: string } | undefined;
+    const total = Number(totalRow?.count ?? 0);
+
+    const items = (await query
+      .selectAll()
+      .orderBy('createdAt', 'desc')
+      .limit(input.limit)
+      .offset(input.offset)
+      .execute()) as WiseTransferRow[];
+
+    return { items, total };
   }
 
   /**
