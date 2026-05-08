@@ -1,6 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
 import { Kysely } from 'kysely';
-import { resolve } from 'node:path';
 import { InvoicesController } from 'src/controllers/invoices.controller';
 import { InvoiceComposeDto } from 'src/dtos/invoice.dto';
 import { ClientClass, TradeName } from 'src/enum';
@@ -13,8 +12,6 @@ import { PaperlessService } from 'src/services/paperless.service';
 import { RenderService } from 'src/services/render.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-const TEMPLATES_DIR = resolve(process.cwd(), 'src/templates');
 
 beforeEach(() => {
   process.env.OIDC_ISSUER ??= 'http://idp.test';
@@ -36,7 +33,7 @@ describe('InvoicesController', () => {
     db = await getKyselyDB();
     clientRepo = new ClientRepository(db);
     invoiceRepo = new InvoiceRepository(db);
-    render = new RenderService(TEMPLATES_DIR);
+    render = new RenderService();
 
     paperless = new PaperlessService();
     paperless.uploadDocument = vi.fn().mockRejectedValue(new Error('paperless not configured in tests'));

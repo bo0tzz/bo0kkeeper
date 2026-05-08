@@ -1,15 +1,22 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { copyFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-/** Path resolver for templates — defaults to `dist/templates/` (post-build). */
-export const TEMPLATES_DIR = resolve(process.cwd(), 'dist/templates');
+/**
+ * Templates live under `src/templates/` and are read directly at runtime —
+ * no dist-copy step. cwd is the server package root in dev, prod (container
+ * WORKDIR) and tests, so this resolves consistently. Override with the
+ * `templatesDir` constructor arg for fixtures.
+ */
+export const TEMPLATES_DIR = resolve(process.cwd(), 'src/templates');
+const KNOWN_TEMPLATES = ['invoice'] as const;
 
 export type RenderInput = {
   /** Bare name, no extension — looks up `<templatesDir>/<template>.typ`. */
-  template: 'invoice';
+  template: (typeof KNOWN_TEMPLATES)[number];
   data: Record<string, unknown>;
 };
 
@@ -20,16 +27,31 @@ export type RenderInput = {
  * shell out to `typst compile`, slurp the PDF, clean up. `typst` must be on
  * PATH (mise.toml pins it for dev; production container image bundles it).
  *
- * Spawning is wrapped in `runTypst` so unit tests can substitute a fake.
+ * `runTypst` is protected so unit tests can substitute a fake spawner.
  */
 @Injectable()
-export class RenderService {
+export class RenderService implements OnModuleInit {
   private readonly logger = new Logger(RenderService.name);
 
   constructor(
     @Optional() private readonly templatesDir: string = TEMPLATES_DIR,
     @Optional() private readonly typstBin: string = process.env.TYPST_BIN ?? 'typst',
   ) {}
+
+  /**
+   * Boot-time sanity check: every known template must be readable. Catches
+   * "I deleted/renamed a template and forgot to update something" loud and
+   * early instead of letting the first compose request 500.
+   */
+  onModuleInit(): void {
+    const missing = KNOWN_TEMPLATES.filter((name) => !existsSync(join(this.templatesDir, `${name}.typ`)));
+    if (missing.length > 0) {
+      throw new Error(
+        `RenderService: templates missing from ${this.templatesDir}: ${missing.join(', ')}. ` +
+          `Did you delete a template without updating KNOWN_TEMPLATES, or is TEMPLATES_DIR wrong for this env?`,
+      );
+    }
+  }
 
   async render(input: RenderInput): Promise<Buffer> {
     const work = await mkdtemp(join(tmpdir(), 'bo0kkeeper-render-'));

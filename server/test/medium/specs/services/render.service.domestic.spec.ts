@@ -1,11 +1,8 @@
-import { resolve } from 'node:path';
 import { RenderService } from 'src/services/render.service';
 import { describe, expect, it } from 'vitest';
 
-const TEMPLATES_DIR = resolve(process.cwd(), 'src/templates');
-
 describe('RenderService — domestic variant', () => {
-  const service = new RenderService(TEMPLATES_DIR);
+  const service = new RenderService();
 
   it('renders a domestic invoice with subtotal/BTW/total + payment block', async () => {
     const pdf = await service.render({

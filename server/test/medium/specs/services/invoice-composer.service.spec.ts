@@ -1,5 +1,4 @@
 import { Kysely } from 'kysely';
-import { resolve } from 'node:path';
 import { ClientClass, JobName, TradeName } from 'src/enum';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
@@ -10,8 +9,6 @@ import { PaperlessService } from 'src/services/paperless.service';
 import { RenderService } from 'src/services/render.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-const TEMPLATES_DIR = resolve(process.cwd(), 'src/templates');
 
 beforeEach(() => {
   process.env.OIDC_ISSUER ??= 'http://idp.test';
@@ -38,7 +35,7 @@ describe('InvoiceComposerService', () => {
     db = await getKyselyDB();
     clientRepo = new ClientRepository(db);
     invoiceRepo = new InvoiceRepository(db);
-    render = new RenderService(TEMPLATES_DIR);
+    render = new RenderService();
 
     paperless = new PaperlessService();
     paperless.uploadDocument = vi.fn().mockResolvedValue({ taskId: 'task-uuid-1' });

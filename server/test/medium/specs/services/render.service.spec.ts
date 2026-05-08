@@ -1,12 +1,10 @@
-import { resolve } from 'node:path';
 import { RenderService } from 'src/services/render.service';
 import { afterAll, describe, expect, it } from 'vitest';
 
-const TEMPLATES_DIR = resolve(process.cwd(), 'src/templates');
-
 describe('RenderService — typst integration', () => {
-  // Use src/templates/ directly so the test isn't sensitive to whether `nest build` ran.
-  const service = new RenderService(TEMPLATES_DIR);
+  // No TEMPLATES_DIR override — exercises the same resolution the runtime
+  // uses, so a missing/renamed template here would also fail in prod.
+  const service = new RenderService();
 
   it('renders a non-EU OverseasClientCo invoice as a non-empty PDF', async () => {
     const pdf = await service.render({
