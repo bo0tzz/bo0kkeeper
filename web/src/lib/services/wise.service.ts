@@ -1,4 +1,4 @@
-import { apiPost } from '$lib/services/api';
+import { apiGet, apiPost } from '$lib/services/api';
 
 export type WiseTransferResponse = {
   id: string;
@@ -21,3 +21,6 @@ export const draftFromEvent = (eventId: string, ourReference?: string, fetchFn?:
 
 export const reconcileWise = (fetchFn?: typeof fetch) =>
   apiPost<{ enqueued: true }>('/api/wise/reconcile', {}, { fetch: fetchFn });
+
+export const listWiseTransfers = (fetchFn?: typeof fetch) =>
+  apiGet<WiseTransferResponse[]>('/api/wise/transfers', { fetch: fetchFn });

@@ -44,6 +44,16 @@ export class WiseTransferRepository {
       .execute();
   }
 
+  /** Recent transfers, newest first. Drives the /wise/transfers list. */
+  findRecent(limit = 100): Promise<WiseTransferRow[]> {
+    return this.db
+      .selectFrom('wise_transfer')
+      .selectAll()
+      .orderBy('createdAt', 'desc')
+      .limit(limit)
+      .execute() as Promise<WiseTransferRow[]>;
+  }
+
   /**
    * Transfers in a non-terminal state, oldest first. The reconcile job pulls
    * each from Wise and reapplies the state — catches missed webhooks.

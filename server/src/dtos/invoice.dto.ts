@@ -66,6 +66,24 @@ const InvoiceComposeResponseSchema = z
   .meta({ id: 'InvoiceComposeResponseDto' });
 export class InvoiceComposeResponseDto extends createZodDto(InvoiceComposeResponseSchema) {}
 
+const InvoiceListItemSchema = z
+  .object({
+    id: z.string(),
+    number: z.string(),
+    issuedAt: z.iso.date(),
+    clientId: z.string(),
+    clientName: z.string().nullable(),
+    currency: z.string(),
+    totalMinor: z.string(),
+    eurTotalMinor: z.string().nullable(),
+    btwRateBps: z.number().int().nullable(),
+    btwMinor: z.string().nullable(),
+    paperlessDocId: z.string().nullable(),
+    paid: z.boolean(),
+  })
+  .meta({ id: 'InvoiceListItemDto' });
+export class InvoiceListItemDto extends createZodDto(InvoiceListItemSchema) {}
+
 export function mapInvoice(invoice: InvoiceWithLines): InvoiceResponseDto {
   return {
     id: invoice.id,

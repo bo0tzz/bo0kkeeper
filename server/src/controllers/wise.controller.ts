@@ -1,9 +1,9 @@
-import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Authenticated } from 'src/decorators';
 import { DraftFromEventDto, WiseTransferResponseDto } from 'src/dtos/wise.dto';
 import { JobName } from 'src/enum';
-import { WiseTransferRow } from 'src/repositories/wise-transfer.repository';
+import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { WiseDraftService } from 'src/services/wise-draft.service';
 
@@ -13,7 +13,16 @@ export class WiseController {
   constructor(
     private readonly wiseDraftService: WiseDraftService,
     private readonly jobRepository: JobRepository,
+    private readonly wiseTransferRepository: WiseTransferRepository,
   ) {}
+
+  /** Recent wise_transfer rows, newest first. */
+  @Get('transfers')
+  @Authenticated()
+  async listTransfers(): Promise<WiseTransferResponseDto[]> {
+    const rows = await this.wiseTransferRepository.findRecent(100);
+    return rows.map((row) => mapWiseTransfer(row));
+  }
 
   /**
    * Draft a USD→EUR transfer in Wise from the given inbound credit event.

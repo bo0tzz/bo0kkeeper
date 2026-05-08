@@ -70,6 +70,30 @@ export class InvoiceRepository {
     });
   }
 
+  /**
+   * Recent invoices (newest issuedAt first), with the client name folded in.
+   * The list view doesn't need lines — those come back from `findById`.
+   */
+  findRecent(
+    limit = 100,
+  ): Promise<Array<Invoice & { clientName: string | null; matchedBankTxId: string | null }>> {
+    return this.db
+      .selectFrom('invoice')
+      .innerJoin('client', 'client.id', 'invoice.clientId')
+      .leftJoin('bank_transaction', 'bank_transaction.matchedInvoiceId', 'invoice.id')
+      .selectAll('invoice')
+      .select([
+        'client.name as clientName',
+        'bank_transaction.id as matchedBankTxId',
+      ])
+      .orderBy('invoice.issuedAt', 'desc')
+      .orderBy('invoice.number', 'desc')
+      .limit(limit)
+      .execute() as Promise<
+      Array<Invoice & { clientName: string | null; matchedBankTxId: string | null }>
+    >;
+  }
+
   /** Set the paperless document id once the PDF has been pushed. */
   async setPaperlessDocId(invoiceId: string, paperlessDocId: string): Promise<void> {
     await this.db

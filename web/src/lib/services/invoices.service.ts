@@ -57,8 +57,26 @@ export type InvoiceComposeResponse = {
   invoice: InvoiceResponse;
 };
 
+export type InvoiceListItem = {
+  id: string;
+  number: string;
+  issuedAt: string;
+  clientId: string;
+  clientName: string | null;
+  currency: string;
+  totalMinor: string;
+  eurTotalMinor: string | null;
+  btwRateBps: number | null;
+  btwMinor: string | null;
+  paperlessDocId: string | null;
+  paid: boolean;
+};
+
 export const composeInvoice = (input: InvoiceComposeInput, fetchFn?: typeof fetch) =>
   apiPost<InvoiceComposeResponse>('/api/invoices/compose', input, { fetch: fetchFn });
 
 export const getInvoice = (id: string, fetchFn?: typeof fetch) =>
   apiGet<InvoiceResponse>(`/api/invoices/${id}`, { fetch: fetchFn });
+
+export const listInvoices = (fetchFn?: typeof fetch) =>
+  apiGet<InvoiceListItem[]>('/api/invoices', { fetch: fetchFn });

@@ -14,7 +14,7 @@
   const navItems = [
     { href: resolve('/wise'), label: 'Wise inbox' },
     { href: resolve('/expenses'), label: 'Expenses' },
-    { href: resolve('/invoices/compose'), label: 'Compose invoice' },
+    { href: resolve('/invoices'), label: 'Invoices' },
     { href: resolve('/aggregator'), label: 'BTW rollup' },
     { href: resolve('/clients'), label: 'Clients' },
     { href: resolve('/banking'), label: 'Banking' },

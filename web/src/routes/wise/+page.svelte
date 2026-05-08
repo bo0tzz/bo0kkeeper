@@ -98,6 +98,7 @@
         <Text size="small" color="muted">
           {data ? `${data.total} pending` : ''}
         </Text>
+        <Button size="small" variant="ghost" href="/wise/transfers">Transfers →</Button>
         <Button size="small" variant="ghost" disabled={reconciling} onclick={reconcile}>
           {reconciling ? 'Reconciling…' : 'Reconcile transfers'}
         </Button>

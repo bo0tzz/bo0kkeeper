@@ -2,7 +2,13 @@ import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post, R
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { Authenticated } from 'src/decorators';
-import { InvoiceComposeDto, InvoiceComposeResponseDto, InvoiceResponseDto, mapInvoice } from 'src/dtos/invoice.dto';
+import {
+  InvoiceComposeDto,
+  InvoiceComposeResponseDto,
+  InvoiceListItemDto,
+  InvoiceResponseDto,
+  mapInvoice,
+} from 'src/dtos/invoice.dto';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { InvoiceComposerService, InvoiceLineInput } from 'src/services/invoice-composer.service';
 
@@ -13,6 +19,27 @@ export class InvoicesController {
     private readonly composer: InvoiceComposerService,
     private readonly invoiceRepository: InvoiceRepository,
   ) {}
+
+  /** Recent invoices, newest first. Drives the /invoices list view. */
+  @Get()
+  @Authenticated()
+  async listInvoices(): Promise<InvoiceListItemDto[]> {
+    const rows = await this.invoiceRepository.findRecent(100);
+    return rows.map((row) => ({
+      id: row.id,
+      number: row.number,
+      issuedAt: toIsoDate(row.issuedAt),
+      clientId: row.clientId,
+      clientName: row.clientName,
+      currency: row.currency,
+      totalMinor: String(row.totalMinor),
+      eurTotalMinor: row.eurTotalMinor === null ? null : String(row.eurTotalMinor),
+      btwRateBps: row.btwRateBps,
+      btwMinor: row.btwMinor === null ? null : String(row.btwMinor),
+      paperlessDocId: row.paperlessDocId,
+      paid: row.matchedBankTxId !== null,
+    }));
+  }
 
   @Get(':id')
   @Authenticated()
@@ -72,4 +99,8 @@ export class InvoicesController {
     res.setHeader('content-length', String(pdf.byteLength));
     res.end(pdf);
   }
+}
+
+function toIsoDate(value: Date | string): string {
+  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
 }
