@@ -44,9 +44,21 @@ export class PaperlessApiError extends Error {
 
 type FetchLike = typeof fetch;
 
+export type PaperlessDocument = {
+  id: number;
+  title: string;
+  correspondent: number | null;
+  document_type: number | null;
+  tags: number[];
+  created: string;
+  added: string;
+};
+
 @Injectable()
 export class PaperlessService {
   private readonly logger = new Logger(PaperlessService.name);
+  /** name → id map, populated lazily; cleared on tag creation. */
+  private tagCache: Map<string, number> | null = null;
   private readonly config: Config['paperless'];
   private readonly fetchFn: FetchLike;
 
@@ -134,6 +146,103 @@ export class PaperlessService {
       await sleep(intervalMs);
     }
     throw new PaperlessApiError(0, null, `Paperless consume task ${taskId} did not complete in time`);
+  }
+
+  /**
+   * Fetch a single document by id. Used to read tags after a workflow webhook
+   * fires (the webhook payload is templated and unreliable; the API is the
+   * source of truth).
+   */
+  async getDocument(id: number | string): Promise<PaperlessDocument> {
+    const baseUrl = this.requireBaseUrl();
+    const token = this.requireToken();
+    const response = await this.fetchFn(`${baseUrl}/api/documents/${encodeURIComponent(String(id))}/`, {
+      method: 'GET',
+      headers: { Authorization: `Token ${token}` },
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      throw new PaperlessApiError(
+        response.status,
+        safeJson(text),
+        `Paperless document lookup failed: ${response.status}`,
+      );
+    }
+    return safeJson(text) as PaperlessDocument;
+  }
+
+  /**
+   * Resolve a list of tag names to their numeric ids. Tags that don't exist
+   * are created (unless `createMissing` is false, in which case missing
+   * tags throw).
+   */
+  async resolveTagIds(names: string[], opts: { createMissing?: boolean } = {}): Promise<number[]> {
+    if (names.length === 0) {
+      return [];
+    }
+    const cache = await this.loadTagCache();
+    const ids: number[] = [];
+    for (const name of names) {
+      const existing = cache.get(name);
+      if (existing !== undefined) {
+        ids.push(existing);
+        continue;
+      }
+      if (opts.createMissing === false) {
+        throw new Error(`Paperless tag not found: ${name}`);
+      }
+      const created = await this.createTag(name);
+      cache.set(name, created);
+      ids.push(created);
+    }
+    return ids;
+  }
+
+  private async loadTagCache(): Promise<Map<string, number>> {
+    if (this.tagCache) {
+      return this.tagCache;
+    }
+    const baseUrl = this.requireBaseUrl();
+    const token = this.requireToken();
+    const cache = new Map<string, number>();
+    let url: string | null = `${baseUrl}/api/tags/?page_size=200`;
+    while (url) {
+      const response = await this.fetchFn(url, {
+        method: 'GET',
+        headers: { Authorization: `Token ${token}` },
+      });
+      const text = await response.text();
+      if (!response.ok) {
+        throw new PaperlessApiError(response.status, safeJson(text), `Paperless tag list failed: ${response.status}`);
+      }
+      const page = safeJson(text) as { results: Array<{ id: number; name: string }>; next: string | null };
+      for (const tag of page.results) {
+        cache.set(tag.name, tag.id);
+      }
+      url = page.next;
+    }
+    this.tagCache = cache;
+    return cache;
+  }
+
+  private async createTag(name: string): Promise<number> {
+    const baseUrl = this.requireBaseUrl();
+    const token = this.requireToken();
+    const response = await this.fetchFn(`${baseUrl}/api/tags/`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ name }),
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      throw new PaperlessApiError(response.status, safeJson(text), `Paperless tag create failed: ${response.status}`);
+    }
+    const tag = safeJson(text) as { id: number; name: string };
+    this.logger.log(`paperless: created tag "${name}" (id=${tag.id})`);
+    return tag.id;
   }
 
   private requireBaseUrl(): string {

@@ -54,6 +54,17 @@ const ConfigSchema = z.object({
    * When set, requests without a matching header are rejected.
    */
   PAPERLESS_WEBHOOK_TOKEN: z.string().optional(),
+  /**
+   * Comma-separated tag NAMES required on a paperless document for it to
+   * register as a pending expense. Doc must have ALL listed tags. Tag names
+   * (not ids) so the same config works against dev + prod paperless.
+   */
+  PAPERLESS_EXPENSE_TAGS: z.string().default('Business,Bills'),
+  /**
+   * Comma-separated tag names to apply to invoices we push into paperless.
+   * Missing tags are auto-created on first use.
+   */
+  PAPERLESS_OUTGOING_INVOICE_TAGS: z.string().default('Business,Invoice,bo0kkeeper'),
 
   /**
    * Issuer details printed on every invoice. KvK + VAT id are required by Dutch
@@ -112,6 +123,10 @@ export type Config = {
     baseUrl?: string;
     token?: string;
     webhookToken?: string;
+    /** Tag names a doc must carry to be ingested as an expense. */
+    expenseTags: string[];
+    /** Tag names applied to bo0kkeeper-issued invoices on upload. */
+    outgoingInvoiceTags: string[];
   };
   issuer: {
     kvk: string;
@@ -175,6 +190,8 @@ export function loadConfig(): Config {
       baseUrl: result.data.PAPERLESS_BASE_URL,
       token: result.data.PAPERLESS_TOKEN,
       webhookToken: result.data.PAPERLESS_WEBHOOK_TOKEN,
+      expenseTags: splitTags(result.data.PAPERLESS_EXPENSE_TAGS),
+      outgoingInvoiceTags: splitTags(result.data.PAPERLESS_OUTGOING_INVOICE_TAGS),
     },
     issuer: {
       kvk: result.data.ISSUER_KVK,
@@ -191,4 +208,11 @@ export function loadConfig(): Config {
       spreadsheetId: result.data.SHEETS_SPREADSHEET_ID,
     },
   };
+}
+
+function splitTags(value: string): string[] {
+  return value
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }

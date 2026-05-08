@@ -4,26 +4,51 @@ import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { DB } from 'src/schema';
 import { ExpensePipelineService } from 'src/services/expense-pipeline.service';
+import { PaperlessService } from 'src/services/paperless.service';
 import { getKyselyDB } from 'test/utils';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 beforeEach(() => {
   process.env.OIDC_ISSUER ??= 'http://idp.test';
   process.env.OIDC_CLIENT_ID ??= 'test';
   process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
+  // Disable tag-gate by default in this suite — it's exercised explicitly by
+  // the dedicated tag-gate test below. Most existing assertions don't care
+  // about tags and would otherwise need to mock paperless.
+  process.env.PAPERLESS_EXPENSE_TAGS = '';
 });
+
+function fakePaperless(opts: { docTags?: number[]; tagIds?: Map<string, number> } = {}): PaperlessService {
+  return {
+    getDocument: vi.fn().mockResolvedValue({
+      id: 0,
+      tags: opts.docTags ?? [],
+      correspondent: null,
+      document_type: null,
+      title: '',
+      created: '',
+      added: '',
+    }),
+    resolveTagIds: vi.fn().mockImplementation((names: string[]) => {
+      const map = opts.tagIds ?? new Map<string, number>();
+      return Promise.resolve(names.map((n) => map.get(n) ?? 0));
+    }),
+  } as unknown as PaperlessService;
+}
 
 describe('ExpensePipelineService', () => {
   let db: Kysely<DB>;
   let eventRepo: EventRepository;
   let expenseRepo: ExpenseRepository;
+  let paperless: PaperlessService;
   let service: ExpensePipelineService;
 
   beforeEach(async () => {
     db = await getKyselyDB();
     eventRepo = new EventRepository(db);
     expenseRepo = new ExpenseRepository(db);
-    service = new ExpensePipelineService(eventRepo, expenseRepo);
+    paperless = fakePaperless();
+    service = new ExpensePipelineService(eventRepo, expenseRepo, paperless);
   });
 
   afterEach(async () => {
@@ -110,6 +135,89 @@ describe('ExpensePipelineService', () => {
 
     const eventAfter = await eventRepo.findById(ingest.event.id);
     expect(eventAfter?.status).toBe(EventStatus.Processed);
+  });
+
+  describe('tag gate', () => {
+    beforeEach(async () => {
+      // Override the env+service for this block: PAPERLESS_EXPENSE_TAGS=Business,Bills
+      // wired to a fake paperless where Business=1, Bills=4.
+      await db.destroy();
+      db = await getKyselyDB();
+      eventRepo = new EventRepository(db);
+      expenseRepo = new ExpenseRepository(db);
+      process.env.PAPERLESS_EXPENSE_TAGS = 'Business,Bills';
+    });
+
+    it('ingests a doc that has all required tags', async () => {
+      paperless = fakePaperless({
+        docTags: [1, 4, 5],
+        tagIds: new Map([
+          ['Business', 1],
+          ['Bills', 4],
+        ]),
+      });
+      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless);
+      const ingest = await eventRepo.ingest({
+        source: EventSource.Paperless,
+        eventType: 'document.consumed',
+        externalId: 'paperless-tagged-yes',
+        occurredAt: new Date('2099-04-05'),
+        payload: { document_id: 4242, correspondent: 'Acme Cables', created: '2099-04-05' },
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+      await service.handleProcessPaperlessDocument({ eventId: ingest.event.id });
+      const pending = await expenseRepo.findPendingReview();
+      expect(pending).toHaveLength(1);
+    });
+
+    it('skips a doc missing one of the required tags', async () => {
+      paperless = fakePaperless({
+        docTags: [1], // has Business but not Bills
+        tagIds: new Map([
+          ['Business', 1],
+          ['Bills', 4],
+        ]),
+      });
+      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless);
+      const ingest = await eventRepo.ingest({
+        source: EventSource.Paperless,
+        eventType: 'document.consumed',
+        externalId: 'paperless-tagged-partial',
+        occurredAt: new Date('2099-04-05'),
+        payload: { document_id: 4243, correspondent: 'Random', created: '2099-04-05' },
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+      await service.handleProcessPaperlessDocument({ eventId: ingest.event.id });
+      const pending = await expenseRepo.findPendingReview();
+      expect(pending).toHaveLength(0);
+      const eventAfter = await eventRepo.findById(ingest.event.id);
+      expect(eventAfter?.status).toBe(EventStatus.Processed);
+    });
+
+    it('falls through to ingest when tag resolution errors (over-ingest > silent drop)', async () => {
+      paperless = {
+        getDocument: vi.fn().mockRejectedValue(new Error('paperless down')),
+        resolveTagIds: vi.fn().mockRejectedValue(new Error('paperless down')),
+      } as unknown as PaperlessService;
+      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless);
+      const ingest = await eventRepo.ingest({
+        source: EventSource.Paperless,
+        eventType: 'document.consumed',
+        externalId: 'paperless-tag-error',
+        occurredAt: new Date('2099-04-05'),
+        payload: { document_id: 4244, correspondent: 'Vendor', created: '2099-04-05' },
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+      await service.handleProcessPaperlessDocument({ eventId: ingest.event.id });
+      const pending = await expenseRepo.findPendingReview();
+      expect(pending).toHaveLength(1);
+    });
   });
 
   it('throws when the event id does not exist', async () => {

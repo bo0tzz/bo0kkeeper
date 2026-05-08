@@ -21,5 +21,57 @@ services:
       timeout: 5s
       retries: 10
 
+  # Local paperless-ngx instance for testing the expense ingest webhook end-to-end.
+  # First boot creates an admin user from the env vars below; once you can log
+  # in at http://localhost:8000, set up a workflow:
+  #   Settings → Workflows → New
+  #     - Trigger: "Document added" (any/all docs you want to surface as expenses)
+  #     - Action: "Webhook" → POST http://host.docker.internal:2283/api/webhooks/paperless
+  #       with Authorization: Bearer <PAPERLESS_WEBHOOK_TOKEN from .env>
+  #       Body: {"document_id": "{doc_pk}", "correspondent": "{correspondent}", "created": "{created_date}"}
+  paperless-broker:
+    container_name: bo0kkeeper_paperless_broker
+    image: docker.io/library/redis:7
+    restart: unless-stopped
+    volumes:
+      - paperless-redis:/data
+
+  paperless:
+    container_name: bo0kkeeper_paperless
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    restart: unless-stopped
+    depends_on:
+      - paperless-broker
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      # So the paperless container can reach the bo0kkeeper backend on the host
+      # to POST workflow webhooks.
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - paperless-data:/usr/src/paperless/data
+      - paperless-media:/usr/src/paperless/media
+      - paperless-export:/usr/src/paperless/export
+      - paperless-consume:/usr/src/paperless/consume
+    environment:
+      PAPERLESS_REDIS: redis://paperless-broker:6379
+      PAPERLESS_DBENGINE: sqlite
+      PAPERLESS_OCR_LANGUAGES: eng+nld
+      PAPERLESS_TIME_ZONE: Europe/Amsterdam
+      PAPERLESS_ADMIN_USER: ${PAPERLESS_DEV_ADMIN_USER:-admin}
+      PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_DEV_ADMIN_PASSWORD:-admin}
+      PAPERLESS_URL: http://localhost:8000
+    healthcheck:
+      test: curl -f http://localhost:8000 || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
 volumes:
   postgres-data:
+  paperless-data:
+  paperless-media:
+  paperless-export:
+  paperless-consume:
+  paperless-redis:

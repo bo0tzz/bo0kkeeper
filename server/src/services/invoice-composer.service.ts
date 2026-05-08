@@ -63,6 +63,7 @@ const INVOICE_TEMPLATE = 'invoice' as const;
 @Injectable()
 export class InvoiceComposerService {
   private readonly logger = new Logger(InvoiceComposerService.name);
+  private readonly outgoingInvoiceTags = loadConfig().paperless.outgoingInvoiceTags;
 
   constructor(
     private readonly clientRepository: ClientRepository,
@@ -95,12 +96,21 @@ export class InvoiceComposerService {
     const data = buildInvoiceData(client, invoice);
     const pdf = await this.renderService.render({ template: INVOICE_TEMPLATE, data });
 
+    // Resolve outgoing-invoice tag NAMES → IDs at upload time (auto-creates
+    // any missing). Keeping config as names lets the same env work against
+    // dev paperless and the user's real instance, where tag IDs differ.
+    const tagIds =
+      this.outgoingInvoiceTags.length === 0
+        ? undefined
+        : await this.paperlessService.resolveTagIds(this.outgoingInvoiceTags);
+
     const issuedAt = invoice.issuedAt instanceof Date ? invoice.issuedAt : new Date(invoice.issuedAt);
     const upload = await this.paperlessService.uploadDocument({
       file: pdf,
       filename: `${invoice.number.replaceAll('/', '-')}.pdf`,
       title: `${client.name} ${invoice.number}`,
       created: issuedAt.toISOString().slice(0, 10),
+      tagIds,
     });
     const docId = await this.paperlessService.waitForDocumentId(upload.taskId);
     await this.invoiceRepository.setPaperlessDocId(invoice.id, docId);
