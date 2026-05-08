@@ -17,6 +17,7 @@
     { href: resolve('/invoices/compose'), label: 'Compose invoice' },
     { href: resolve('/aggregator'), label: 'BTW rollup' },
     { href: resolve('/clients'), label: 'Clients' },
+    { href: resolve('/banking'), label: 'Banking' },
     { href: resolve('/events'), label: 'Events' },
   ];
 </script>
