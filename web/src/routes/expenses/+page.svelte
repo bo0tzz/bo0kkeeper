@@ -124,6 +124,30 @@
     return (negative ? -total : total).toString();
   }
 
+  /**
+   * Derive BTW from gross + rate using Dutch convention (gross is VAT-inclusive):
+   *   btw = gross * rate / (100 + rate)
+   * Returns '' when either input is empty/invalid so the field can be cleared
+   * by clearing the rate.
+   */
+  function deriveBtwMajor(amountMajor: string, btwRatePercent: string): string {
+    const gross = Number.parseFloat(amountMajor);
+    const rate = Number.parseFloat(btwRatePercent);
+    if (!Number.isFinite(gross) || !Number.isFinite(rate) || rate < 0) {
+      return '';
+    }
+    const btw = (gross * rate) / (100 + rate);
+    return btw.toFixed(2);
+  }
+
+  function recalcBtw(id: string) {
+    const draft = drafts[id];
+    if (!draft) {
+      return;
+    }
+    draft.btwMajor = deriveBtwMajor(draft.amountMajor, draft.btwRatePercent);
+  }
+
   function expand(expense: ExpenseResponse) {
     expandedId = expense.id;
     if (!drafts[expense.id]) {
@@ -304,10 +328,18 @@
               </HStack>
               <HStack gap={3}>
                 <Field label="Amount (gross, EUR)" invalid={hasIssue('amountMinor')}>
-                  <Input bind:value={drafts[expense.id].amountMajor} placeholder="0.00" />
+                  <Input
+                    bind:value={drafts[expense.id].amountMajor}
+                    placeholder="0.00"
+                    oninput={() => recalcBtw(expense.id)}
+                  />
                 </Field>
                 <Field label="BTW rate (%)" invalid={hasIssue('btwRateBps')}>
-                  <Input bind:value={drafts[expense.id].btwRatePercent} placeholder="21" />
+                  <Input
+                    bind:value={drafts[expense.id].btwRatePercent}
+                    placeholder="21"
+                    oninput={() => recalcBtw(expense.id)}
+                  />
                 </Field>
                 <Field label="BTW amount (EUR)" invalid={hasIssue('btwMinor')}>
                   <Input bind:value={drafts[expense.id].btwMajor} placeholder="0.00" />
