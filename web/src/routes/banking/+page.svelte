@@ -339,9 +339,9 @@
                 <TableCell><Badge color={label.color}>{label.text}</Badge></TableCell>
                 <TableCell>
                   {#if matched}
-                    <Button size="tiny" variant="ghost" onclick={() => unlink(tx)}>Unlink</Button>
+                    <Button size="small" variant="ghost" onclick={() => unlink(tx)}>Unlink</Button>
                   {:else}
-                    <Button size="tiny" onclick={() => openLinkModal(tx)}>Link</Button>
+                    <Button size="small" onclick={() => openLinkModal(tx)}>Link</Button>
                   {/if}
                 </TableCell>
               </TableRow>
@@ -353,7 +353,7 @@
   </Stack>
 
   {#if linkingTx}
-    <Modal title="Link bank transaction" onClose={closeLinkModal} size="medium">
+    <Modal title="Link bank transaction" onClose={closeLinkModal} size="medium" closeOnBackdropClick>
       <ModalBody>
         <Stack gap={4}>
           <div class="rounded border p-3 text-sm">
@@ -390,7 +390,7 @@
                       {formatAmount(t.sourceAmountMinor, t.sourceCurrency)} → {formatAmount(t.targetAmountMinor, t.targetCurrency)}
                     </div>
                   </div>
-                  <Button size="tiny" disabled={linking} onclick={() => link('wise_transfer', t.id)}>Link</Button>
+                  <Button size="small" disabled={linking} onclick={() => link('wise_transfer', t.id)}>Link</Button>
                 </HStack>
               {/each}
             </Stack>
@@ -407,7 +407,7 @@
                       {i.issuedAt} · {formatAmount(i.totalMinor, i.currency)}
                     </div>
                   </div>
-                  <Button size="tiny" disabled={linking} onclick={() => link('invoice', i.id)}>Link</Button>
+                  <Button size="small" disabled={linking} onclick={() => link('invoice', i.id)}>Link</Button>
                 </HStack>
               {/each}
             </Stack>
@@ -424,7 +424,7 @@
                       {e.expenseDate} · {formatAmount(e.amountMinor, e.currency)}
                     </div>
                   </div>
-                  <Button size="tiny" disabled={linking} onclick={() => link('expense', e.id)}>Link</Button>
+                  <Button size="small" disabled={linking} onclick={() => link('expense', e.id)}>Link</Button>
                 </HStack>
               {/each}
             </Stack>

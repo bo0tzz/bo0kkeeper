@@ -7,7 +7,6 @@
     Button,
     Field,
     Heading,
-    HStack,
     Input,
     Stack,
     Table,
@@ -133,10 +132,6 @@
           </TableBody>
         </Table>
       {/if}
-
-      <HStack>
-        <Button variant="ghost" onclick={() => load()}>Refresh</Button>
-      </HStack>
     {/if}
   </Stack>
 </main>
