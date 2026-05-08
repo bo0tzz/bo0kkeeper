@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '$lib/services/api';
+import { apiDelete, apiGet, apiPost, apiPut } from '$lib/services/api';
 
 export type BankingAccount = {
   uid: string;
@@ -59,3 +59,51 @@ export type BankTransaction = {
 
 export const listBankTransactions = (fetchFn?: typeof fetch) =>
   apiGet<BankTransaction[]>('/api/banking/transactions', { fetch: fetchFn });
+
+export type TransferCandidate = {
+  id: string;
+  wiseTransferId: string;
+  ourReference: string | null;
+  state: string;
+  sourceCurrency: string;
+  sourceAmountMinor: string;
+  targetCurrency: string;
+  targetAmountMinor: string;
+  createdAt: string;
+};
+export type InvoiceCandidate = {
+  id: string;
+  number: string;
+  totalMinor: string;
+  currency: string;
+  issuedAt: string;
+  clientName: string | null;
+};
+export type ExpenseCandidate = {
+  id: string;
+  vendor: string;
+  amountMinor: string;
+  currency: string;
+  expenseDate: string;
+  status: string;
+};
+export type MatchCandidates = {
+  transfers: TransferCandidate[];
+  invoices: InvoiceCandidate[];
+  expenses: ExpenseCandidate[];
+};
+
+export const listMatchCandidates = (q: string, fetchFn?: typeof fetch) =>
+  apiGet<MatchCandidates>('/api/banking/match-candidates', {
+    fetch: fetchFn,
+    query: q ? { q } : undefined,
+  });
+
+export const setBankTxMatch = (
+  bankTxId: string,
+  body: { type: 'wise_transfer' | 'invoice' | 'expense'; targetId: string },
+  fetchFn?: typeof fetch,
+) => apiPut<BankTransaction>(`/api/banking/transactions/${bankTxId}/match`, body, { fetch: fetchFn });
+
+export const clearBankTxMatch = (bankTxId: string, fetchFn?: typeof fetch) =>
+  apiDelete<BankTransaction>(`/api/banking/transactions/${bankTxId}/match`, { fetch: fetchFn });

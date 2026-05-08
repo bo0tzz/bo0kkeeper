@@ -5,9 +5,12 @@ import { BankingController } from 'src/controllers/banking.controller';
 import { BankingSessionStatus, BankSource, JobName } from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
+import { ClientRepository } from 'src/repositories/client.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
+import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { BankingSessionService } from 'src/services/banking-session.service';
+import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -48,7 +51,10 @@ describe('BankingController', () => {
     jobRepo = {
       queue: vi.fn().mockResolvedValue('fake-job-id'),
     } as unknown as JobRepository & { queue: ReturnType<typeof vi.fn> };
-    controller = new BankingController(service, repo, jobRepo, bankTxRepo);
+    const clientRepo = new ClientRepository(db);
+    const sheetWriter = { writeIncomeRow: vi.fn().mockResolvedValue() } as unknown as SheetWriterService;
+    const matcher = new BankMatcherService(db, bankTxRepo, clientRepo, sheetWriter);
+    controller = new BankingController(service, repo, jobRepo, bankTxRepo, matcher);
   });
 
   afterEach(async () => {
@@ -107,6 +113,71 @@ describe('BankingController', () => {
     const result = await controller.sync('203.0.113.42');
     expect(result).toEqual({ enqueued: true });
     expect(jobRepo.queue).toHaveBeenCalledWith(JobName.BankingSyncAll, { psuIpAddress: '203.0.113.42' });
+  });
+
+  it('GET /match-candidates without a query returns recent items of each type', async () => {
+    const result = await controller.matchCandidates();
+    expect(result).toEqual({ transfers: [], invoices: [], expenses: [] });
+  });
+
+  it('PUT /transactions/:id/match links a wise_transfer with confidence=manual', async () => {
+    const tx = await db
+      .insertInto('bank_transaction')
+      .values({
+        source: BankSource.EnableBanking,
+        externalId: 'ctrl-link-1',
+        txDate: new Date('2026-05-07'),
+        amountMinor: 50_000n,
+        currency: 'EUR',
+        description: 'no reference here',
+        rawPayload: {},
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    const transfer = await db
+      .insertInto('wise_transfer')
+      .values({
+        wiseTransferId: 'WISE-MANUAL-1',
+        direction: 'out',
+        sourceAmountMinor: 60_000n,
+        sourceCurrency: 'USD',
+        targetAmountMinor: 50_000n,
+        targetCurrency: 'EUR',
+        feeMinor: 0n,
+        feeCurrency: 'USD',
+        state: 'outgoing_payment_sent',
+        stateUpdatedAt: new Date(),
+        ourReference: 'TXN-9999',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    const result = await controller.setMatch(tx.id, { type: 'wise_transfer', targetId: transfer.id });
+    expect(result.matchedTransferId).toBe(transfer.id);
+    expect(result.matchConfidence).toBe('manual');
+  });
+
+  it('DELETE /transactions/:id/match clears all match fields', async () => {
+    const tx = await db
+      .insertInto('bank_transaction')
+      .values({
+        source: BankSource.EnableBanking,
+        externalId: 'ctrl-link-2',
+        txDate: new Date('2026-05-07'),
+        amountMinor: 50_000n,
+        currency: 'EUR',
+        description: '',
+        rawPayload: {},
+        matchedTransferId: null,
+        matchedAt: new Date(),
+        matchConfidence: 'auto_high',
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    const result = await controller.clearMatch(tx.id);
+    expect(result.matchedAt).toBeNull();
+    expect(result.matchConfidence).toBeNull();
   });
 
   it('GET /transactions returns recent rows mapped into a serializable DTO', async () => {

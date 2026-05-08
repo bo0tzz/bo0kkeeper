@@ -79,6 +79,22 @@ export async function apiPatch<T>(path: string, body: unknown, options: ApiOptio
   return parse<T>(res);
 }
 
+export async function apiPut<T>(path: string, body: unknown, options: ApiOptions = {}): Promise<T> {
+  const fetchFn = options.fetch ?? fetch;
+  const res = await fetchFn(path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
+  });
+  return parse<T>(res);
+}
+
+export async function apiDelete<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  const fetchFn = options.fetch ?? fetch;
+  const res = await fetchFn(path, { method: 'DELETE' });
+  return parse<T>(res);
+}
+
 async function parse<T>(res: Response): Promise<T> {
   const text = await res.text();
   const data: unknown = text ? safeParseJson(text) : undefined;

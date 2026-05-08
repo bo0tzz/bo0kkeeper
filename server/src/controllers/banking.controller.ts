@@ -1,4 +1,17 @@
-import { BadRequestException, Body, Controller, Get, Ip, Post, Query, Res } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Ip,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Put,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { Authenticated } from 'src/decorators';
@@ -7,11 +20,14 @@ import {
   BankingStartAuthDto,
   BankingStartAuthResponseDto,
   BankTransactionResponseDto,
+  BankTxMatchCandidatesDto,
+  BankTxSetMatchDto,
 } from 'src/dtos/banking.dto';
 import { JobName } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { JobRepository } from 'src/repositories/job.repository';
+import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { BankingSessionService } from 'src/services/banking-session.service';
 
 /**
@@ -34,6 +50,7 @@ export class BankingController {
     private readonly sessionRepository: BankingSessionRepository,
     private readonly jobRepository: JobRepository,
     private readonly bankTransactionRepository: BankTransactionRepository,
+    private readonly matcher: BankMatcherService,
   ) {}
 
   @Post('auth/start')
@@ -91,6 +108,65 @@ export class BankingController {
   async listTransactions(): Promise<BankTransactionResponseDto[]> {
     const rows = await this.bankTransactionRepository.findRecent(50);
     return rows.map((row) => toBankTransactionDto(row));
+  }
+
+  /**
+   * Candidates for manual link. Defaults to recent rows of each type when no
+   * query is given; with a query, filters by the most useful identifier per
+   * type (wise reference, invoice number, vendor name).
+   */
+  @Get('match-candidates')
+  @Authenticated()
+  async matchCandidates(@Query('q') q?: string): Promise<BankTxMatchCandidatesDto> {
+    const candidates = await this.matcher.findMatchCandidates(q);
+    return {
+      transfers: candidates.transfers.map((t) => ({
+        id: t.id,
+        wiseTransferId: t.wiseTransferId,
+        ourReference: t.ourReference,
+        state: t.state,
+        sourceCurrency: t.sourceCurrency,
+        sourceAmountMinor: String(t.sourceAmountMinor),
+        targetCurrency: t.targetCurrency,
+        targetAmountMinor: String(t.targetAmountMinor),
+        createdAt: new Date(t.createdAt).toISOString(),
+      })),
+      invoices: candidates.invoices.map((i) => ({
+        id: i.id,
+        number: i.number,
+        totalMinor: String(i.totalMinor),
+        currency: i.currency,
+        issuedAt: new Date(i.issuedAt).toISOString().slice(0, 10),
+        clientName: i.clientName,
+      })),
+      expenses: candidates.expenses.map((e) => ({
+        id: e.id,
+        vendor: e.vendor,
+        amountMinor: String(e.amountMinor),
+        currency: e.currency,
+        expenseDate: new Date(e.expenseDate).toISOString().slice(0, 10),
+        status: e.status,
+      })),
+    };
+  }
+
+  /** Operator-driven manual match. Sets confidence=manual, runs sheet append. */
+  @Put('transactions/:id/match')
+  @Authenticated()
+  async setMatch(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: BankTxSetMatchDto,
+  ): Promise<BankTransactionResponseDto> {
+    const row = await this.matcher.manualMatch(id, { type: body.type, targetId: body.targetId });
+    return toBankTransactionDto(row);
+  }
+
+  /** Operator unlink — clears all match fields. */
+  @Delete('transactions/:id/match')
+  @Authenticated()
+  async clearMatch(@Param('id', ParseUUIDPipe) id: string): Promise<BankTransactionResponseDto> {
+    const row = await this.matcher.clearMatch(id);
+    return toBankTransactionDto(row);
   }
 }
 

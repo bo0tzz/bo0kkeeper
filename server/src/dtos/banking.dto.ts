@@ -42,6 +42,52 @@ const SessionResponseSchema = z
   .meta({ id: 'BankingSessionResponseDto' });
 export class BankingSessionResponseDto extends createZodDto(SessionResponseSchema) {}
 
+const MatchTargetType = z.enum(['wise_transfer', 'invoice', 'expense']);
+
+const SetMatchBodySchema = z
+  .object({
+    type: MatchTargetType,
+    targetId: z.uuid(),
+  })
+  .meta({ id: 'BankTxSetMatchDto' });
+export class BankTxSetMatchDto extends createZodDto(SetMatchBodySchema) {}
+
+const TransferCandidateSchema = z.object({
+  id: z.uuid(),
+  wiseTransferId: z.string(),
+  ourReference: z.string().nullable(),
+  state: z.string(),
+  sourceCurrency: z.string(),
+  sourceAmountMinor: z.string(),
+  targetCurrency: z.string(),
+  targetAmountMinor: z.string(),
+  createdAt: z.string(),
+});
+const InvoiceCandidateSchema = z.object({
+  id: z.uuid(),
+  number: z.string(),
+  totalMinor: z.string(),
+  currency: z.string(),
+  issuedAt: z.string(),
+  clientName: z.string().nullable(),
+});
+const ExpenseCandidateSchema = z.object({
+  id: z.uuid(),
+  vendor: z.string(),
+  amountMinor: z.string(),
+  currency: z.string(),
+  expenseDate: z.string(),
+  status: z.string(),
+});
+const MatchCandidatesResponseSchema = z
+  .object({
+    transfers: z.array(TransferCandidateSchema),
+    invoices: z.array(InvoiceCandidateSchema),
+    expenses: z.array(ExpenseCandidateSchema),
+  })
+  .meta({ id: 'BankTxMatchCandidatesDto' });
+export class BankTxMatchCandidatesDto extends createZodDto(MatchCandidatesResponseSchema) {}
+
 const BankTransactionResponseSchema = z
   .object({
     id: z.uuid(),

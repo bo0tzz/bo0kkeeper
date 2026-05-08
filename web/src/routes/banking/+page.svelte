@@ -1,19 +1,27 @@
 <script lang="ts">
   import { page } from '$app/state';
   import {
+    clearBankTxMatch,
     getLatestBankingSession,
     listBankTransactions,
+    listMatchCandidates,
+    setBankTxMatch,
     startBankingAuth,
     syncBankingNow,
     type BankingSession,
     type BankTransaction,
+    type MatchCandidates,
   } from '$lib/services/banking.service';
   import {
     Alert,
     Badge,
     Button,
+    Field,
     Heading,
     HStack,
+    Input,
+    Modal,
+    ModalBody,
     Stack,
     Table,
     TableBody,
@@ -31,6 +39,12 @@
   let syncing = $state(false);
   let error = $state<string | null>(null);
   let info = $state<string | null>(null);
+
+  let linkingTx = $state<BankTransaction | null>(null);
+  let candidates = $state<MatchCandidates>({ transfers: [], invoices: [], expenses: [] });
+  let candidateQuery = $state('');
+  let candidatesLoading = $state(false);
+  let linking = $state(false);
 
   const callbackError = page.url.searchParams.get('error');
 
@@ -99,6 +113,58 @@
     return { color: 'warning', text: 'unmatched' };
   }
 
+  function isMatched(tx: BankTransaction): boolean {
+    return tx.matchedTransferId !== null || tx.matchedInvoiceId !== null || tx.matchedExpenseId !== null;
+  }
+
+  async function openLinkModal(tx: BankTransaction) {
+    linkingTx = tx;
+    candidateQuery = '';
+    await loadCandidates();
+  }
+
+  function closeLinkModal() {
+    linkingTx = null;
+    candidates = { transfers: [], invoices: [], expenses: [] };
+    candidateQuery = '';
+  }
+
+  async function loadCandidates() {
+    candidatesLoading = true;
+    try {
+      candidates = await listMatchCandidates(candidateQuery);
+    } catch (error_) {
+      error = (error_ as Error).message;
+    } finally {
+      candidatesLoading = false;
+    }
+  }
+
+  async function link(type: 'wise_transfer' | 'invoice' | 'expense', targetId: string) {
+    if (!linkingTx) {
+      return;
+    }
+    linking = true;
+    try {
+      const updated = await setBankTxMatch(linkingTx.id, { type, targetId });
+      transactions = transactions.map((row) => (row.id === updated.id ? updated : row));
+      closeLinkModal();
+    } catch (error_) {
+      error = (error_ as Error).message;
+    } finally {
+      linking = false;
+    }
+  }
+
+  async function unlink(tx: BankTransaction) {
+    try {
+      const updated = await clearBankTxMatch(tx.id);
+      transactions = transactions.map((row) => (row.id === updated.id ? updated : row));
+    } catch (error_) {
+      error = (error_ as Error).message;
+    }
+  }
+
   function daysUntil(iso: string | null): number | null {
     if (!iso) {
       return null;
@@ -121,7 +187,7 @@
   }
 </script>
 
-<main class="mx-auto max-w-4xl px-6 py-10">
+<main class="mx-auto max-w-6xl px-6 py-10">
   <Stack gap={6}>
     <Heading size="large" tag="h1">Banking</Heading>
 
@@ -249,11 +315,13 @@
               <TableHeading>Counterparty</TableHeading>
               <TableHeading>Description</TableHeading>
               <TableHeading>Match</TableHeading>
+              <TableHeading></TableHeading>
             </TableRow>
           </TableHeader>
           <TableBody>
             {#each transactions as tx (tx.id)}
               {@const label = matchLabel(tx)}
+              {@const matched = isMatched(tx)}
               <TableRow>
                 <TableCell>{tx.txDate}</TableCell>
                 <TableCell>
@@ -267,8 +335,15 @@
                     <div class="text-xs text-muted-foreground"><code>{tx.counterpartyIban}</code></div>
                   {/if}
                 </TableCell>
-                <TableCell class="max-w-md truncate">{tx.description || '—'}</TableCell>
+                <TableCell class="whitespace-normal break-words">{tx.description || '—'}</TableCell>
                 <TableCell><Badge color={label.color}>{label.text}</Badge></TableCell>
+                <TableCell>
+                  {#if matched}
+                    <Button size="tiny" variant="ghost" onclick={() => unlink(tx)}>Unlink</Button>
+                  {:else}
+                    <Button size="tiny" onclick={() => openLinkModal(tx)}>Link</Button>
+                  {/if}
+                </TableCell>
               </TableRow>
             {/each}
           </TableBody>
@@ -276,4 +351,90 @@
       {/if}
     </Stack>
   </Stack>
+
+  {#if linkingTx}
+    <Modal title="Link bank transaction" onClose={closeLinkModal} size="medium">
+      <ModalBody>
+        <Stack gap={4}>
+          <div class="rounded border p-3 text-sm">
+            <div><strong>{linkingTx.txDate}</strong> · {formatAmount(linkingTx.amountMinor, linkingTx.currency)}</div>
+            <div class="text-muted-foreground">{linkingTx.description || '—'}</div>
+            {#if linkingTx.counterpartyName}<div class="text-muted-foreground">{linkingTx.counterpartyName}</div>{/if}
+          </div>
+
+          <Field label="Search">
+            <Input
+              bind:value={candidateQuery}
+              placeholder="TXN ref / invoice number / vendor"
+              onkeydown={(e: KeyboardEvent) => {
+                if (e.key === 'Enter') {
+                  void loadCandidates();
+                }
+              }}
+            />
+          </Field>
+          <HStack>
+            <Button size="small" variant="ghost" disabled={candidatesLoading} onclick={loadCandidates}>
+              {candidatesLoading ? 'Searching…' : 'Search'}
+            </Button>
+          </HStack>
+
+          {#if candidates.transfers.length > 0}
+            <Stack gap={2}>
+              <Text size="small" color="muted">Wise transfers</Text>
+              {#each candidates.transfers as t (t.id)}
+                <HStack class="justify-between rounded border px-3 py-2">
+                  <div class="text-sm">
+                    <div><strong>{t.ourReference ?? t.wiseTransferId}</strong> <span class="text-muted-foreground">· {t.state}</span></div>
+                    <div class="text-muted-foreground">
+                      {formatAmount(t.sourceAmountMinor, t.sourceCurrency)} → {formatAmount(t.targetAmountMinor, t.targetCurrency)}
+                    </div>
+                  </div>
+                  <Button size="tiny" disabled={linking} onclick={() => link('wise_transfer', t.id)}>Link</Button>
+                </HStack>
+              {/each}
+            </Stack>
+          {/if}
+
+          {#if candidates.invoices.length > 0}
+            <Stack gap={2}>
+              <Text size="small" color="muted">Invoices</Text>
+              {#each candidates.invoices as i (i.id)}
+                <HStack class="justify-between rounded border px-3 py-2">
+                  <div class="text-sm">
+                    <div><strong>{i.number}</strong> {#if i.clientName}<span class="text-muted-foreground">· {i.clientName}</span>{/if}</div>
+                    <div class="text-muted-foreground">
+                      {i.issuedAt} · {formatAmount(i.totalMinor, i.currency)}
+                    </div>
+                  </div>
+                  <Button size="tiny" disabled={linking} onclick={() => link('invoice', i.id)}>Link</Button>
+                </HStack>
+              {/each}
+            </Stack>
+          {/if}
+
+          {#if candidates.expenses.length > 0}
+            <Stack gap={2}>
+              <Text size="small" color="muted">Expenses</Text>
+              {#each candidates.expenses as e (e.id)}
+                <HStack class="justify-between rounded border px-3 py-2">
+                  <div class="text-sm">
+                    <div><strong>{e.vendor}</strong> <span class="text-muted-foreground">· {e.status}</span></div>
+                    <div class="text-muted-foreground">
+                      {e.expenseDate} · {formatAmount(e.amountMinor, e.currency)}
+                    </div>
+                  </div>
+                  <Button size="tiny" disabled={linking} onclick={() => link('expense', e.id)}>Link</Button>
+                </HStack>
+              {/each}
+            </Stack>
+          {/if}
+
+          {#if !candidatesLoading && candidates.transfers.length === 0 && candidates.invoices.length === 0 && candidates.expenses.length === 0}
+            <Text color="muted">No candidates. Try a different search.</Text>
+          {/if}
+        </Stack>
+      </ModalBody>
+    </Modal>
+  {/if}
 </main>
