@@ -1,8 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Config, loadConfig } from 'src/config';
-import { BankingSessionStatus } from 'src/enum';
+import { BankingSessionStatus, JobName } from 'src/enum';
 import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { EnableBankingAccount, EnableBankingApiService } from 'src/services/enable-banking-api.service';
 
 /**
@@ -44,6 +45,7 @@ export class BankingSessionService {
   constructor(
     private readonly sessionRepository: BankingSessionRepository,
     private readonly apiService: EnableBankingApiService,
+    private readonly jobRepository: JobRepository,
   ) {
     this.config = loadConfig().enableBanking;
   }
@@ -99,6 +101,9 @@ export class BankingSessionService {
     this.logger.log(
       `Active banking session ${updated.id} (${updated.aspspName}) — ${session.accounts.length} account(s) shared, expires ${session.validUntil}`,
     );
+    // Kick off an immediate sync so the user sees data on the /banking page
+    // without having to click "Sync now". The cron picks up from there.
+    await this.jobRepository.queue(JobName.BankingSyncAll, {});
     return updated;
   }
 

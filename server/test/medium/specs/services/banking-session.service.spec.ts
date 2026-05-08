@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
-import { BankingSessionStatus } from 'src/enum';
+import { BankingSessionStatus, JobName } from 'src/enum';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
 import { BankingSessionService } from 'src/services/banking-session.service';
 import {
@@ -37,13 +38,17 @@ describe('BankingSessionService', () => {
   let db: Kysely<DB>;
   let repo: BankingSessionRepository;
   let api: ReturnType<typeof fakeApi>;
+  let jobRepo: JobRepository & { queue: ReturnType<typeof vi.fn> };
   let service: BankingSessionService;
 
   beforeEach(async () => {
     db = await getKyselyDB();
     repo = new BankingSessionRepository(db);
     api = fakeApi();
-    service = new BankingSessionService(repo, api);
+    jobRepo = {
+      queue: vi.fn().mockResolvedValue('fake-job-id'),
+    } as unknown as JobRepository & { queue: ReturnType<typeof vi.fn> };
+    service = new BankingSessionService(repo, api, jobRepo);
   });
 
   afterEach(async () => {
@@ -114,6 +119,7 @@ describe('BankingSessionService', () => {
     expect(updated.expiresAt!.toISOString()).toBe('2026-08-06T12:00:00.000Z');
     expect(updated.accountsJson).toHaveLength(2);
     expect(api.createSession).toHaveBeenCalledWith('cb-code');
+    expect(jobRepo.queue).toHaveBeenCalledWith(JobName.BankingSyncAll, {});
   });
 
   it('completeCallback rejects an unknown state', async () => {
