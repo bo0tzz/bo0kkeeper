@@ -15,6 +15,7 @@
     { href: resolve('/wise'), label: 'Wise drafts' },
     { href: resolve('/expenses'), label: 'Expenses' },
     { href: resolve('/invoices'), label: 'Invoices' },
+    { href: resolve('/transactions'), label: 'Transactions' },
     { href: resolve('/aggregator'), label: 'BTW rollup' },
     { href: resolve('/clients'), label: 'Clients' },
     { href: resolve('/banking'), label: 'Banking' },
