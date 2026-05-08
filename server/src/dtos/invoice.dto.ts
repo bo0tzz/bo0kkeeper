@@ -84,6 +84,28 @@ const InvoiceListItemSchema = z
   .meta({ id: 'InvoiceListItemDto' });
 export class InvoiceListItemDto extends createZodDto(InvoiceListItemSchema) {}
 
+const ListInvoicesQuerySchema = z
+  .object({
+    /** Filter to invoices issued in this year (YYYY). */
+    year: z.coerce.number().int().min(2000).max(2100).optional(),
+    /** 'open' = no matched bank tx; 'paid' = matched. */
+    status: z.enum(['open', 'paid']).optional(),
+    /** 1-indexed page; defaults to 1. */
+    page: z.coerce.number().int().min(1).default(1),
+    /** Page size; capped at 100. */
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .meta({ id: 'ListInvoicesQueryDto' });
+export class ListInvoicesQueryDto extends createZodDto(ListInvoicesQuerySchema) {}
+
+const ListInvoicesResponseSchema = z
+  .object({
+    items: z.array(InvoiceListItemSchema),
+    total: z.number().int(),
+  })
+  .meta({ id: 'ListInvoicesResponseDto' });
+export class ListInvoicesResponseDto extends createZodDto(ListInvoicesResponseSchema) {}
+
 export function mapInvoice(invoice: InvoiceWithLines): InvoiceResponseDto {
   return {
     id: invoice.id,

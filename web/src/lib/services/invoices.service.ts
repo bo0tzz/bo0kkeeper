@@ -72,11 +72,31 @@ export type InvoiceListItem = {
   paid: boolean;
 };
 
+export type ListInvoicesParams = {
+  year?: number;
+  status?: 'open' | 'paid';
+  page?: number;
+  limit?: number;
+};
+
+export type ListInvoicesResponse = {
+  items: InvoiceListItem[];
+  total: number;
+};
+
 export const composeInvoice = (input: InvoiceComposeInput, fetchFn?: typeof fetch) =>
   apiPost<InvoiceComposeResponse>('/api/invoices/compose', input, { fetch: fetchFn });
 
 export const getInvoice = (id: string, fetchFn?: typeof fetch) =>
   apiGet<InvoiceResponse>(`/api/invoices/${id}`, { fetch: fetchFn });
 
-export const listInvoices = (fetchFn?: typeof fetch) =>
-  apiGet<InvoiceListItem[]>('/api/invoices', { fetch: fetchFn });
+export const listInvoices = (params: ListInvoicesParams = {}, fetchFn?: typeof fetch) =>
+  apiGet<ListInvoicesResponse>('/api/invoices', {
+    fetch: fetchFn,
+    query: {
+      year: params.year,
+      status: params.status,
+      page: params.page,
+      limit: params.limit,
+    },
+  });

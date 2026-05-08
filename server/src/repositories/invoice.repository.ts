@@ -71,27 +71,51 @@ export class InvoiceRepository {
   }
 
   /**
-   * Recent invoices (newest issuedAt first), with the client name folded in.
-   * The list view doesn't need lines — those come back from `findById`.
+   * Paginated list with optional year + status filters. Status is derived
+   * from the bank_transaction left-join — `paid` ⇒ a row matched this
+   * invoice, `open` ⇒ none. Returns the page slice plus the unsliced total
+   * so the UI can size the pager without a second round trip. Newest
+   * issuedAt first (ties broken by number desc).
    */
-  findRecent(
-    limit = 100,
-  ): Promise<Array<Invoice & { clientName: string | null; matchedBankTxId: string | null }>> {
-    return this.db
+  async findPaginated(input: {
+    year?: number;
+    status?: 'open' | 'paid';
+    offset: number;
+    limit: number;
+  }): Promise<{
+    items: Array<Invoice & { clientName: string | null; matchedBankTxId: string | null }>;
+    total: number;
+  }> {
+    let query = this.db
       .selectFrom('invoice')
       .innerJoin('client', 'client.id', 'invoice.clientId')
-      .leftJoin('bank_transaction', 'bank_transaction.matchedInvoiceId', 'invoice.id')
+      .leftJoin('bank_transaction', 'bank_transaction.matchedInvoiceId', 'invoice.id');
+    if (input.year !== undefined) {
+      const start = new Date(Date.UTC(input.year, 0, 1));
+      const end = new Date(Date.UTC(input.year + 1, 0, 1));
+      query = query.where('invoice.issuedAt', '>=', start).where('invoice.issuedAt', '<', end);
+    }
+    if (input.status === 'paid') {
+      query = query.where('bank_transaction.id', 'is not', null);
+    } else if (input.status === 'open') {
+      query = query.where('bank_transaction.id', 'is', null);
+    }
+
+    const totalRow = (await query
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .executeTakeFirst()) as { count: string } | undefined;
+    const total = Number(totalRow?.count ?? 0);
+
+    const items = (await query
       .selectAll('invoice')
-      .select([
-        'client.name as clientName',
-        'bank_transaction.id as matchedBankTxId',
-      ])
+      .select(['client.name as clientName', 'bank_transaction.id as matchedBankTxId'])
       .orderBy('invoice.issuedAt', 'desc')
       .orderBy('invoice.number', 'desc')
-      .limit(limit)
-      .execute() as Promise<
-      Array<Invoice & { clientName: string | null; matchedBankTxId: string | null }>
-    >;
+      .limit(input.limit)
+      .offset(input.offset)
+      .execute()) as Array<Invoice & { clientName: string | null; matchedBankTxId: string | null }>;
+
+    return { items, total };
   }
 
   /** Set the paperless document id once the PDF has been pushed. */

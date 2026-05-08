@@ -1,13 +1,14 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post, Res } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { loadConfig } from 'src/config';
-import { Authenticated } from 'src/decorators';
+import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import {
   InvoiceComposeDto,
   InvoiceComposeResponseDto,
-  InvoiceListItemDto,
   InvoiceResponseDto,
+  ListInvoicesQueryDto,
+  ListInvoicesResponseDto,
   mapInvoice,
 } from 'src/dtos/invoice.dto';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
@@ -21,25 +22,34 @@ export class InvoicesController {
     private readonly invoiceRepository: InvoiceRepository,
   ) {}
 
-  /** Recent invoices, newest first. Drives the /invoices list view. */
+  /** Paginated invoice list. Drives the /invoices list view. */
   @Get()
   @Authenticated()
-  async listInvoices(): Promise<InvoiceListItemDto[]> {
-    const rows = await this.invoiceRepository.findRecent(100);
-    return rows.map((row) => ({
-      id: row.id,
-      number: row.number,
-      issuedAt: toIsoDate(row.issuedAt),
-      clientId: row.clientId,
-      clientName: row.clientName,
-      currency: row.currency,
-      totalMinor: String(row.totalMinor),
-      eurTotalMinor: row.eurTotalMinor === null ? null : String(row.eurTotalMinor),
-      btwRateBps: row.btwRateBps,
-      btwMinor: row.btwMinor === null ? null : String(row.btwMinor),
-      paperlessDocId: row.paperlessDocId,
-      paid: row.matchedBankTxId !== null,
-    }));
+  @ApiQueryFromDto(ListInvoicesQueryDto)
+  async listInvoices(@Query() query: ListInvoicesQueryDto): Promise<ListInvoicesResponseDto> {
+    const { items, total } = await this.invoiceRepository.findPaginated({
+      year: query.year,
+      status: query.status,
+      offset: (query.page - 1) * query.limit,
+      limit: query.limit,
+    });
+    return {
+      items: items.map((row) => ({
+        id: row.id,
+        number: row.number,
+        issuedAt: toIsoDate(row.issuedAt),
+        clientId: row.clientId,
+        clientName: row.clientName,
+        currency: row.currency,
+        totalMinor: String(row.totalMinor),
+        eurTotalMinor: row.eurTotalMinor === null ? null : String(row.eurTotalMinor),
+        btwRateBps: row.btwRateBps,
+        btwMinor: row.btwMinor === null ? null : String(row.btwMinor),
+        paperlessDocId: row.paperlessDocId,
+        paid: row.matchedBankTxId !== null,
+      })),
+      total,
+    };
   }
 
   @Get(':id')
