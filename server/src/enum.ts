@@ -61,6 +61,13 @@ export enum JobName {
    * Daily cron is plenty.
    */
   BankingSweepStalePending = 'banking.sweep_stale_pending',
+  /**
+   * Pull non-terminal `wise_transfer` rows from the Wise API and reapply
+   * their state. Belt-and-braces against missed `transfers#state-change`
+   * webhooks — without it, a single dropped delivery would leave a transfer
+   * showing the wrong state forever.
+   */
+  WiseReconcile = 'wise.reconcile',
 }
 
 /** Tax/billing classification of a client; drives BTW treatment + invoice template selection. */

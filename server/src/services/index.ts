@@ -14,6 +14,7 @@ import { WebhookService } from 'src/services/webhook.service';
 import { WiseApiService } from 'src/services/wise-api.service';
 import { WiseDraftService } from 'src/services/wise-draft.service';
 import { WiseEventService } from 'src/services/wise-event.service';
+import { WiseReconcileService } from 'src/services/wise-reconcile.service';
 
 export const services = [
   AuthService,
@@ -32,4 +33,5 @@ export const services = [
   WiseApiService,
   WiseDraftService,
   WiseEventService,
+  WiseReconcileService,
 ];

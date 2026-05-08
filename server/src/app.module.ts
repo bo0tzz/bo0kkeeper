@@ -53,5 +53,9 @@ export class AppModule implements OnModuleInit {
     // GC abandoned auths once a day; cheap, doesn't need to run with the
     // sync — they're independent concerns.
     await this.jobRepository.schedule(JobName.BankingSweepStalePending, '0 4 * * *', {});
+    // Wise reconcile every 4h — catches missed transfers#state-change
+    // webhooks. Wise is much more lenient on call quotas than PSD2 ASPSPs
+    // so we can poll relatively aggressively.
+    await this.jobRepository.schedule(JobName.WiseReconcile, '0 */4 * * *', {});
   }
 }

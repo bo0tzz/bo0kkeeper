@@ -1,0 +1,114 @@
+import { Kysely } from 'kysely';
+import { WiseTransferState } from 'src/enum';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
+import { DB } from 'src/schema';
+import { WiseApiError, WiseApiService, WiseTransfer } from 'src/services/wise-api.service';
+import { WiseReconcileService } from 'src/services/wise-reconcile.service';
+import { getKyselyDB } from 'test/utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+beforeEach(() => {
+  process.env.OIDC_ISSUER ??= 'http://idp.test';
+  process.env.OIDC_CLIENT_ID ??= 'test';
+  process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
+});
+
+function makeWiseTransfer(
+  id: number,
+  state: WiseTransfer['state'],
+  rate: WiseTransfer['rate'] = '0.85',
+): WiseTransfer {
+  return {
+    id,
+    state,
+    reference: `TXN-${id}`,
+    rate,
+    sourceCurrency: 'USD',
+    sourceValue: 1000,
+    targetCurrency: 'EUR',
+    targetValue: 850,
+  };
+}
+
+describe('WiseReconcileService', () => {
+  let db: Kysely<DB>;
+  let repo: WiseTransferRepository;
+  let api: WiseApiService & { getTransfer: ReturnType<typeof vi.fn> };
+  let service: WiseReconcileService;
+
+  beforeEach(async () => {
+    db = await getKyselyDB();
+    repo = new WiseTransferRepository(db);
+    api = { getTransfer: vi.fn() } as unknown as WiseApiService & {
+      getTransfer: ReturnType<typeof vi.fn>;
+    };
+    service = new WiseReconcileService(repo, api);
+  });
+
+  afterEach(async () => {
+    await db.destroy();
+  });
+
+  async function seedTransfer(state: WiseTransferState, wiseId = '99999999') {
+    return await repo.create({
+      wiseTransferId: wiseId,
+      direction: 'out',
+      sourceAmountMinor: 100_000n,
+      sourceCurrency: 'USD',
+      targetAmountMinor: 85_000n,
+      targetCurrency: 'EUR',
+      feeMinor: 0n,
+      feeCurrency: 'USD',
+      state,
+      stateUpdatedAt: new Date('2026-05-01'),
+      ourReference: 'TXN-9999',
+    });
+  }
+
+  it('updates a transfer whose upstream state has advanced past ours', async () => {
+    const seeded = await seedTransfer(WiseTransferState.Processing);
+    api.getTransfer.mockResolvedValue(makeWiseTransfer(99_999_999, 'outgoing_payment_sent'));
+
+    const result = await service.reconcileAll();
+    expect(result).toMatchObject({ checked: 1, updated: 1, missing: 0 });
+    const refreshed = await repo.findByWiseTransferId(seeded.wiseTransferId);
+    expect(refreshed!.state).toBe('outgoing_payment_sent');
+    expect(api.getTransfer).toHaveBeenCalledWith(99_999_999);
+  });
+
+  it('leaves a transfer unchanged when upstream agrees', async () => {
+    await seedTransfer(WiseTransferState.Processing);
+    api.getTransfer.mockResolvedValue(makeWiseTransfer(99_999_999, 'processing'));
+    const result = await service.reconcileAll();
+    expect(result).toEqual({ checked: 1, updated: 0, missing: 0 });
+  });
+
+  it('skips terminal-state transfers (no API call)', async () => {
+    await seedTransfer(WiseTransferState.OutgoingPaymentSent, '88888888');
+    await seedTransfer(WiseTransferState.Cancelled, '77777777');
+    await seedTransfer(WiseTransferState.Failed, '66666666');
+    const result = await service.reconcileAll();
+    expect(result.checked).toBe(0);
+    expect(api.getTransfer).not.toHaveBeenCalled();
+  });
+
+  it('handles a 404 by counting it as missing without bombing the rest', async () => {
+    await seedTransfer(WiseTransferState.Processing, '11111111');
+    await seedTransfer(WiseTransferState.Processing, '22222222');
+    api.getTransfer.mockImplementation((id: number) => {
+      if (id === 11_111_111) {
+        return Promise.reject(new WiseApiError(404, { error: 'not found' }, 'Wise API GET failed: 404'));
+      }
+      return Promise.resolve(makeWiseTransfer(id, 'outgoing_payment_sent'));
+    });
+    const result = await service.reconcileAll();
+    expect(result).toEqual({ checked: 2, updated: 1, missing: 1 });
+  });
+
+  it('skips non-numeric wiseTransferId without calling the API', async () => {
+    await seedTransfer(WiseTransferState.Processing, 'WISE-MANUAL-FIXTURE');
+    const result = await service.reconcileAll();
+    expect(api.getTransfer).not.toHaveBeenCalled();
+    expect(result).toEqual({ checked: 1, updated: 0, missing: 0 });
+  });
+});

@@ -1,12 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, Selectable, sql, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
+import { WiseTransferState } from 'src/enum';
 import { DB } from 'src/schema';
 import { WiseTransferTable } from 'src/schema/tables/wise-transfer.table';
 
 export type WiseTransferRow = Selectable<WiseTransferTable>;
 export type NewWiseTransfer = Insertable<WiseTransferTable>;
 export type WiseTransferUpdate = Updateable<WiseTransferTable>;
+
+/**
+ * States we treat as terminal — no more state transitions expected, no need
+ * to poll Wise for updates. Anything else is fair game for the reconcile job.
+ */
+const TERMINAL_STATES: WiseTransferState[] = [
+  WiseTransferState.OutgoingPaymentSent,
+  WiseTransferState.Cancelled,
+  WiseTransferState.Failed,
+];
 
 @Injectable()
 export class WiseTransferRepository {
@@ -31,6 +42,19 @@ export class WiseTransferRepository {
       .set({ state, stateUpdatedAt, updatedAt: new Date() })
       .where('wiseTransferId', '=', wiseTransferId)
       .execute();
+  }
+
+  /**
+   * Transfers in a non-terminal state, oldest first. The reconcile job pulls
+   * each from Wise and reapplies the state — catches missed webhooks.
+   */
+  findReconcilable(): Promise<WiseTransferRow[]> {
+    return this.db
+      .selectFrom('wise_transfer')
+      .selectAll()
+      .where('state', 'not in', TERMINAL_STATES)
+      .orderBy('stateUpdatedAt', 'asc')
+      .execute() as Promise<WiseTransferRow[]>;
   }
 
   /**

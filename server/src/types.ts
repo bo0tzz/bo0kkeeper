@@ -24,6 +24,7 @@ type JobItemMap = {
   /** Optional PSU-IP-Address for on-demand syncs to bypass the PSD2 background cap. */
   [JobName.BankingSyncAll]: { psuIpAddress?: string };
   [JobName.BankingSweepStalePending]: Record<string, never>;
+  [JobName.WiseReconcile]: Record<string, never>;
 };
 
 /** Producer-side: `data` shape for a given job name. */
