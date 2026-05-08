@@ -84,6 +84,59 @@ describe('WebhookService — Wise ingestion', () => {
     expect(() => service.verifyWiseSignature('any body')).not.toThrow();
   });
 
+  // Reference body + signature from
+  // https://github.com/transferwise/digital-signatures-examples/blob/main/verify-webhook-signature/verify-signature.js
+  // — public test vector; lets us assert the verifier wires up the well-known
+  // sandbox public key correctly without holding a private key.
+  describe('with verification enabled (sandbox public key)', () => {
+    const SANDBOX_PUB_KEY = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwpb91cEYuyJNQepZAVfP
+ZIlPZfNUefH+n6w9SW3fykqKu938cR7WadQv87oF2VuT+fDt7kqeRziTmPSUhqPU
+ys/V2Q1rlfJuXbE+Gga37t7zwd0egQ+KyOEHQOpcTwKmtZ81ieGHynAQzsn1We3j
+wt760MsCPJ7GMT141ByQM+yW1Bx+4SG3IGjXWyqOWrcXsxAvIXkpUD/jK/L958Cg
+nZEgz0BSEh0QxYLITnW1lLokSx/dTianWPFEhMC9BgijempgNXHNfcVirg1lPSyg
+z7KqoKUN0oHqWLr2U1A+7kqrl6O2nx3CKs1bj1hToT1+p4kcMoHXA7kA+VBLUpEs
+VwIDAQAB
+-----END PUBLIC KEY-----`;
+    const REF_BODY =
+      '{"data":{"resource":{"id":49983981,"profile_id":16055450,"account_id":14124090,"type":"transfer"},"current_state":"incoming_payment_waiting","previous_state":null,"occurred_at":"2021-08-23T10:12:50Z"},"subscription_id":"90aa8e14-4ef1-4a56-861c-f3c9cde097ea","event_type":"transfers#state-change","schema_version":"2.0.0","sent_at":"2021-08-23T10:12:50Z"}';
+    const REF_SIG =
+      'wKcKCYXAzxNgiu7xmoDm943NUni7Rz33QN8JkEA9dWSGebgndonabgSj18Y4C08OrwVmueGsED2s00M7DtJVcYKOS1i3G4TMVx+mgM3aL9djMBkQtiYNBFUd6wrPI7ZUNHv/TrlKSjTMc+6JFvUvJ7owY3z85e3I4jLRLJowMFvO8kvCJ60+1pY9wDwZvtZ//WS93LrwGjk9Dvwzpmu0w+P4J75tETT5qC3Uv0y5G2yO8SEoO3yNP/tg/BOli02niHb53vEOUWUb9bly6thnfMoXoiV/osoGxgF20R58RlvkAmezyyl1Sv542TfS2DpiwVnmjjjkCyXeSUcKookYLQ==';
+
+    let verifying: WebhookService;
+    beforeEach(() => {
+      process.env.WISE_WEBHOOK_VERIFY = 'true';
+      process.env.WISE_WEBHOOK_PUBLIC_KEY = SANDBOX_PUB_KEY;
+      verifying = new WebhookService(eventRepository, jobRepository);
+    });
+
+    it('accepts a valid signature for the reference body', () => {
+      expect(() => verifying.verifyWiseSignature(REF_BODY, REF_SIG)).not.toThrow();
+    });
+
+    it('rejects when the body has been tampered with', () => {
+      const tampered = REF_BODY.replace('"id":49983981', '"id":99999999');
+      expect(() => verifying.verifyWiseSignature(tampered, REF_SIG)).toThrow(/Invalid Wise/);
+    });
+
+    it('rejects a corrupted signature', () => {
+      const bad = `${REF_SIG.slice(0, -4)}AAA=`;
+      expect(() => verifying.verifyWiseSignature(REF_BODY, bad)).toThrow(/Invalid Wise/);
+    });
+
+    it('rejects when the signature header is missing', () => {
+      expect(() => verifying.verifyWiseSignature(REF_BODY)).toThrow(/Missing X-Signature/);
+    });
+
+    it('throws when verification is enabled but no key is configured', () => {
+      process.env.WISE_WEBHOOK_PUBLIC_KEY = '';
+      const unconfigured = new WebhookService(eventRepository, jobRepository);
+      expect(() => unconfigured.verifyWiseSignature(REF_BODY, REF_SIG)).toThrow(
+        /WISE_WEBHOOK_PUBLIC_KEY is not set/,
+      );
+    });
+  });
+
   it('auto-enqueues WiseTransferStateChange for transfers#state-change events', async () => {
     const { parsed } = await loadFixture('transfer-state-change.example.json');
 
