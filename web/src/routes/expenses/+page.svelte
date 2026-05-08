@@ -13,6 +13,7 @@
     type ListExpensesResponse,
   } from '$lib/services/expenses.service';
   import {
+    Alert,
     Badge,
     Button,
     Field,
@@ -146,6 +147,37 @@
       return;
     }
     draft.btwMajor = deriveBtwMajor(draft.amountMajor, draft.btwRatePercent);
+  }
+
+  /**
+   * NL VAT brackets per location. Reverse-charge (B2B intra-EU) and non-EU
+   * imports leave the supplier with no Dutch VAT to charge — rate is N/A,
+   * BTW amount snaps to 0.
+   */
+  function ratesForLocation(loc: ExpenseLocationClass): { value: string; label: string }[] {
+    if (loc === 'eu_reverse_charge' || loc === 'non_eu') {
+      return [{ value: '', label: 'N/A' }];
+    }
+    return [
+      { value: '21', label: '21%' },
+      { value: '9', label: '9%' },
+      { value: '0', label: '0%' },
+    ];
+  }
+
+  function onLocationChange(id: string, next: ExpenseLocationClass) {
+    const draft = drafts[id];
+    if (!draft) {
+      return;
+    }
+    draft.locationClass = next;
+    if (next === 'eu_reverse_charge' || next === 'non_eu') {
+      draft.btwRatePercent = '';
+      draft.btwMajor = '0.00';
+    } else {
+      // Re-derive BTW under the new location's bracket.
+      recalcBtw(id);
+    }
   }
 
   function expand(expense: ExpenseResponse) {
@@ -327,6 +359,16 @@
           <div class="rounded border bg-subtle p-4">
             <Stack gap={4}>
               <Heading size="small" tag="h2">Editing {expense.vendor || expense.paperlessDocId}</Heading>
+              {#if expense.status === 'approved'}
+                <Alert color="warning">
+                  This expense is already approved. Edits update the database only — the accountant
+                  sheet row was written at approve time and isn't rewritten.
+                </Alert>
+              {:else if expense.status === 'rejected'}
+                <Alert color="warning">
+                  This expense is rejected. Re-saving doesn't restore it to pending review.
+                </Alert>
+              {/if}
               <HStack gap={3}>
                 <Field label="Vendor" invalid={hasIssue('vendor')}>
                   <Input bind:value={drafts[expense.id].vendor} />
@@ -344,10 +386,13 @@
                   />
                 </Field>
                 <Field label="BTW rate (%)" invalid={hasIssue('btwRateBps')}>
-                  <Input
-                    bind:value={drafts[expense.id].btwRatePercent}
-                    placeholder="21"
-                    oninput={() => recalcBtw(expense.id)}
+                  <Select
+                    value={drafts[expense.id].btwRatePercent}
+                    options={ratesForLocation(drafts[expense.id].locationClass)}
+                    onChange={(value) => {
+                      drafts[expense.id].btwRatePercent = value;
+                      recalcBtw(expense.id);
+                    }}
                   />
                 </Field>
                 <Field label="BTW amount (EUR)" invalid={hasIssue('btwMinor')}>
@@ -356,10 +401,11 @@
               </HStack>
               <HStack gap={3}>
                 <Field label="Location class" invalid={hasIssue('locationClass')}>
-                  <Select bind:value={drafts[expense.id].locationClass} options={locationOptions} />
-                </Field>
-                <Field label="Category" invalid={hasIssue('category')}>
-                  <Input bind:value={drafts[expense.id].category} />
+                  <Select
+                    value={drafts[expense.id].locationClass}
+                    options={locationOptions}
+                    onChange={(value) => onLocationChange(expense.id, value as ExpenseLocationClass)}
+                  />
                 </Field>
               </HStack>
               <Field label="Notes" invalid={hasIssue('notes')}>
@@ -368,8 +414,10 @@
               <HStack gap={3}>
                 <Button variant="ghost" onclick={collapse}>Cancel</Button>
                 <Button variant="outline" onclick={() => save(expense)}>Save</Button>
-                <Button color="danger" variant="outline" onclick={() => reject(expense)}>Reject</Button>
-                <Button color="primary" onclick={() => approve(expense)}>Save & Approve</Button>
+                {#if expense.status === 'pending_review'}
+                  <Button color="danger" variant="outline" onclick={() => reject(expense)}>Reject</Button>
+                  <Button color="primary" onclick={() => approve(expense)}>Save & Approve</Button>
+                {/if}
               </HStack>
             </Stack>
           </div>

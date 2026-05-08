@@ -3,6 +3,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { loadConfig } from 'src/config';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
+import { EventSource } from 'src/enum';
+import { EventRepository } from 'src/repositories/event.repository';
 import {
   ExpenseApproveDto,
   ExpenseRejectDto,
@@ -17,7 +19,10 @@ import { ExpenseRepository, ExpenseUpdate } from 'src/repositories/expense.repos
 @ApiTags('Expenses')
 @Controller('/api/expenses')
 export class ExpensesController {
-  constructor(private readonly expenseRepository: ExpenseRepository) {}
+  constructor(
+    private readonly expenseRepository: ExpenseRepository,
+    private readonly eventRepository: EventRepository,
+  ) {}
 
   @Get()
   @Authenticated()
@@ -62,6 +67,11 @@ export class ExpensesController {
     if (!row) {
       throw new NotFoundException();
     }
+    await this.eventRepository.recordAction({
+      source: EventSource.Manual,
+      eventType: 'expense.updated',
+      payload: { expenseId: row.id, vendor: row.vendor },
+    });
     return mapExpense(row);
   }
 
@@ -79,6 +89,16 @@ export class ExpensesController {
     if (!row) {
       throw new NotFoundException();
     }
+    await this.eventRepository.recordAction({
+      source: EventSource.Manual,
+      eventType: 'expense.approved',
+      payload: {
+        expenseId: row.id,
+        vendor: row.vendor,
+        amountMinor: String(row.amountMinor),
+        currency: row.currency,
+      },
+    });
     return mapExpense(row);
   }
 
@@ -112,6 +132,11 @@ export class ExpensesController {
     if (!row) {
       throw new NotFoundException();
     }
+    await this.eventRepository.recordAction({
+      source: EventSource.Manual,
+      eventType: 'expense.rejected',
+      payload: { expenseId: row.id, vendor: row.vendor, notes: dto.notes ?? null },
+    });
     return mapExpense(row);
   }
 }

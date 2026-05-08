@@ -25,9 +25,10 @@ import {
   BankTxSetCategoryDto,
   BankTxSetMatchDto,
 } from 'src/dtos/banking.dto';
-import { BankTxCategory, JobName } from 'src/enum';
+import { BankTxCategory, EventSource, JobName } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
+import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { BankingSessionService } from 'src/services/banking-session.service';
@@ -53,6 +54,7 @@ export class BankingController {
     private readonly jobRepository: JobRepository,
     private readonly bankTransactionRepository: BankTransactionRepository,
     private readonly matcher: BankMatcherService,
+    private readonly eventRepository: EventRepository,
   ) {}
 
   @Post('auth/start')
@@ -178,6 +180,11 @@ export class BankingController {
     if (!row) {
       throw new NotFoundException();
     }
+    await this.eventRepository.recordAction({
+      source: EventSource.Manual,
+      eventType: row.category ? 'banking.tx.categorized' : 'banking.tx.uncategorized',
+      payload: { bankTxId: row.id, category: row.category },
+    });
     return toBankTransactionDto(row);
   }
 

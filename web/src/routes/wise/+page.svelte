@@ -93,7 +93,7 @@
 <main class="mx-auto max-w-6xl px-6 py-10">
   <Stack gap={6}>
     <div class="flex items-center justify-between">
-      <Heading size="large" tag="h1">Wise inbound credits</Heading>
+      <Heading size="large" tag="h1">Wise drafts</Heading>
       <div class="flex items-center gap-3">
         <Text size="small" color="muted">
           {data ? `${data.total} pending` : ''}

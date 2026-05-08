@@ -12,7 +12,7 @@
   let { children }: Props = $props();
 
   const navItems = [
-    { href: resolve('/wise'), label: 'Wise inbox' },
+    { href: resolve('/wise'), label: 'Wise drafts' },
     { href: resolve('/expenses'), label: 'Expenses' },
     { href: resolve('/invoices'), label: 'Invoices' },
     { href: resolve('/aggregator'), label: 'BTW rollup' },

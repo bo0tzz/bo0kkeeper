@@ -9,6 +9,7 @@ import {
   ListExpensesQueryDto,
 } from 'src/dtos/expense.dto';
 import { ExpenseLocationClass, ExpenseStatus } from 'src/enum';
+import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository, NewExpense } from 'src/repositories/expense.repository';
 import { DB } from 'src/schema';
 import { getKyselyDB } from 'test/utils';
@@ -37,7 +38,7 @@ describe('ExpensesController', () => {
   beforeEach(async () => {
     db = await getKyselyDB();
     repo = new ExpenseRepository(db);
-    controller = new ExpensesController(repo);
+    controller = new ExpensesController(repo, new EventRepository(db));
   });
 
   afterEach(async () => {

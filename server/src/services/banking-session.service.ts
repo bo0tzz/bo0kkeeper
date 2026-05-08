@@ -77,6 +77,17 @@ export class BankingSessionService {
         validUntil,
       });
       this.logger.log(`Started Enable Banking auth for ${input.aspspName} (session=${session.id})`);
+      await this.eventRepository.recordAction({
+        source: EventSource.Manual,
+        eventType: 'banking.auth.started',
+        payload: {
+          sessionId: session.id,
+          aspspName: input.aspspName,
+          aspspCountry: input.aspspCountry,
+          psuType,
+          validUntil: validUntil.toISOString(),
+        },
+      });
       return { sessionId: session.id, redirectUrl: auth.url };
     } catch (error) {
       // Roll the pending row to expired so a retry mints a fresh state.

@@ -55,7 +55,7 @@ describe('BankingController', () => {
     const clientRepo = new ClientRepository(db);
     const sheetWriter = { writeIncomeRow: vi.fn().mockResolvedValue(undefined) } as unknown as SheetWriterService;
     const matcher = new BankMatcherService(db, bankTxRepo, clientRepo, sheetWriter, new EventRepository(db));
-    controller = new BankingController(service, repo, jobRepo, bankTxRepo, matcher);
+    controller = new BankingController(service, repo, jobRepo, bankTxRepo, matcher, new EventRepository(db));
   });
 
   afterEach(async () => {
