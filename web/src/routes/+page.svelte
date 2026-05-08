@@ -1,6 +1,12 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { getQuarterlyAggregate, type QuarterlyAggregateResponse } from '$lib/services/aggregator.service';
+  import {
+    getLatestBankingSession,
+    listBankTransactions,
+    type BankingSession,
+    type BankTransaction,
+  } from '$lib/services/banking.service';
   import { listEvents, type ListEventsResponse } from '$lib/services/events.service';
   import { listExpenses, type ListExpensesResponse } from '$lib/services/expenses.service';
   import {
@@ -20,6 +26,8 @@
   type Counts = {
     pendingWiseCredits: number;
     pendingExpenseReviews: number;
+    unmatchedBankTx: number;
+    bankingSession: BankingSession | null;
     aggregate: QuarterlyAggregateResponse | null;
     aggregateYear: number;
     aggregateQuarter: number;
@@ -36,7 +44,7 @@
       const now = new Date();
       const year = now.getUTCFullYear();
       const quarter = Math.floor(now.getUTCMonth() / 3) + 1;
-      const [wise, expenses, agg] = await Promise.all([
+      const [wise, expenses, bankTx, bankingSession, agg] = await Promise.all([
         listEvents({
           source: 'wise',
           eventType: 'balances#credit',
@@ -44,11 +52,15 @@
           limit: 1,
         }) as Promise<ListEventsResponse>,
         listExpenses({ status: 'pending_review', limit: 1 }) as Promise<ListExpensesResponse>,
+        listBankTransactions().catch(() => [] as BankTransaction[]),
+        getLatestBankingSession().catch(() => null),
         getQuarterlyAggregate(year, quarter).catch(() => null),
       ]);
       counts = {
         pendingWiseCredits: wise.total,
         pendingExpenseReviews: expenses.total,
+        unmatchedBankTx: bankTx.filter((tx) => !tx.matchedTransferId && !tx.matchedInvoiceId && !tx.matchedExpenseId).length,
+        bankingSession,
         aggregate: agg,
         aggregateYear: year,
         aggregateQuarter: quarter,
@@ -72,6 +84,13 @@
     const tail = (abs % 100n).toString().padStart(2, '0');
     return `${negative ? '-' : ''}€${major}.${tail}`;
   }
+
+  function bankingExpiryDays(session: BankingSession | null): number | null {
+    if (!session?.expiresAt || session.status !== 'active') {
+      return null;
+    }
+    return Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+  }
 </script>
 
 <main class="mx-auto max-w-5xl px-6 py-10">
@@ -85,9 +104,22 @@
     {#if loading && !counts}
       <Text>Loading…</Text>
     {:else if counts}
-      {@const totalThingsToDo = counts.pendingWiseCredits + counts.pendingExpenseReviews}
+      {@const totalThingsToDo =
+        counts.pendingWiseCredits + counts.pendingExpenseReviews + counts.unmatchedBankTx}
+      {@const reconnectDays = bankingExpiryDays(counts.bankingSession)}
       {#if totalThingsToDo === 0}
         <Alert color="success">Inbox zero — nothing pending review.</Alert>
+      {/if}
+      {#if counts.bankingSession && (counts.bankingSession.status === 'expired' || counts.bankingSession.status === 'revoked')}
+        <Alert color="danger">
+          Bank consent is {counts.bankingSession.status} — bank tx sync is paused.
+          <a class="ml-1 underline" href={resolve('/banking')}>Reconnect →</a>
+        </Alert>
+      {:else if reconnectDays !== null && reconnectDays <= 7}
+        <Alert color="warning">
+          Bank consent expires in {reconnectDays} day{reconnectDays === 1 ? '' : 's'}.
+          <a class="ml-1 underline" href={resolve('/banking')}>Reconnect →</a>
+        </Alert>
       {/if}
 
       <Stack gap={4}>
@@ -128,6 +160,28 @@
                 <Text size="small" color="muted">Receipts ingested by paperless awaiting amount + BTW + approval.</Text>
                 {#if counts.pendingExpenseReviews > 0}
                   <Button href={resolve('/expenses')} variant="outline">Review →</Button>
+                {/if}
+              </Stack>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Bank reconciliation</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <Stack gap={3}>
+                <HStack class="items-center justify-between">
+                  <Heading size="medium" tag="h3">{counts.unmatchedBankTx}</Heading>
+                  <Badge color={counts.unmatchedBankTx === 0 ? 'secondary' : 'warning'}>
+                    {counts.unmatchedBankTx === 0 ? 'all matched' : 'unmatched'}
+                  </Badge>
+                </HStack>
+                <Text size="small" color="muted">
+                  Recent bank rows without an automatic match — link them to a transfer or invoice.
+                </Text>
+                {#if counts.unmatchedBankTx > 0}
+                  <Button href={resolve('/banking')} variant="outline">Review →</Button>
                 {/if}
               </Stack>
             </CardBody>
@@ -190,6 +244,12 @@
           {#if agg.warnings.length > 0}
             <Stack gap={2}>
               {#each agg.warnings as warning (warning.kind)}
+                {@const target =
+                  warning.kind === 'invoice_unmatched'
+                    ? resolve('/banking')
+                    : warning.kind === 'expense_pending_review'
+                      ? resolve('/expenses')
+                      : resolve('/banking')}
                 <Alert color="warning">
                   {#if warning.kind === 'invoice_unmatched'}
                     {warning.count} invoice{warning.count === 1 ? '' : 's'} not yet matched to a bank tx
@@ -198,6 +258,7 @@
                   {:else}
                     {warning.count} bank tx match{warning.count === 1 ? '' : 'es'} need manual confirmation
                   {/if}
+                  <a class="ml-1 underline" href={target}>Open →</a>
                 </Alert>
               {/each}
             </Stack>
