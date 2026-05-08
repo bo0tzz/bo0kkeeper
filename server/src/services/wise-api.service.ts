@@ -166,29 +166,69 @@ function toMinor(major: unknown): bigint {
   throw new Error(`Unable to coerce ${typeof major} to minor units`);
 }
 
-type QuoteResponse = {
-  id: string;
-  rate: number;
-  fee?: number;
-  feeBreakdown?: { transferwise?: number; payIn?: number; total?: number };
+type QuotePaymentOption = {
+  payIn: string;
+  payOut: string;
+  disabled: boolean;
   sourceAmount: number;
-  sourceCurrency: string;
   targetAmount: number;
+  fee?: { total?: number };
+  sourceCurrency: string;
   targetCurrency: string;
 };
 
+type QuoteResponse = {
+  id: string;
+  rate: number;
+  sourceAmount: number;
+  sourceCurrency: string;
+  targetCurrency: string;
+  paymentOptions?: QuotePaymentOption[];
+};
+
+/**
+ * Quote → our shape. Wise v3 quotes don't expose a single targetAmount/fee at
+ * the top level — they live per-payIn-method inside `paymentOptions[]`. We
+ * pick a method preferring BALANCE (production: user funds from their Wise
+ * USD balance after a paycheck arrives), falling back through DIRECT_DEBIT
+ * and BANK_TRANSFER for sandboxes / accounts without a balance.
+ *
+ * The user still SCA-confirms the draft in the Wise app, so the picked
+ * method here is just the one we record; if the user re-picks at confirm
+ * time the actual amount may shift slightly. We log the chosen method for
+ * traceability.
+ */
+const PAY_IN_PREFERENCE = ['BALANCE', 'DIRECT_DEBIT', 'BANK_TRANSFER'];
+
+function pickPaymentOption(options: QuotePaymentOption[]): QuotePaymentOption {
+  const enabled = options.filter((o) => !o.disabled);
+  if (enabled.length === 0) {
+    throw new Error('Wise quote has no enabled payment options');
+  }
+  for (const preferred of PAY_IN_PREFERENCE) {
+    const match = enabled.find((o) => o.payIn === preferred);
+    if (match) {
+      return match;
+    }
+  }
+  return enabled[0];
+}
+
 function mapQuote(data: unknown): WiseQuote {
   const q = data as QuoteResponse;
-  const totalFeeMajor = q.feeBreakdown?.total ?? q.fee ?? 0;
+  if (!q.paymentOptions || q.paymentOptions.length === 0) {
+    throw new Error('Wise quote response missing paymentOptions');
+  }
+  const option = pickPaymentOption(q.paymentOptions);
   return {
     id: q.id,
     rate: String(q.rate),
-    feeMinor: toMinor(totalFeeMajor),
-    feeCurrency: q.sourceCurrency,
-    sourceAmountMinor: toMinor(q.sourceAmount),
-    sourceCurrency: q.sourceCurrency,
-    targetAmountMinor: toMinor(q.targetAmount),
-    targetCurrency: q.targetCurrency,
+    feeMinor: toMinor(option.fee?.total ?? 0),
+    feeCurrency: option.sourceCurrency,
+    sourceAmountMinor: toMinor(option.sourceAmount),
+    sourceCurrency: option.sourceCurrency,
+    targetAmountMinor: toMinor(option.targetAmount),
+    targetCurrency: option.targetCurrency,
   };
 }
 
