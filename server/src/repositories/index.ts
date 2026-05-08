@@ -5,6 +5,7 @@ import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
+import { PeriodCloseRepository } from 'src/repositories/period-close.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 
 export const repositories = [
@@ -15,5 +16,6 @@ export const repositories = [
   ExpenseRepository,
   InvoiceRepository,
   JobRepository,
+  PeriodCloseRepository,
   WiseTransferRepository,
 ];

@@ -1,6 +1,8 @@
 <script lang="ts">
   import {
+    closePeriod,
     getQuarterlyAggregate,
+    reopenPeriod,
     type AggregatorWarning,
     type ClientClass,
     type QuarterlyAggregateResponse,
@@ -29,6 +31,30 @@
   $effect(() => {
     void load();
   });
+
+  let closing = $state(false);
+  async function close() {
+    closing = true;
+    try {
+      await closePeriod(Number(year), Number(quarter));
+      await load();
+    } catch (error_) {
+      error = (error_ as Error).message;
+    } finally {
+      closing = false;
+    }
+  }
+  async function reopen() {
+    closing = true;
+    try {
+      await reopenPeriod(Number(year), Number(quarter));
+      await load();
+    } catch (error_) {
+      error = (error_ as Error).message;
+    } finally {
+      closing = false;
+    }
+  }
 
   const classLabels: Record<ClientClass, string> = {
     non_eu: 'Non-EU (export)',
@@ -90,14 +116,28 @@
       <HStack gap={3}>
         <Select bind:value={year} options={yearOptions} />
         <Select bind:value={quarter} options={quarterOptions} />
+        {#if data?.closedAt}
+          <Badge color="success">closed {new Date(data.closedAt).toLocaleDateString()}</Badge>
+        {/if}
       </HStack>
-      <Button
-        size="small"
-        variant="ghost"
-        href={`/api/aggregator/quarterly/export.xlsx?year=${year}&quarter=${quarter}`}
-      >
-        Export for accountant ↓
-      </Button>
+      <HStack gap={2}>
+        {#if data}
+          {#if data.closedAt}
+            <Button size="small" variant="ghost" disabled={closing} onclick={reopen}>Reopen</Button>
+          {:else}
+            <Button size="small" variant="ghost" disabled={closing} onclick={close}>
+              {closing ? 'Closing…' : 'Mark filed'}
+            </Button>
+          {/if}
+        {/if}
+        <Button
+          size="small"
+          variant="ghost"
+          href={`/api/aggregator/quarterly/export.xlsx?year=${year}&quarter=${quarter}`}
+        >
+          Export for accountant ↓
+        </Button>
+      </HStack>
     </HStack>
 
     {#if error}

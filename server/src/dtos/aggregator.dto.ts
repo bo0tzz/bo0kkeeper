@@ -59,11 +59,23 @@ const QuarterlyAggregateResponseSchema = z
     }),
     netBtwEurMinor: z.string(),
     warnings: z.array(AggregatorWarningSchema),
+    /** ISO timestamp when the user marked this period as filed; null = open. */
+    closedAt: z.string().nullable(),
   })
   .meta({ id: 'QuarterlyAggregateResponseDto' });
 export class QuarterlyAggregateResponseDto extends createZodDto(QuarterlyAggregateResponseSchema) {}
 
-export function mapAggregate(value: QuarterlyAggregate): QuarterlyAggregateResponseDto {
+const ClosePeriodBodySchema = z
+  .object({
+    notes: z.string().optional(),
+  })
+  .meta({ id: 'ClosePeriodDto' });
+export class ClosePeriodDto extends createZodDto(ClosePeriodBodySchema) {}
+
+export function mapAggregate(
+  value: QuarterlyAggregate,
+  closedAt: Date | null = null,
+): QuarterlyAggregateResponseDto {
   return {
     year: value.year,
     quarter: value.quarter,
@@ -85,6 +97,7 @@ export function mapAggregate(value: QuarterlyAggregate): QuarterlyAggregateRespo
     },
     netBtwEurMinor: String(value.netBtwEurMinor),
     warnings: [...value.warnings],
+    closedAt: closedAt ? closedAt.toISOString() : null,
   } as QuarterlyAggregateResponseDto;
 }
 

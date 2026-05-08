@@ -7,6 +7,7 @@ import { ExpenseTable } from 'src/schema/tables/expense.table';
 import { InvoiceLineTable } from 'src/schema/tables/invoice-line.table';
 import { InvoiceNumberSequenceTable } from 'src/schema/tables/invoice-number-sequence.table';
 import { InvoiceTable } from 'src/schema/tables/invoice.table';
+import { PeriodCloseTable } from 'src/schema/tables/period-close.table';
 import { WiseTransferTable } from 'src/schema/tables/wise-transfer.table';
 
 @Extensions(['uuid-ossp', 'plpgsql'])
@@ -22,6 +23,7 @@ export class Bo0kkeeperDatabase {
     BankTransactionTable,
     ExpenseTable,
     BankingSessionTable,
+    PeriodCloseTable,
   ];
   functions = [];
   enum = [];
@@ -47,4 +49,5 @@ export interface DB {
   bank_transaction: BankTransactionTable;
   expense: ExpenseTable;
   banking_session: BankingSessionTable;
+  period_close: PeriodCloseTable;
 }

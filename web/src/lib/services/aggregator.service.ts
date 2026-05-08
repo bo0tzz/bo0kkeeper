@@ -1,4 +1,4 @@
-import { apiGet } from '$lib/services/api';
+import { apiDelete, apiGet, apiPost } from '$lib/services/api';
 
 export type ClientClass = 'non_eu' | 'eu' | 'eu_reverse_charge' | 'domestic';
 
@@ -29,6 +29,7 @@ export type QuarterlyAggregateResponse = {
   };
   netBtwEurMinor: string;
   warnings: AggregatorWarning[];
+  closedAt: string | null;
 };
 
 export const getQuarterlyAggregate = (year: number, quarter: number, fetchFn?: typeof fetch) =>
@@ -36,3 +37,16 @@ export const getQuarterlyAggregate = (year: number, quarter: number, fetchFn?: t
     fetch: fetchFn,
     query: { year, quarter },
   });
+
+export const closePeriod = (year: number, quarter: number, notes?: string, fetchFn?: typeof fetch) =>
+  apiPost<{ closedAt: string }>(
+    `/api/aggregator/quarterly/close?year=${year}&quarter=${quarter}`,
+    { notes },
+    { fetch: fetchFn },
+  );
+
+export const reopenPeriod = (year: number, quarter: number, fetchFn?: typeof fetch) =>
+  apiDelete<{ reopened: true }>(
+    `/api/aggregator/quarterly/close?year=${year}&quarter=${quarter}`,
+    { fetch: fetchFn },
+  );
