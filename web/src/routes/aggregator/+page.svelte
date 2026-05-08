@@ -86,9 +86,18 @@
   <Stack gap={6}>
     <Heading size="large" tag="h1">BTW-aangifte rollup</Heading>
 
-    <HStack gap={3}>
-      <Select bind:value={year} options={yearOptions} />
-      <Select bind:value={quarter} options={quarterOptions} />
+    <HStack class="justify-between">
+      <HStack gap={3}>
+        <Select bind:value={year} options={yearOptions} />
+        <Select bind:value={quarter} options={quarterOptions} />
+      </HStack>
+      <Button
+        size="small"
+        variant="ghost"
+        href={`/api/aggregator/quarterly/export.xlsx?year=${year}&quarter=${quarter}`}
+      >
+        Export for accountant ↓
+      </Button>
     </HStack>
 
     {#if error}
