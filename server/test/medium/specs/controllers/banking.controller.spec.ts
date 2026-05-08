@@ -202,9 +202,10 @@ describe('BankingController', () => {
       description: 'Test row',
       rawPayload: {},
     });
-    const result = await controller.listTransactions();
-    expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({
+    const result = await controller.listTransactions({ page: 1, limit: 50 });
+    expect(result.total).toBe(1);
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
       externalId: 'ctrl-tx-1',
       amountMinor: '12345',
       currency: 'EUR',

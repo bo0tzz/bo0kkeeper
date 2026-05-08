@@ -128,3 +128,32 @@ const SetCategoryBodySchema = z
   })
   .meta({ id: 'BankTxSetCategoryDto' });
 export class BankTxSetCategoryDto extends createZodDto(SetCategoryBodySchema) {}
+
+const ListBankTransactionsQuerySchema = z
+  .object({
+    /** ISO YYYY-MM-DD; rows on or after this date. */
+    dateFrom: z.iso.date().optional(),
+    /** ISO YYYY-MM-DD; rows on or before this date. */
+    dateTo: z.iso.date().optional(),
+    /**
+     * Coarse resolution status:
+     *  - matched     → linked to a transfer/invoice/expense
+     *  - categorized → manually categorized as ignorable
+     *  - unmatched   → no link, no category — needs operator attention
+     */
+    status: z.enum(['matched', 'categorized', 'unmatched']).optional(),
+    /** 1-indexed page; defaults to 1. */
+    page: z.coerce.number().int().min(1).default(1),
+    /** Page size; capped at 100. */
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  })
+  .meta({ id: 'ListBankTransactionsQueryDto' });
+export class ListBankTransactionsQueryDto extends createZodDto(ListBankTransactionsQuerySchema) {}
+
+const ListBankTransactionsResponseSchema = z
+  .object({
+    items: z.array(BankTransactionResponseSchema),
+    total: z.number().int(),
+  })
+  .meta({ id: 'ListBankTransactionsResponseDto' });
+export class ListBankTransactionsResponseDto extends createZodDto(ListBankTransactionsResponseSchema) {}

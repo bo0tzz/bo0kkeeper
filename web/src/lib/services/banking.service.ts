@@ -67,8 +67,32 @@ export type BankTransaction = {
   category: BankTxCategory | null;
 };
 
-export const listBankTransactions = (fetchFn?: typeof fetch) =>
-  apiGet<BankTransaction[]>('/api/banking/transactions', { fetch: fetchFn });
+export type BankTxStatusFilter = 'matched' | 'categorized' | 'unmatched';
+
+export type ListBankTransactionsParams = {
+  dateFrom?: string;
+  dateTo?: string;
+  status?: BankTxStatusFilter;
+  page?: number;
+  limit?: number;
+};
+
+export type ListBankTransactionsResponse = {
+  items: BankTransaction[];
+  total: number;
+};
+
+export const listBankTransactions = (params: ListBankTransactionsParams = {}, fetchFn?: typeof fetch) =>
+  apiGet<ListBankTransactionsResponse>('/api/banking/transactions', {
+    fetch: fetchFn,
+    query: {
+      dateFrom: params.dateFrom,
+      dateTo: params.dateTo,
+      status: params.status,
+      page: params.page,
+      limit: params.limit,
+    },
+  });
 
 export type TransferCandidate = {
   id: string;

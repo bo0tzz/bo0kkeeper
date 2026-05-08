@@ -15,7 +15,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
-import { Authenticated } from 'src/decorators';
+import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import {
   BankingSessionResponseDto,
   BankingStartAuthDto,
@@ -24,6 +24,8 @@ import {
   BankTxMatchCandidatesDto,
   BankTxSetCategoryDto,
   BankTxSetMatchDto,
+  ListBankTransactionsQueryDto,
+  ListBankTransactionsResponseDto,
 } from 'src/dtos/banking.dto';
 import { BankTxCategory, EventSource, JobName } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
@@ -122,12 +124,21 @@ export class BankingController {
     return { enqueued: true };
   }
 
-  /** Recent bank_transaction rows. Drives the list panel on /banking. */
+  /** Paginated bank_transaction list with optional filters. Drives /banking. */
   @Get('transactions')
   @Authenticated()
-  async listTransactions(): Promise<BankTransactionResponseDto[]> {
-    const rows = await this.bankTransactionRepository.findRecent(50);
-    return rows.map((row) => toBankTransactionDto(row));
+  @ApiQueryFromDto(ListBankTransactionsQueryDto)
+  async listTransactions(
+    @Query() query: ListBankTransactionsQueryDto,
+  ): Promise<ListBankTransactionsResponseDto> {
+    const { items, total } = await this.bankTransactionRepository.findPaginated({
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      status: query.status,
+      offset: (query.page - 1) * query.limit,
+      limit: query.limit,
+    });
+    return { items: items.map((row) => toBankTransactionDto(row)), total };
   }
 
   /**

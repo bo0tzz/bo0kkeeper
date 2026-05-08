@@ -105,7 +105,7 @@ export class BankTransactionRepository {
     return result?.total ? BigInt(result.total) : 0n;
   }
 
-  /** Recent rows, newest first. Used by the banking UI list. */
+  /** Recent rows, newest first. Used by the /transactions all-flows view. */
   findRecent(limit = 50): Promise<BankTransaction[]> {
     return this.db
       .selectFrom('bank_transaction')
@@ -114,5 +114,58 @@ export class BankTransactionRepository {
       .orderBy('createdAt', 'desc')
       .limit(limit)
       .execute() as Promise<BankTransaction[]>;
+  }
+
+  /**
+   * Paginated rows with optional date-range + status filter, newest first.
+   * Status: 'matched' = any matched* FK set; 'categorized' = category set;
+   * 'unmatched' = neither. Returns the page slice plus the unsliced total.
+   */
+  async findPaginated(input: {
+    dateFrom?: string;
+    dateTo?: string;
+    status?: 'matched' | 'categorized' | 'unmatched';
+    offset: number;
+    limit: number;
+  }): Promise<{ items: BankTransaction[]; total: number }> {
+    let query = this.db.selectFrom('bank_transaction');
+    if (input.dateFrom) {
+      query = query.where('txDate', '>=', new Date(input.dateFrom));
+    }
+    if (input.dateTo) {
+      query = query.where('txDate', '<=', new Date(input.dateTo));
+    }
+    switch (input.status) {
+      case 'matched': {
+        query = query.where('matchedAt', 'is not', null);
+        break;
+      }
+      case 'categorized': {
+        query = query.where('category', 'is not', null);
+        break;
+      }
+      case 'unmatched': {
+        query = query.where('matchedAt', 'is', null).where('category', 'is', null);
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+
+    const totalRow = (await query
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .executeTakeFirst()) as { count: string } | undefined;
+    const total = Number(totalRow?.count ?? 0);
+
+    const items = (await query
+      .selectAll()
+      .orderBy('txDate', 'desc')
+      .orderBy('createdAt', 'desc')
+      .limit(input.limit)
+      .offset(input.offset)
+      .execute()) as BankTransaction[];
+
+    return { items, total };
   }
 }

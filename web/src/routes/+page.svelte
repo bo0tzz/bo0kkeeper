@@ -5,7 +5,6 @@
     getLatestBankingSession,
     listBankTransactions,
     type BankingSession,
-    type BankTransaction,
   } from '$lib/services/banking.service';
   import { listEvents, type ListEventsResponse } from '$lib/services/events.service';
   import { listExpenses, type ListExpensesResponse } from '$lib/services/expenses.service';
@@ -52,16 +51,14 @@
           limit: 1,
         }) as Promise<ListEventsResponse>,
         listExpenses({ status: 'pending_review', limit: 1 }) as Promise<ListExpensesResponse>,
-        listBankTransactions().catch(() => [] as BankTransaction[]),
+        listBankTransactions({ status: 'unmatched', limit: 1 }).catch(() => ({ items: [], total: 0 })),
         getLatestBankingSession().catch(() => null),
         getQuarterlyAggregate(year, quarter).catch(() => null),
       ]);
       counts = {
         pendingWiseCredits: wise.total,
         pendingExpenseReviews: expenses.total,
-        unmatchedBankTx: bankTx.filter(
-          (tx) => !tx.matchedTransferId && !tx.matchedInvoiceId && !tx.matchedExpenseId && !tx.category,
-        ).length,
+        unmatchedBankTx: bankTx.total,
         bankingSession,
         aggregate: agg,
         aggregateYear: year,

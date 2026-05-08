@@ -12,6 +12,8 @@
     type BankingSession,
     type BankTransaction,
     type BankTxCategory,
+    type BankTxStatusFilter,
+    type ListBankTransactionsResponse,
     type MatchCandidates,
   } from '$lib/services/banking.service';
   import {
@@ -35,13 +37,27 @@
     Text,
   } from '@immich/ui';
 
+  const PAGE_SIZE = 50;
+
   let session = $state<BankingSession | null>(null);
-  let transactions = $state<BankTransaction[]>([]);
+  let txData = $state<ListBankTransactionsResponse | null>(null);
   let loading = $state(false);
   let starting = $state(false);
   let syncing = $state(false);
   let error = $state<string | null>(null);
   let info = $state<string | null>(null);
+
+  let dateFrom = $state('');
+  let dateTo = $state('');
+  let status = $state<'' | BankTxStatusFilter>('');
+  let txPage = $state(1);
+
+  const statusOptions = [
+    { value: '', label: 'Any status' },
+    { value: 'unmatched', label: 'Unmatched' },
+    { value: 'matched', label: 'Matched' },
+    { value: 'categorized', label: 'Categorized' },
+  ];
 
   let linkingTx = $state<BankTransaction | null>(null);
   let candidates = $state<MatchCandidates>({ transfers: [], invoices: [], expenses: [] });
@@ -51,13 +67,33 @@
 
   const callbackError = page.url.searchParams.get('error');
 
+  async function loadSession() {
+    try {
+      session = await getLatestBankingSession();
+    } catch (error_) {
+      error = (error_ as Error).message;
+    }
+  }
+
+  async function loadTx() {
+    try {
+      txData = await listBankTransactions({
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        status: status || undefined,
+        page: txPage,
+        limit: PAGE_SIZE,
+      });
+    } catch (error_) {
+      error = (error_ as Error).message;
+    }
+  }
+
   async function load() {
     loading = true;
     error = null;
     try {
-      [session, transactions] = await Promise.all([getLatestBankingSession(), listBankTransactions()]);
-    } catch (error_) {
-      error = (error_ as Error).message;
+      await Promise.all([loadSession(), loadTx()]);
     } finally {
       loading = false;
     }
@@ -66,6 +102,32 @@
   $effect(() => {
     void load();
   });
+
+  function applyTxFilters() {
+    txPage = 1;
+    void loadTx();
+  }
+
+  function clearTxFilters() {
+    dateFrom = '';
+    dateTo = '';
+    status = '';
+    txPage = 1;
+    void loadTx();
+  }
+
+  let totalPages = $derived(txData ? Math.max(1, Math.ceil(txData.total / PAGE_SIZE)) : 1);
+  let transactions = $derived<BankTransaction[]>(txData?.items ?? []);
+
+  function replaceTx(updated: BankTransaction) {
+    if (!txData) {
+      return;
+    }
+    txData = {
+      ...txData,
+      items: txData.items.map((row) => (row.id === updated.id ? updated : row)),
+    };
+  }
 
   async function connect() {
     starting = true;
@@ -140,7 +202,7 @@
     const next = (value || null) as BankTxCategory | null;
     try {
       const updated = await setBankTxCategory(tx.id, next);
-      transactions = transactions.map((row) => (row.id === updated.id ? updated : row));
+      replaceTx(updated);
     } catch (error_) {
       error = (error_ as Error).message;
     }
@@ -176,7 +238,7 @@
     linking = true;
     try {
       const updated = await setBankTxMatch(linkingTx.id, { type, targetId });
-      transactions = transactions.map((row) => (row.id === updated.id ? updated : row));
+      replaceTx(updated);
       closeLinkModal();
     } catch (error_) {
       error = (error_ as Error).message;
@@ -188,7 +250,7 @@
   async function unlink(tx: BankTransaction) {
     try {
       const updated = await clearBankTxMatch(tx.id);
-      transactions = transactions.map((row) => (row.id === updated.id ? updated : row));
+      replaceTx(updated);
     } catch (error_) {
       error = (error_ as Error).message;
     }
@@ -213,7 +275,7 @@
     }
     try {
       const updated = await setBankTxMatch(tx.id, target);
-      transactions = transactions.map((row) => (row.id === updated.id ? updated : row));
+      replaceTx(updated);
     } catch (error_) {
       error = (error_ as Error).message;
     }
@@ -367,11 +429,28 @@
     <Stack gap={3}>
       <HStack class="justify-between">
         <Heading size="medium" tag="h2">Recent transactions</Heading>
-        <Text size="small" color="muted">{transactions.length} shown</Text>
+        <Text size="small" color="muted">{txData ? `${txData.total} total` : ''}</Text>
       </HStack>
+
+      <HStack gap={3} class="items-end">
+        <Field label="From">
+          <Input type="date" bind:value={dateFrom} />
+        </Field>
+        <Field label="To">
+          <Input type="date" bind:value={dateTo} />
+        </Field>
+        <Field label="Status">
+          <Select bind:value={status} options={statusOptions} />
+        </Field>
+        <Button size="small" onclick={applyTxFilters}>Apply</Button>
+        <Button size="small" variant="ghost" onclick={clearTxFilters}>Clear</Button>
+      </HStack>
+
       {#if transactions.length === 0}
         <Text color="muted">
-          No bank transactions yet. They'll appear here after the next sync.
+          {txData && (dateFrom || dateTo || status)
+            ? 'No transactions match these filters.'
+            : "No bank transactions yet. They'll appear here after the next sync."}
         </Text>
       {:else}
         <Table>
@@ -438,6 +517,36 @@
             {/each}
           </TableBody>
         </Table>
+
+        <HStack class="justify-between">
+          <Text size="small" color="muted">
+            Page {txPage} of {totalPages}
+          </Text>
+          <HStack gap={2}>
+            <Button
+              size="small"
+              variant="ghost"
+              disabled={txPage <= 1 || loading}
+              onclick={() => {
+                txPage -= 1;
+                void loadTx();
+              }}
+            >
+              ← Prev
+            </Button>
+            <Button
+              size="small"
+              variant="ghost"
+              disabled={txPage >= totalPages || loading}
+              onclick={() => {
+                txPage += 1;
+                void loadTx();
+              }}
+            >
+              Next →
+            </Button>
+          </HStack>
+        </HStack>
       {/if}
     </Stack>
   </Stack>
