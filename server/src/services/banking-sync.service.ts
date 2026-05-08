@@ -162,33 +162,37 @@ function formatYmd(d: Date): string {
  * Map an Enable Banking transaction → `bank_transaction` insert. Returns
  * null when the API row lacks a stable id (defensive — Enable Banking
  * normalizes this already, but we'd rather drop than mint a fake id).
+ *
+ * Wire shape is snake_case with nested `creditor` / `debtor` objects; our
+ * row shape is flat. We keep the raw payload around in `rawPayload` so any
+ * fields we don't pull out are still available for audit.
  */
 export function mapTransaction(
   tx: EnableBankingTransaction,
   _account: EnableBankingAccount,
 ): NewBankTransaction | null {
-  const externalId = tx.entryReference ?? tx.transactionId;
+  const externalId = tx.entry_reference ?? tx.transaction_id;
   if (!externalId) {
     return null;
   }
-  const sign = tx.creditDebitIndicator === 'CRDT' ? 1n : -1n;
-  const amountMinor = sign * BigInt(Math.round(Number.parseFloat(tx.transactionAmount.amount) * 100));
+  const sign = tx.credit_debit_indicator === 'CRDT' ? 1n : -1n;
+  const amountMinor = sign * BigInt(Math.round(Number.parseFloat(tx.transaction_amount.amount) * 100));
 
   // CRDT (money in)  → counterparty is the *debtor* (the payer).
   // DBIT (money out) → counterparty is the *creditor* (the payee).
-  const isIncoming = tx.creditDebitIndicator === 'CRDT';
-  const counterpartyName = (isIncoming ? tx.debtorName : tx.creditorName) ?? null;
-  const counterpartyIban = (isIncoming ? tx.debtorAccount?.iban : tx.creditorAccount?.iban) ?? null;
+  const isIncoming = tx.credit_debit_indicator === 'CRDT';
+  const counterpartyName = (isIncoming ? tx.debtor?.name : tx.creditor?.name) ?? null;
+  const counterpartyIban = (isIncoming ? tx.debtor_account?.iban : tx.creditor_account?.iban) ?? null;
 
   return {
     source: BankSource.EnableBanking,
     externalId,
-    txDate: new Date(tx.bookingDate),
+    txDate: new Date(tx.booking_date),
     amountMinor,
-    currency: tx.transactionAmount.currency,
+    currency: tx.transaction_amount.currency,
     counterpartyName,
     counterpartyIban,
-    description: (tx.remittanceInformation ?? []).join(' ').trim(),
+    description: (tx.remittance_information ?? []).join(' ').trim(),
     rawPayload: tx as unknown as Record<string, unknown>,
   };
 }

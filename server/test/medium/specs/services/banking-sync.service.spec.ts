@@ -28,12 +28,12 @@ const ACC: EnableBankingAccount = { uid: 'acct-1', currency: 'EUR', name: 'Busin
 
 function tx(overrides: Partial<EnableBankingTransaction> = {}): EnableBankingTransaction {
   return {
-    entryReference: 'tx-' + Math.random().toString(36).slice(2, 8),
-    bookingDate: '2026-05-01',
-    transactionAmount: { amount: '100.00', currency: 'EUR' },
-    creditDebitIndicator: 'CRDT',
-    debtorName: 'ACME B.V.',
-    remittanceInformation: ['Invoice 2026/001'],
+    entry_reference: 'tx-' + Math.random().toString(36).slice(2, 8),
+    booking_date: '2026-05-01',
+    transaction_amount: { amount: '100.00', currency: 'EUR' },
+    credit_debit_indicator: 'CRDT',
+    debtor: { name: 'ACME B.V.' },
+    remittance_information: ['Invoice 2026/001'],
     ...overrides,
   };
 }
@@ -56,12 +56,12 @@ describe('mapTransaction', () => {
   it('signs CRDT positive (money in) and pulls counterparty from debtor', () => {
     const row = mapTransaction(
       tx({
-        entryReference: 'eb-1',
-        creditDebitIndicator: 'CRDT',
-        transactionAmount: { amount: '420.50', currency: 'EUR' },
-        debtorName: 'Client X',
-        debtorAccount: { iban: 'NL01CLNT' },
-        creditorName: 'Should Not Use',
+        entry_reference: 'eb-1',
+        credit_debit_indicator: 'CRDT',
+        transaction_amount: { amount: '420.50', currency: 'EUR' },
+        debtor: { name: 'Client X' },
+        debtor_account: { iban: 'NL01CLNT' },
+        creditor: { name: 'Should Not Use' },
       }),
       ACC,
     );
@@ -77,10 +77,10 @@ describe('mapTransaction', () => {
   it('signs DBIT negative (money out) and pulls counterparty from creditor', () => {
     const row = mapTransaction(
       tx({
-        creditDebitIndicator: 'DBIT',
-        transactionAmount: { amount: '50.25', currency: 'EUR' },
-        creditorName: 'Vendor Y',
-        creditorAccount: { iban: 'NL02VEND' },
+        credit_debit_indicator: 'DBIT',
+        transaction_amount: { amount: '50.25', currency: 'EUR' },
+        creditor: { name: 'Vendor Y' },
+        creditor_account: { iban: 'NL02VEND' },
       }),
       ACC,
     );
@@ -89,11 +89,11 @@ describe('mapTransaction', () => {
     expect(row!.counterpartyIban).toBe('NL02VEND');
   });
 
-  it('falls back to transactionId when entryReference is missing, drops if both absent', () => {
-    expect(mapTransaction(tx({ entryReference: undefined, transactionId: 'tx-id-9' }), ACC)?.externalId).toBe(
+  it('falls back to transaction_id when entry_reference is missing, drops if both absent', () => {
+    expect(mapTransaction(tx({ entry_reference: undefined, transaction_id: 'tx-id-9' }), ACC)?.externalId).toBe(
       'tx-id-9',
     );
-    expect(mapTransaction(tx({ entryReference: undefined }), ACC)).toBeNull();
+    expect(mapTransaction(tx({ entry_reference: undefined }), ACC)).toBeNull();
   });
 });
 
@@ -138,11 +138,11 @@ describe('BankingSyncService', () => {
     api.listTransactions.mockReset();
     api.listTransactions
       .mockResolvedValueOnce({
-        transactions: [tx({ entryReference: 'p1-a' }), tx({ entryReference: 'p1-b' })],
+        transactions: [tx({ entry_reference: 'p1-a' }), tx({ entry_reference: 'p1-b' })],
         continuationKey: 'cursor-2',
       })
       .mockResolvedValueOnce({
-        transactions: [tx({ entryReference: 'p2-a' })],
+        transactions: [tx({ entry_reference: 'p2-a' })],
         continuationKey: null,
       });
 
@@ -160,7 +160,7 @@ describe('BankingSyncService', () => {
   });
 
   it('deduplicates rows on retry — same externalId ingested twice → one row', async () => {
-    const same = tx({ entryReference: 'dup-1' });
+    const same = tx({ entry_reference: 'dup-1' });
     api.listTransactions.mockResolvedValue({ transactions: [same], continuationKey: null });
 
     const sessionId = await makeActiveSession([ACC]);
@@ -220,8 +220,8 @@ describe('BankingSyncService', () => {
     api.listTransactions.mockResolvedValue({
       transactions: [
         tx({
-          entryReference: 'eb-match',
-          remittanceInformation: ['Wise transfer TXN-0046 from Acme'],
+          entry_reference: 'eb-match',
+          remittance_information: ['Wise transfer TXN-0046 from Acme'],
         }),
       ],
       continuationKey: null,

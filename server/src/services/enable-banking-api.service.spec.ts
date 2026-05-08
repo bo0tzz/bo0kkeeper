@@ -131,10 +131,10 @@ describe('EnableBankingApiService — wire shapes', () => {
       return Response.json({
         transactions: [
           {
-            entryReference: 'tx-9',
-            bookingDate: '2026-05-07',
-            transactionAmount: { amount: '12.34', currency: 'EUR' },
-            creditDebitIndicator: 'CRDT',
+            entry_reference: 'tx-9',
+            booking_date: '2026-05-07',
+            transaction_amount: { amount: '12.34', currency: 'EUR' },
+            credit_debit_indicator: 'CRDT',
           },
         ],
         continuation_key: null,

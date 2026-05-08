@@ -65,20 +65,26 @@ export type ListTransactionsInput = {
   psuIpAddress?: string;
 };
 
+/**
+ * Enable Banking returns snake_case keys with nested party objects, e.g.
+ * `creditor: { name: "..." }` rather than a flat `creditorName`. We mirror
+ * the wire shape verbatim — the mapper in banking-sync handles the
+ * translation into our flat `bank_transaction` shape.
+ */
 export type EnableBankingTransaction = {
   /** Stable id from the bank. */
-  entryReference?: string;
-  transactionId?: string;
-  bookingDate: string;
-  valueDate?: string;
-  transactionAmount: { amount: string; currency: string };
-  /** True for outgoing, false for incoming, used to sign the amount. */
-  creditDebitIndicator: 'CRDT' | 'DBIT';
-  remittanceInformation?: string[];
-  creditorName?: string;
-  creditorAccount?: { iban?: string };
-  debtorName?: string;
-  debtorAccount?: { iban?: string };
+  entry_reference?: string;
+  transaction_id?: string;
+  booking_date: string;
+  value_date?: string;
+  transaction_amount: { amount: string; currency: string };
+  /** CRDT = money in (account credited), DBIT = money out. */
+  credit_debit_indicator: 'CRDT' | 'DBIT';
+  remittance_information?: string[];
+  creditor?: { name?: string } | null;
+  creditor_account?: { iban?: string } | null;
+  debtor?: { name?: string } | null;
+  debtor_account?: { iban?: string } | null;
   status?: string;
 };
 
