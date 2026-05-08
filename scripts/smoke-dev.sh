@@ -77,6 +77,25 @@ if ! [[ "${location}" =~ ^https?:// ]]; then
 fi
 pass "auth/login -> 302 to IDP (${location:0:60}...)"
 
+# --- The redirect_uri sent to the IDP points at the FRONTEND port ---
+# Vite's `changeOrigin: true` rewrites Host to the backend, which makes
+# openid-client derive a redirect_uri pointing at :2283 — the IDP then rejects
+# the token exchange because that doesn't match what /authorize received.
+redirect_uri=$(echo "${location}" | python3 -c '
+import sys, urllib.parse
+url = sys.stdin.read().strip()
+qs = urllib.parse.urlparse(url).query
+params = urllib.parse.parse_qs(qs)
+print(params.get("redirect_uri", [""])[0])
+' 2>/dev/null)
+if [[ -z "${redirect_uri}" ]]; then
+  fail "auth/login redirect didn't include redirect_uri in the query — broken OIDC config."
+fi
+if [[ "${redirect_uri}" == *":${SERVER_PORT}/"* ]]; then
+  fail "redirect_uri sent to IDP is '${redirect_uri}' (backend port). Vite proxy must NOT rewrite Host (changeOrigin: false), and OIDC_REDIRECT_URI in .env must point at :${WEB_PORT}."
+fi
+pass "redirect_uri sent to IDP uses the frontend port"
+
 # --- IDP JWKS is populated (catches the empty-JWKS Authentik misconfig) ---
 issuer=$(grep -E '^OIDC_ISSUER=' .env 2>/dev/null | cut -d= -f2- | tr -d "'\"")
 if [[ -z "${issuer}" ]]; then

@@ -5,7 +5,11 @@ import { defineConfig, type ProxyOptions, type UserConfig } from 'vite';
 const upstream: ProxyOptions = {
   target: process.env.SERVER_URL || 'http://localhost:2283/',
   secure: true,
-  changeOrigin: true,
+  // Keep the original Host header (`localhost:3000`) so the backend reconstructs
+  // the callback URL against the frontend port. Critical for the OIDC token
+  // exchange: openid-client derives `redirect_uri` from the request URL, and the
+  // IDP rejects the exchange if it doesn't match the URL given to /authorize.
+  changeOrigin: false,
   ws: true,
 };
 
