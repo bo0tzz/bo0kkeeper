@@ -1,4 +1,5 @@
 import { Database, Extensions, Generated, Int8 } from '@immich/sql-tools';
+import { AppSettingsTable } from 'src/schema/tables/app-settings.table';
 import { BankTransactionTable } from 'src/schema/tables/bank-transaction.table';
 import { BankingSessionTable } from 'src/schema/tables/banking-session.table';
 import { ClientTable } from 'src/schema/tables/client.table';
@@ -24,6 +25,7 @@ export class Bo0kkeeperDatabase {
     ExpenseTable,
     BankingSessionTable,
     PeriodCloseTable,
+    AppSettingsTable,
   ];
   functions = [];
   enum = [];
@@ -50,4 +52,5 @@ export interface DB {
   expense: ExpenseTable;
   banking_session: BankingSessionTable;
   period_close: PeriodCloseTable;
+  app_settings: AppSettingsTable;
 }

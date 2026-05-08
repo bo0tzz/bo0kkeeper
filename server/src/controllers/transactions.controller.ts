@@ -47,9 +47,9 @@ export class TransactionsController {
 
     // Resolve the labels we'll need for matched bank rows in one round trip
     // each, rather than per-row N+1.
-    const matchedTransferIds = unique(bankRows.map((r) => r.matchedTransferId).filter(notNull));
-    const matchedInvoiceIds = unique(bankRows.map((r) => r.matchedInvoiceId).filter(notNull));
-    const matchedExpenseIds = unique(bankRows.map((r) => r.matchedExpenseId).filter(notNull));
+    const matchedTransferIds = unique(bankRows.map((r) => r.matchedTransferId).filter((v) => v !== null));
+    const matchedInvoiceIds = unique(bankRows.map((r) => r.matchedInvoiceId).filter((v) => v !== null));
+    const matchedExpenseIds = unique(bankRows.map((r) => r.matchedExpenseId).filter((v) => v !== null));
     const transferRefs = await this.lookupTransferRefs(matchedTransferIds);
     const invoiceNumbers = await this.lookupInvoiceNumbers(matchedInvoiceIds);
     const expenseVendors = await this.lookupExpenseVendors(matchedExpenseIds);
@@ -174,10 +174,6 @@ function mapWiseRow(row: WiseTransferRow): ListTransactionsResponseDto['items'][
 
 function unique<T>(values: T[]): T[] {
   return [...new Set(values)];
-}
-
-function notNull<T>(value: T | null): value is T {
-  return value !== null;
 }
 
 function capitalize(s: string): string {

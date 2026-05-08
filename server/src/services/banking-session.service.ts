@@ -57,7 +57,10 @@ export class BankingSessionService {
     const redirectUri = this.requireRedirectUri();
     const psuType = input.psuType ?? 'personal';
     const oauthState = randomUUID();
-    const validUntil = new Date(Date.now() + this.config.consentDays * 24 * 60 * 60 * 1000);
+    // PSD2 caps consent at 90 days; we always ask for the full window. The
+    // bank may grant less and we trust whatever it returns in `valid_until`.
+    const PSD2_MAX_CONSENT_DAYS = 90;
+    const validUntil = new Date(Date.now() + PSD2_MAX_CONSENT_DAYS * 24 * 60 * 60 * 1000);
 
     const session = await this.sessionRepository.create({
       oauthState,

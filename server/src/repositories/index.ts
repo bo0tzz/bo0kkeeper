@@ -1,3 +1,4 @@
+import { AppSettingsRepository } from 'src/repositories/app-settings.repository';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
@@ -9,6 +10,7 @@ import { PeriodCloseRepository } from 'src/repositories/period-close.repository'
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 
 export const repositories = [
+  AppSettingsRepository,
   BankTransactionRepository,
   BankingSessionRepository,
   ClientRepository,

@@ -55,31 +55,6 @@ const ConfigSchema = z.object({
    */
   PAPERLESS_WEBHOOK_TOKEN: z.string().optional(),
   /**
-   * Comma-separated tag NAMES required on a paperless document for it to
-   * register as a pending expense. Doc must have ALL listed tags. Tag names
-   * (not ids) so the same config works against dev + prod paperless.
-   */
-  PAPERLESS_EXPENSE_TAGS: z.string().default('Business,Bills'),
-  /**
-   * Comma-separated tag names to apply to invoices we push into paperless.
-   * Missing tags are auto-created on first use.
-   */
-  PAPERLESS_OUTGOING_INVOICE_TAGS: z.string().default('Business,Invoice,bo0kkeeper'),
-
-  /**
-   * Issuer details printed on every invoice. KvK + VAT id are required by Dutch
-   * tax law; address gets formatted into the right-aligned header block.
-   */
-  ISSUER_KVK: z.string().default('CONFIGURE'),
-  ISSUER_VAT_ID: z.string().default('CONFIGURE'),
-  ISSUER_ADDRESS_LINE1: z.string().default('Example Street 1'),
-  ISSUER_POSTAL_CODE: z.string().default('1234 AB'),
-  ISSUER_CITY: z.string().default('Exampletown'),
-  ISSUER_COUNTRY: z.string().default('The Netherlands'),
-  /** IBAN printed in the "Payment to:" block on domestic invoices. */
-  ISSUER_IBAN: z.string().default('CONFIGURE'),
-
-  /**
    * Enable Banking application id (UUID, registered at enablebanking.com/cp).
    * Used as JWT `kid`. Optional in dev — services that need it throw at call time.
    */
@@ -90,11 +65,6 @@ const ConfigSchema = z.object({
   ENABLE_BANKING_API_BASE_URL: z.url().default('https://api.enablebanking.com'),
   /** Public callback URL the bank redirects back to after PSU consent. */
   ENABLE_BANKING_REDIRECT_URI: z.url().optional(),
-  /**
-   * Days of consent validity to request (PSD2 caps at 90; some ASPSPs are lower).
-   * The bank may grant less than we ask for; we trust the response's `valid_until`.
-   */
-  ENABLE_BANKING_CONSENT_DAYS: z.coerce.number().int().min(1).max(180).default(90),
   /**
    * Cutover date — bank transactions with a bookingDate before this are
    * silently dropped at sync time. AISP returns ~90 days of history and we
@@ -151,19 +121,6 @@ export type Config = {
     baseUrl?: string;
     token?: string;
     webhookToken?: string;
-    /** Tag names a doc must carry to be ingested as an expense. */
-    expenseTags: string[];
-    /** Tag names applied to bo0kkeeper-issued invoices on upload. */
-    outgoingInvoiceTags: string[];
-  };
-  issuer: {
-    kvk: string;
-    vatId: string;
-    addressLine1: string;
-    postalCode: string;
-    city: string;
-    country: string;
-    iban: string;
   };
   enableBanking: {
     /** Application id (used as JWT `kid`). Required at call-time, optional at boot. */
@@ -173,8 +130,6 @@ export type Config = {
     apiBaseUrl: string;
     /** Public callback URL bank redirects to. Required to start auth. */
     redirectUri?: string;
-    /** Days of consent validity to request from the bank. */
-    consentDays: number;
     /** Cutover date as ISO YYYY-MM-DD; bank tx before this are dropped. */
     ingestFrom?: string;
   };
@@ -231,24 +186,12 @@ export function loadConfig(): Config {
       baseUrl: result.data.PAPERLESS_BASE_URL,
       token: result.data.PAPERLESS_TOKEN,
       webhookToken: result.data.PAPERLESS_WEBHOOK_TOKEN,
-      expenseTags: splitTags(result.data.PAPERLESS_EXPENSE_TAGS),
-      outgoingInvoiceTags: splitTags(result.data.PAPERLESS_OUTGOING_INVOICE_TAGS),
-    },
-    issuer: {
-      kvk: result.data.ISSUER_KVK,
-      vatId: result.data.ISSUER_VAT_ID,
-      addressLine1: result.data.ISSUER_ADDRESS_LINE1,
-      postalCode: result.data.ISSUER_POSTAL_CODE,
-      city: result.data.ISSUER_CITY,
-      country: result.data.ISSUER_COUNTRY,
-      iban: result.data.ISSUER_IBAN,
     },
     enableBanking: {
       appId: result.data.ENABLE_BANKING_APP_ID,
       privateKey: result.data.ENABLE_BANKING_PRIVATE_KEY,
       apiBaseUrl: result.data.ENABLE_BANKING_API_BASE_URL,
       redirectUri: result.data.ENABLE_BANKING_REDIRECT_URI,
-      consentDays: result.data.ENABLE_BANKING_CONSENT_DAYS,
       ingestFrom: result.data.ENABLE_BANKING_INGEST_FROM,
     },
     sheets: {
@@ -257,11 +200,4 @@ export function loadConfig(): Config {
       spreadsheetId: result.data.SHEETS_SPREADSHEET_ID,
     },
   };
-}
-
-function splitTags(value: string): string[] {
-  return value
-    .split(',')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
 }

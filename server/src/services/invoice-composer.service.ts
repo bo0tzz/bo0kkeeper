@@ -1,5 +1,4 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Config, loadConfig } from 'src/config';
 import { OnJob } from 'src/decorators';
 import { ClientClass, EventSource, JobName, QueueName, TradeName } from 'src/enum';
 import { Client, ClientRepository } from 'src/repositories/client.repository';
@@ -8,6 +7,7 @@ import { InvoiceRepository, InvoiceWithLines } from 'src/repositories/invoice.re
 import { JobRepository } from 'src/repositories/job.repository';
 import { PaperlessService } from 'src/services/paperless.service';
 import { RenderService } from 'src/services/render.service';
+import { SettingsService } from 'src/services/settings.service';
 import { JobOf } from 'src/types';
 
 export type InvoiceLineInput = {
@@ -64,7 +64,6 @@ const INVOICE_TEMPLATE = 'invoice' as const;
 @Injectable()
 export class InvoiceComposerService {
   private readonly logger = new Logger(InvoiceComposerService.name);
-  private readonly outgoingInvoiceTags = loadConfig().paperless.outgoingInvoiceTags;
 
   constructor(
     private readonly clientRepository: ClientRepository,
@@ -73,6 +72,7 @@ export class InvoiceComposerService {
     private readonly paperlessService: PaperlessService,
     private readonly jobRepository: JobRepository,
     private readonly eventRepository: EventRepository,
+    private readonly settingsService: SettingsService,
   ) {}
 
   /**
@@ -95,16 +95,18 @@ export class InvoiceComposerService {
     if (!client) {
       throw new Error(`Client not found for invoice ${invoice.number}: ${invoice.clientId}`);
     }
-    const data = buildInvoiceData(client, invoice);
+    const data = buildInvoiceData(client, invoice, await this.settingsService.getIssuer());
     const pdf = await this.renderService.render({ template: INVOICE_TEMPLATE, data });
 
     // Resolve outgoing-invoice tag NAMES → IDs at upload time (auto-creates
-    // any missing). Keeping config as names lets the same env work against
-    // dev paperless and the user's real instance, where tag IDs differ.
+    // any missing). Keeping settings as names lets the same config work
+    // against dev paperless and the user's real instance, where tag IDs
+    // differ.
+    const outgoingInvoiceTags = await this.settingsService.getPaperlessOutgoingInvoiceTags();
     const tagIds =
-      this.outgoingInvoiceTags.length === 0
+      outgoingInvoiceTags.length === 0
         ? undefined
-        : await this.paperlessService.resolveTagIds(this.outgoingInvoiceTags);
+        : await this.paperlessService.resolveTagIds(outgoingInvoiceTags);
 
     const issuedAt = invoice.issuedAt instanceof Date ? invoice.issuedAt : new Date(invoice.issuedAt);
     const upload = await this.paperlessService.uploadDocument({
@@ -152,7 +154,7 @@ export class InvoiceComposerService {
       })),
     });
 
-    const data = buildInvoiceData(client, issued);
+    const data = buildInvoiceData(client, issued, await this.settingsService.getIssuer());
     const pdf = await this.renderService.render({ template: INVOICE_TEMPLATE, data });
 
     // Paperless archive runs async via pg-boss. Keeps compose fast, retries
@@ -192,7 +194,7 @@ export class InvoiceComposerService {
     if (!client) {
       throw new Error(`Client not found for invoice ${invoice.number}: ${invoice.clientId}`);
     }
-    const data = buildInvoiceData(client, invoice);
+    const data = buildInvoiceData(client, invoice, await this.settingsService.getIssuer());
     const pdf = await this.renderService.render({ template: INVOICE_TEMPLATE, data });
     return {
       filename: `${invoice.number.replaceAll('/', '-')}.pdf`,
@@ -245,7 +247,17 @@ function eurFromMinor(minor: bigint, fxRate: string | null): string {
   return eur.toFixed(2);
 }
 
-function buildIssuer(client: Client, issuer: Config['issuer']): Record<string, string> {
+type IssuerInfo = {
+  kvk: string;
+  vatId: string;
+  addressLine1: string;
+  postalCode: string;
+  city: string;
+  country: string;
+  iban: string;
+};
+
+function buildIssuer(client: Client, issuer: IssuerInfo): Record<string, string> {
   const name = client.tradeName === TradeName.ItServices ? 'de Willigen IT Services' : 'de Willigen 3D';
   return {
     name,
@@ -297,8 +309,7 @@ function formatDateDutch(date: Date | string): string {
  *     amount / total) and a 3-line summary (subtotal, BTW, total). IBAN
  *     payment block.
  */
-function buildInvoiceData(client: Client, invoice: InvoiceWithLines): Record<string, unknown> {
-  const issuer = loadConfig().issuer;
+function buildInvoiceData(client: Client, invoice: InvoiceWithLines, issuer: IssuerInfo): Record<string, unknown> {
   const totalMinor = BigInt(invoice.totalMinor as unknown as string);
   const isNonEu = client.class === ClientClass.NonEu;
   const isReverseCharge = client.class === ClientClass.EuReverseCharge;

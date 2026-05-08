@@ -53,7 +53,7 @@ describe('BankingController', () => {
       queue: vi.fn().mockResolvedValue('fake-job-id'),
     } as unknown as JobRepository & { queue: ReturnType<typeof vi.fn> };
     const clientRepo = new ClientRepository(db);
-    const sheetWriter = { writeIncomeRow: vi.fn().mockResolvedValue(undefined) } as unknown as SheetWriterService;
+    const sheetWriter = { writeIncomeRow: vi.fn().mockResolvedValue(void 0) } as unknown as SheetWriterService;
     const matcher = new BankMatcherService(db, bankTxRepo, clientRepo, sheetWriter, new EventRepository(db));
     controller = new BankingController(service, repo, jobRepo, bankTxRepo, matcher, new EventRepository(db));
   });

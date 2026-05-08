@@ -103,7 +103,7 @@ export class BankingController {
     const earliestBaselineDate = accounts
       .map((a) => a.baseline?.asOf)
       .filter((d): d is string => typeof d === 'string')
-      .sort()[0];
+      .toSorted()[0];
     const ingestedSinceBaseline = earliestBaselineDate
       ? await this.bankTransactionRepository.sumIngestedSince(earliestBaselineDate.slice(0, 10))
       : 0n;

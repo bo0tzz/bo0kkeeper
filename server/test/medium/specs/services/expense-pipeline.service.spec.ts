@@ -5,6 +5,7 @@ import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { DB } from 'src/schema';
 import { ExpensePipelineService } from 'src/services/expense-pipeline.service';
 import { PaperlessService } from 'src/services/paperless.service';
+import { SettingsService } from 'src/services/settings.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,11 +13,18 @@ beforeEach(() => {
   process.env.OIDC_ISSUER ??= 'http://idp.test';
   process.env.OIDC_CLIENT_ID ??= 'test';
   process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
-  // Disable tag-gate by default in this suite — it's exercised explicitly by
-  // the dedicated tag-gate test below. Most existing assertions don't care
-  // about tags and would otherwise need to mock paperless.
-  process.env.PAPERLESS_EXPENSE_TAGS = '';
 });
+
+/**
+ * Tag-gate config used to live in env (PAPERLESS_EXPENSE_TAGS); now it's on
+ * SettingsService. A test-local fake lets each block opt into different
+ * tag sets without touching DB state.
+ */
+function fakeSettings(expenseTags: string[] = []): SettingsService {
+  return {
+    getPaperlessExpenseTags: vi.fn().mockResolvedValue(expenseTags),
+  } as unknown as SettingsService;
+}
 
 function fakePaperless(opts: { docTags?: number[]; tagIds?: Map<string, number> } = {}): PaperlessService {
   return {
@@ -48,7 +56,7 @@ describe('ExpensePipelineService', () => {
     eventRepo = new EventRepository(db);
     expenseRepo = new ExpenseRepository(db);
     paperless = fakePaperless();
-    service = new ExpensePipelineService(eventRepo, expenseRepo, paperless);
+    service = new ExpensePipelineService(eventRepo, expenseRepo, paperless, fakeSettings([]));
   });
 
   afterEach(async () => {
@@ -139,13 +147,12 @@ describe('ExpensePipelineService', () => {
 
   describe('tag gate', () => {
     beforeEach(async () => {
-      // Override the env+service for this block: PAPERLESS_EXPENSE_TAGS=Business,Bills
-      // wired to a fake paperless where Business=1, Bills=4.
+      // Settings configured to require Business + Bills, wired to a fake
+      // paperless where Business=1 and Bills=4.
       await db.destroy();
       db = await getKyselyDB();
       eventRepo = new EventRepository(db);
       expenseRepo = new ExpenseRepository(db);
-      process.env.PAPERLESS_EXPENSE_TAGS = 'Business,Bills';
     });
 
     it('ingests a doc that has all required tags', async () => {
@@ -156,7 +163,7 @@ describe('ExpensePipelineService', () => {
           ['Bills', 4],
         ]),
       });
-      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless);
+      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless, fakeSettings(['Business', 'Bills']));
       const ingest = await eventRepo.ingest({
         source: EventSource.Paperless,
         eventType: 'document.consumed',
@@ -180,7 +187,7 @@ describe('ExpensePipelineService', () => {
           ['Bills', 4],
         ]),
       });
-      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless);
+      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless, fakeSettings(['Business', 'Bills']));
       const ingest = await eventRepo.ingest({
         source: EventSource.Paperless,
         eventType: 'document.consumed',
@@ -203,7 +210,7 @@ describe('ExpensePipelineService', () => {
         getDocument: vi.fn().mockRejectedValue(new Error('paperless down')),
         resolveTagIds: vi.fn().mockRejectedValue(new Error('paperless down')),
       } as unknown as PaperlessService;
-      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless);
+      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless, fakeSettings(['Business', 'Bills']));
       const ingest = await eventRepo.ingest({
         source: EventSource.Paperless,
         eventType: 'document.consumed',

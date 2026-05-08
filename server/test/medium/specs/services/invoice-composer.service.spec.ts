@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { ClientClass, JobName, TradeName } from 'src/enum';
+import { AppSettingsRepository } from 'src/repositories/app-settings.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
@@ -8,6 +9,7 @@ import { DB } from 'src/schema';
 import { InvoiceComposerService } from 'src/services/invoice-composer.service';
 import { PaperlessService } from 'src/services/paperless.service';
 import { RenderService } from 'src/services/render.service';
+import { SettingsService } from 'src/services/settings.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,7 +45,9 @@ describe('InvoiceComposerService', () => {
     paperless.waitForDocumentId = vi.fn().mockResolvedValue('paperless-doc-42');
 
     jobs = fakeJobRepo();
-    composer = new InvoiceComposerService(clientRepo, invoiceRepo, render, paperless, jobs, new EventRepository(db));
+    const settingsService = new SettingsService(new AppSettingsRepository(db));
+    await settingsService.onModuleInit();
+    composer = new InvoiceComposerService(clientRepo, invoiceRepo, render, paperless, jobs, new EventRepository(db), settingsService);
 
     const client = await clientRepo.create({
       name: 'FAKECO',

@@ -9,6 +9,7 @@ import { InvoiceComposerService } from 'src/services/invoice-composer.service';
 import { PaperlessService } from 'src/services/paperless.service';
 import { QuarterlyAggregatorService } from 'src/services/quarterly-aggregator.service';
 import { RenderService } from 'src/services/render.service';
+import { SettingsService } from 'src/services/settings.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { SheetsService } from 'src/services/sheets.service';
 import { WebhookService } from 'src/services/webhook.service';
@@ -29,6 +30,7 @@ export const services = [
   PaperlessService,
   QuarterlyAggregatorService,
   RenderService,
+  SettingsService,
   SheetsService,
   SheetWriterService,
   WebhookService,
