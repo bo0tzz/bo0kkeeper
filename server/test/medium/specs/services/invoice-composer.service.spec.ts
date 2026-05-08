@@ -1,8 +1,9 @@
 import { Kysely } from 'kysely';
 import { resolve } from 'node:path';
-import { ClientClass, TradeName } from 'src/enum';
+import { ClientClass, JobName, TradeName } from 'src/enum';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
 import { InvoiceComposerService } from 'src/services/invoice-composer.service';
 import { PaperlessService } from 'src/services/paperless.service';
@@ -18,12 +19,18 @@ beforeEach(() => {
   process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
 });
 
+function fakeJobRepo() {
+  const queue = vi.fn().mockResolvedValue('fake-job-id');
+  return { queue, queueAll: vi.fn(), setup: vi.fn() } as unknown as JobRepository & { queue: ReturnType<typeof vi.fn> };
+}
+
 describe('InvoiceComposerService', () => {
   let db: Kysely<DB>;
   let clientRepo: ClientRepository;
   let invoiceRepo: InvoiceRepository;
   let render: RenderService;
   let paperless: PaperlessService;
+  let jobs: JobRepository & { queue: ReturnType<typeof vi.fn> };
   let composer: InvoiceComposerService;
   let clientId: string;
 
@@ -37,7 +44,8 @@ describe('InvoiceComposerService', () => {
     paperless.uploadDocument = vi.fn().mockResolvedValue({ taskId: 'task-uuid-1' });
     paperless.waitForDocumentId = vi.fn().mockResolvedValue('paperless-doc-42');
 
-    composer = new InvoiceComposerService(clientRepo, invoiceRepo, render, paperless);
+    jobs = fakeJobRepo();
+    composer = new InvoiceComposerService(clientRepo, invoiceRepo, render, paperless, jobs);
 
     const client = await clientRepo.create({
       name: 'FAKECO',
@@ -52,7 +60,7 @@ describe('InvoiceComposerService', () => {
     await db.destroy();
   });
 
-  it('issues, renders, and archives an invoice end-to-end', async () => {
+  it('issues + renders + enqueues an archive job (no inline paperless call)', async () => {
     const result = await composer.composeAndIssue({
       clientId,
       issuedAt: new Date('2099-01-15T00:00:00Z'),
@@ -61,29 +69,18 @@ describe('InvoiceComposerService', () => {
       currency: 'USD',
       eurTotalMinor: 404_572n,
       fxRate: '0.846991',
-      lines: [
-        {
-          description: 'Provided services, January 1 - January 15',
-          lineTotalMinor: 479_100n,
-        },
-      ],
+      lines: [{ description: 'Services Jan 1 – 15', lineTotalMinor: 479_100n }],
     });
 
     expect(result.invoice.number).toBe('2099/001');
-    expect(result.invoice.lines).toHaveLength(1);
     expect(result.pdf.subarray(0, 5).toString('utf8')).toBe('%PDF-');
-    expect(result.paperlessTaskId).toBe('task-uuid-1');
-    expect(result.paperlessDocId).toBe('paperless-doc-42');
-
-    // setPaperlessDocId persisted on the row.
-    const refetched = await invoiceRepo.findByNumber('2099/001');
-    expect(refetched?.paperlessDocId).toBe('paperless-doc-42');
+    // paperless is NOT called inline — that happens in the queued job.
+    expect(paperless.uploadDocument).not.toHaveBeenCalled();
+    expect(jobs.queue).toHaveBeenCalledWith(JobName.ArchiveInvoiceToPaperless, { invoiceId: result.invoice.id });
   });
 
-  it('survives paperless failure: invoice + PDF still produced, doc id null', async () => {
-    paperless.uploadDocument = vi.fn().mockRejectedValue(new Error('paperless down'));
-
-    const result = await composer.composeAndIssue({
+  it('archive job uploads to paperless and persists the doc id', async () => {
+    const composed = await composer.composeAndIssue({
       clientId,
       issuedAt: new Date('2099-02-15T00:00:00Z'),
       currency: 'USD',
@@ -92,10 +89,44 @@ describe('InvoiceComposerService', () => {
       lines: [{ description: 'X', lineTotalMinor: 100_000n }],
     });
 
-    expect(result.invoice.number).toBe('2099/001'); // first invoice of year
-    expect(result.pdf.byteLength).toBeGreaterThan(1000);
-    expect(result.paperlessDocId).toBeUndefined();
+    await composer.handleArchiveInvoiceToPaperless({ invoiceId: composed.invoice.id });
 
+    expect(paperless.uploadDocument).toHaveBeenCalledOnce();
+    const refetched = await invoiceRepo.findByNumber('2099/001');
+    expect(refetched?.paperlessDocId).toBe('paperless-doc-42');
+  });
+
+  it('archive job is idempotent — already-archived invoices are a no-op', async () => {
+    const composed = await composer.composeAndIssue({
+      clientId,
+      issuedAt: new Date('2099-03-15T00:00:00Z'),
+      currency: 'USD',
+      eurTotalMinor: 100_000n,
+      fxRate: '0.85',
+      lines: [{ description: 'X', lineTotalMinor: 100_000n }],
+    });
+
+    await composer.handleArchiveInvoiceToPaperless({ invoiceId: composed.invoice.id });
+    await composer.handleArchiveInvoiceToPaperless({ invoiceId: composed.invoice.id });
+
+    expect(paperless.uploadDocument).toHaveBeenCalledOnce();
+  });
+
+  it('archive job propagates paperless errors so pg-boss can retry', async () => {
+    paperless.uploadDocument = vi.fn().mockRejectedValue(new Error('paperless down'));
+
+    const composed = await composer.composeAndIssue({
+      clientId,
+      issuedAt: new Date('2099-04-15T00:00:00Z'),
+      currency: 'USD',
+      eurTotalMinor: 100_000n,
+      fxRate: '0.85',
+      lines: [{ description: 'X', lineTotalMinor: 100_000n }],
+    });
+
+    await expect(composer.handleArchiveInvoiceToPaperless({ invoiceId: composed.invoice.id })).rejects.toThrow(
+      /paperless down/,
+    );
     const refetched = await invoiceRepo.findByNumber('2099/001');
     expect(refetched?.paperlessDocId).toBeNull();
   });
@@ -103,7 +134,7 @@ describe('InvoiceComposerService', () => {
   it('persists multi-line invoices with summed total', async () => {
     const result = await composer.composeAndIssue({
       clientId,
-      issuedAt: new Date('2099-03-15T00:00:00Z'),
+      issuedAt: new Date('2099-05-15T00:00:00Z'),
       currency: 'USD',
       eurTotalMinor: 1_923_492n,
       fxRate: '0.91289',

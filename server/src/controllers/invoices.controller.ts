@@ -51,8 +51,6 @@ export class InvoicesController {
     });
     return {
       invoice: mapInvoice(result.invoice),
-      paperlessTaskId: result.paperlessTaskId,
-      paperlessDocId: result.paperlessDocId,
     } as InvoiceComposeResponseDto;
   }
 

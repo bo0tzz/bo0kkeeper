@@ -43,6 +43,12 @@ export enum JobName {
   WiseTransferStateChange = 'wise.transfer.state_change',
   /** Convert a paperless `document.consumed` event into a pending expense. */
   ProcessPaperlessDocument = 'paperless.document.consumed',
+  /**
+   * Re-render an invoice and upload to paperless. Enqueued when the inline
+   * upload during compose fails (paperless down, network blip, etc.) so the
+   * archive eventually completes once paperless is reachable again.
+   */
+  ArchiveInvoiceToPaperless = 'invoice.archive_to_paperless',
 }
 
 /** Tax/billing classification of a client; drives BTW treatment + invoice template selection. */

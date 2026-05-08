@@ -55,8 +55,6 @@ export type InvoiceResponse = {
 
 export type InvoiceComposeResponse = {
   invoice: InvoiceResponse;
-  paperlessTaskId?: string;
-  paperlessDocId?: string;
 };
 
 export const composeInvoice = (input: InvoiceComposeInput, fetchFn?: typeof fetch) =>

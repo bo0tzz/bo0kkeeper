@@ -62,8 +62,6 @@ export class InvoiceResponseDto extends createZodDto(InvoiceResponseSchema) {}
 const InvoiceComposeResponseSchema = z
   .object({
     invoice: InvoiceResponseSchema,
-    paperlessTaskId: z.string().optional(),
-    paperlessDocId: z.string().optional(),
   })
   .meta({ id: 'InvoiceComposeResponseDto' });
 export class InvoiceComposeResponseDto extends createZodDto(InvoiceComposeResponseSchema) {}

@@ -138,13 +138,7 @@
       <Alert color="success">
         <Stack gap={2}>
           <Text>
-            Issued invoice <strong>{result.invoice.number}</strong>
-            {#if result.paperlessDocId}
-              — archived as paperless doc <code>{result.paperlessDocId}</code>.
-            {:else}
-              — paperless archive failed or unconfigured (the invoice is still persisted; you can download the PDF below
-              and upload manually).
-            {/if}
+            Issued invoice <strong>{result.invoice.number}</strong> — paperless archive queued in the background.
           </Text>
           <HStack>
             <Button variant="outline" onclick={() => downloadPdf(result!.invoice.id)}>Download PDF</Button>

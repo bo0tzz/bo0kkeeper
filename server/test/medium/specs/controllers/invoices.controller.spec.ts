@@ -6,6 +6,7 @@ import { InvoiceComposeDto } from 'src/dtos/invoice.dto';
 import { ClientClass, TradeName } from 'src/enum';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
 import { InvoiceComposerService } from 'src/services/invoice-composer.service';
 import { PaperlessService } from 'src/services/paperless.service';
@@ -41,7 +42,12 @@ describe('InvoicesController', () => {
     paperless.uploadDocument = vi.fn().mockRejectedValue(new Error('paperless not configured in tests'));
     paperless.waitForDocumentId = vi.fn();
 
-    composer = new InvoiceComposerService(clientRepo, invoiceRepo, render, paperless);
+    const jobs = {
+      queue: vi.fn().mockResolvedValue('fake-job-id'),
+      queueAll: vi.fn(),
+      setup: vi.fn(),
+    } as unknown as JobRepository;
+    composer = new InvoiceComposerService(clientRepo, invoiceRepo, render, paperless, jobs);
     controller = new InvoicesController(composer, invoiceRepo);
 
     const client = await clientRepo.create({

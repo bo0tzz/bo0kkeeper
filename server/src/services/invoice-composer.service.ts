@@ -1,9 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ClientClass } from 'src/enum';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { OnJob } from 'src/decorators';
+import { ClientClass, JobName, QueueName } from 'src/enum';
 import { Client, ClientRepository } from 'src/repositories/client.repository';
 import { InvoiceRepository, InvoiceWithLines } from 'src/repositories/invoice.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { PaperlessService } from 'src/services/paperless.service';
 import { RenderService } from 'src/services/render.service';
+import { JobOf } from 'src/types';
 
 export type InvoiceLineInput = {
   description: string;
@@ -37,10 +40,6 @@ export type InvoiceCompositionInput = {
 export type ComposeResult = {
   invoice: InvoiceWithLines;
   pdf: Buffer;
-  /** Paperless task id, returned when upload was attempted. */
-  paperlessTaskId?: string;
-  /** Final paperless document id, returned when polling completed. */
-  paperlessDocId?: string;
 };
 
 const TEMPLATE_BY_CLASS: Record<ClientClass, 'overseas-non-eu' | 'domestic'> = {
@@ -51,16 +50,16 @@ const TEMPLATE_BY_CLASS: Record<ClientClass, 'overseas-non-eu' | 'domestic'> = {
 };
 
 /**
- * Orchestrates "compose → issue → render → archive."
+ * Orchestrates invoice composition.
  *
  *   1. Validates input and resolves the client.
  *   2. Issues the invoice (allocates number + persists invoice + lines).
- *   3. Renders the PDF via Typst.
- *   4. Uploads to paperless (when configured) and stores the doc id.
- *
- * Steps 3/4 are best-effort wrt paperless availability — failure to upload
- * shouldn't lose the issued invoice (the row already exists). Paperless
- * polling can retry later via a job.
+ *   3. Renders the PDF via Typst (returned to the caller — eg the compose
+ *      response, or the on-demand download endpoint).
+ *   4. Enqueues an `ArchiveInvoiceToPaperless` job to push the PDF into
+ *      paperless. The job re-renders from the row each time it runs, so
+ *      retries are safe and the invoice is fully reproducible from DB
+ *      state alone.
  */
 @Injectable()
 export class InvoiceComposerService {
@@ -71,7 +70,44 @@ export class InvoiceComposerService {
     private readonly invoiceRepository: InvoiceRepository,
     private readonly renderService: RenderService,
     private readonly paperlessService: PaperlessService,
+    private readonly jobRepository: JobRepository,
   ) {}
+
+  /**
+   * Re-render the invoice from its persisted state and push to paperless.
+   * Idempotent: if the invoice already has a paperlessDocId, the upload is
+   * skipped and the job succeeds. pg-boss will retry on transient failures
+   * (paperless down, network blip).
+   */
+  @OnJob({ name: JobName.ArchiveInvoiceToPaperless, queue: QueueName.Default })
+  async handleArchiveInvoiceToPaperless({ invoiceId }: JobOf<JobName.ArchiveInvoiceToPaperless>): Promise<void> {
+    const invoice = await this.invoiceRepository.findById(invoiceId);
+    if (!invoice) {
+      throw new NotFoundException(`Invoice not found: ${invoiceId}`);
+    }
+    if (invoice.paperlessDocId) {
+      this.logger.log(`invoice ${invoice.number} already archived (paperlessDocId=${invoice.paperlessDocId})`);
+      return;
+    }
+    const client = await this.clientRepository.findById(invoice.clientId);
+    if (!client) {
+      throw new Error(`Client not found for invoice ${invoice.number}: ${invoice.clientId}`);
+    }
+    const template = TEMPLATE_BY_CLASS[client.class];
+    const data = template === 'overseas-non-eu' ? buildNonEuData(client, invoice) : buildDomesticData(client, invoice);
+    const pdf = await this.renderService.render({ template, data });
+
+    const issuedAt = invoice.issuedAt instanceof Date ? invoice.issuedAt : new Date(invoice.issuedAt);
+    const upload = await this.paperlessService.uploadDocument({
+      file: pdf,
+      filename: `${invoice.number.replaceAll('/', '-')}.pdf`,
+      title: `${client.name} ${invoice.number}`,
+      created: issuedAt.toISOString().slice(0, 10),
+    });
+    const docId = await this.paperlessService.waitForDocumentId(upload.taskId);
+    await this.invoiceRepository.setPaperlessDocId(invoice.id, docId);
+    this.logger.log(`invoice ${invoice.number} archived as paperless doc ${docId}`);
+  }
 
   async composeAndIssue(input: InvoiceCompositionInput): Promise<ComposeResult> {
     const client = await this.clientRepository.findById(input.clientId);
@@ -109,23 +145,13 @@ export class InvoiceComposerService {
     const data = template === 'overseas-non-eu' ? buildNonEuData(client, issued) : buildDomesticData(client, issued);
     const pdf = await this.renderService.render({ template, data });
 
-    let paperlessTaskId: string | undefined;
-    let paperlessDocId: string | undefined;
-    try {
-      const upload = await this.paperlessService.uploadDocument({
-        file: pdf,
-        filename: `${issued.number.replaceAll('/', '-')}.pdf`,
-        title: `${client.name} ${issued.number}`,
-        created: input.issuedAt.toISOString().slice(0, 10),
-      });
-      paperlessTaskId = upload.taskId;
-      paperlessDocId = await this.paperlessService.waitForDocumentId(upload.taskId);
-      await this.invoiceRepository.setPaperlessDocId(issued.id, paperlessDocId);
-    } catch (error) {
-      this.logger.error(`Paperless archive failed for invoice ${issued.number}: ${(error as Error).message}`);
-    }
+    // Paperless archive runs async via pg-boss. Keeps compose fast, retries
+    // automatically if paperless is unreachable, and avoids a "PDF lost in
+    // memory" failure mode — the invoice is fully reproducible from the row,
+    // so the job re-renders before each upload attempt.
+    await this.jobRepository.queue(JobName.ArchiveInvoiceToPaperless, { invoiceId: issued.id });
 
-    return { invoice: issued, pdf, paperlessTaskId, paperlessDocId };
+    return { invoice: issued, pdf };
   }
 
   /**
