@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
   import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
   import {
@@ -299,14 +298,14 @@
               <TableCell><code class="text-xs">{expense.locationClass}</code></TableCell>
               <TableCell><Badge color={statusColor(expense.status)}>{expense.status}</Badge></TableCell>
               <TableCell>
-                <a
-                  class="text-xs underline"
-                  href={resolve(`/api/expenses/${expense.id}/paperless`)}
+                <Button
+                  size="tiny"
+                  variant="ghost"
+                  href={`/api/expenses/${expense.id}/paperless`}
                   target="_blank"
-                  rel="noopener"
                 >
                   {expense.paperlessDocId} ↗
-                </a>
+                </Button>
               </TableCell>
               <TableCell>
                 <Button

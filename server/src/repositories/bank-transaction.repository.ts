@@ -67,13 +67,23 @@ export class BankTransactionRepository {
   }
 
   /**
-   * Set the manual category for a row (or clear it with null). Returns the
+   * Set the manual category for a row (or clear it with null). Categorizing
+   * implies "not a real income/expense", so any existing match is cleared —
+   * match and category are mutually exclusive resolution paths. Returns the
    * refreshed row so the API can echo back the canonical state.
    */
   async setCategory(id: string, category: BankTxCategory | null): Promise<BankTransaction | undefined> {
+    const patch: Record<string, unknown> = { category, updatedAt: new Date() };
+    if (category !== null) {
+      patch.matchedTransferId = null;
+      patch.matchedInvoiceId = null;
+      patch.matchedExpenseId = null;
+      patch.matchedAt = null;
+      patch.matchConfidence = null;
+    }
     return this.db
       .updateTable('bank_transaction')
-      .set({ category, updatedAt: new Date() })
+      .set(patch)
       .where('id', '=', id)
       .returningAll()
       .executeTakeFirst() as Promise<BankTransaction | undefined>;

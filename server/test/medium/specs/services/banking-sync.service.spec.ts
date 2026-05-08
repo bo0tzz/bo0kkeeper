@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { BankingSessionStatus, BankSource } from 'src/enum';
+import { BankingSessionStatus, BankSource, WiseTransferDirection, WiseTransferState } from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
@@ -111,7 +111,7 @@ describe('BankingSyncService', () => {
     sessionRepo = new BankingSessionRepository(db);
     bankRepo = new BankTransactionRepository(db);
     const clientRepo = new ClientRepository(db);
-    const sheetWriter = { append: vi.fn().mockResolvedValue() } as unknown as SheetWriterService;
+    const sheetWriter = { append: vi.fn().mockResolvedValue(undefined) } as unknown as SheetWriterService;
     matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, new EventRepository(db));
     api = fakeApi([]);
     service = new BankingSyncService(sessionRepo, bankRepo, api, matcher, new EventRepository(db));
@@ -206,14 +206,14 @@ describe('BankingSyncService', () => {
     const wiseRepo = new WiseTransferRepository(db);
     await wiseRepo.create({
       wiseTransferId: 'WISE-TEST-1',
-      direction: 'out',
+      direction: WiseTransferDirection.Out,
       sourceAmountMinor: 500_000n,
       sourceCurrency: 'USD',
       targetAmountMinor: 423_132n,
       targetCurrency: 'EUR',
       feeMinor: 0n,
       feeCurrency: 'USD',
-      state: 'outgoing_payment_sent',
+      state: WiseTransferState.OutgoingPaymentSent,
       stateUpdatedAt: new Date(),
       ourReference: 'TXN-0046',
     });

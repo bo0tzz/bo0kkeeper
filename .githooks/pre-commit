@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Block commits that don't strictly type-check. The dev-mode `nest start
+# --watch` runs SWC (relaxed) and silently keeps an old build alive when
+# tsc would have errored — that has bitten us repeatedly. Catching it
+# here keeps the bug class out of git history.
+#
+# Server: tsc --noEmit
+# Web:    svelte-check + tsc --noEmit
+#
+# Skip for `git commit --no-verify` (only do this for hot-fixes you'll
+# clean up immediately).
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+# Prefer the project's pnpm via mise if available, else assume PATH.
+if command -v mise >/dev/null 2>&1; then
+  PNPM=(mise exec -- pnpm)
+else
+  PNPM=(pnpm)
+fi
+
+echo "pre-commit: server tsc --noEmit"
+"${PNPM[@]}" --filter bo0kkeeper run check
+
+echo "pre-commit: web svelte-check + tsc --noEmit"
+"${PNPM[@]}" --filter web run check
+
+echo "pre-commit: ok"

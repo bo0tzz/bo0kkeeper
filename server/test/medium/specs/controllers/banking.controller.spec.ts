@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import type { Response } from 'express';
 import { Kysely } from 'kysely';
 import { BankingController } from 'src/controllers/banking.controller';
-import { BankingSessionStatus, BankSource, JobName } from 'src/enum';
+import { BankingSessionStatus, BankSource, JobName, MatchConfidence, WiseTransferDirection, WiseTransferState } from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
@@ -53,7 +53,7 @@ describe('BankingController', () => {
       queue: vi.fn().mockResolvedValue('fake-job-id'),
     } as unknown as JobRepository & { queue: ReturnType<typeof vi.fn> };
     const clientRepo = new ClientRepository(db);
-    const sheetWriter = { writeIncomeRow: vi.fn().mockResolvedValue() } as unknown as SheetWriterService;
+    const sheetWriter = { writeIncomeRow: vi.fn().mockResolvedValue(undefined) } as unknown as SheetWriterService;
     const matcher = new BankMatcherService(db, bankTxRepo, clientRepo, sheetWriter, new EventRepository(db));
     controller = new BankingController(service, repo, jobRepo, bankTxRepo, matcher);
   });
@@ -139,14 +139,14 @@ describe('BankingController', () => {
       .insertInto('wise_transfer')
       .values({
         wiseTransferId: 'WISE-MANUAL-1',
-        direction: 'out',
+        direction: WiseTransferDirection.Out,
         sourceAmountMinor: 60_000n,
         sourceCurrency: 'USD',
         targetAmountMinor: 50_000n,
         targetCurrency: 'EUR',
         feeMinor: 0n,
         feeCurrency: 'USD',
-        state: 'outgoing_payment_sent',
+        state: WiseTransferState.OutgoingPaymentSent,
         stateUpdatedAt: new Date(),
         ourReference: 'TXN-9999',
       })
@@ -171,7 +171,7 @@ describe('BankingController', () => {
         rawPayload: {},
         matchedTransferId: null,
         matchedAt: new Date(),
-        matchConfidence: 'auto_high',
+        matchConfidence: MatchConfidence.AutoHigh,
       })
       .returningAll()
       .executeTakeFirstOrThrow();

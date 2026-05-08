@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { WiseTransferState } from 'src/enum';
+import { WiseTransferDirection, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
@@ -53,7 +53,7 @@ describe('WiseReconcileService', () => {
   async function seedTransfer(state: WiseTransferState, wiseId = '99999999') {
     return await repo.create({
       wiseTransferId: wiseId,
-      direction: 'out',
+      direction: WiseTransferDirection.Out,
       sourceAmountMinor: 100_000n,
       sourceCurrency: 'USD',
       targetAmountMinor: 85_000n,

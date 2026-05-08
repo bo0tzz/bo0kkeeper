@@ -12,7 +12,7 @@
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import { loadConfig } from 'src/config';
-import { BankSource, EventSource, ExpenseLocationClass, WiseTransferDirection, WiseTransferState } from 'src/enum';
+import { BankingSessionStatus, BankSource, EventSource, ExpenseLocationClass, WiseTransferDirection, WiseTransferState } from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
@@ -81,7 +81,7 @@ async function main(): Promise<void> {
         aspspName: 'Mock ASPSP (abandoned)',
         aspspCountry: 'NL',
         psuType: 'personal',
-        status: 'pending',
+        status: BankingSessionStatus.Pending,
         // createdAt is auto-set; we want it to be old enough that the
         // sweepStalePending will GC it on next run.
       })

@@ -95,6 +95,11 @@ export class BankMatcherService {
     if (bankTx.matchedAt) {
       return { matched: false, reason: 'already matched' };
     }
+    if (bankTx.category) {
+      // Operator labelled this as not a real income/expense (tax, self-transfer,
+      // fee, etc.); the matcher should leave it alone.
+      return { matched: false, reason: `categorized as ${bankTx.category}` };
+    }
 
     const description = bankTx.description ?? '';
 
@@ -530,6 +535,7 @@ export class BankMatcherService {
         matchedTransferId: transferId,
         matchedAt: new Date(),
         matchConfidence: confidence,
+        category: null,
         updatedAt: new Date(),
       })
       .where('id', '=', bankTxId)
@@ -545,6 +551,7 @@ export class BankMatcherService {
         matchedInvoiceId: invoiceId,
         matchedAt: new Date(),
         matchConfidence: confidence,
+        category: null,
         updatedAt: new Date(),
       })
       .where('id', '=', bankTxId)
@@ -560,6 +567,7 @@ export class BankMatcherService {
         matchedExpenseId: expenseId,
         matchedAt: new Date(),
         matchConfidence: confidence,
+        category: null,
         updatedAt: new Date(),
       })
       .where('id', '=', bankTxId)

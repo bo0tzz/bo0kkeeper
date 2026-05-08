@@ -17,7 +17,9 @@ beforeEach(() => {
 
 async function readXlsxStrings(buffer: Buffer): Promise<string[]> {
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer);
+  // exceljs's typings predate Node's Buffer<ArrayBufferLike> narrowing; the
+  // value is a real Buffer, the typedef just hasn't kept up.
+  await wb.xlsx.load(buffer as unknown as ArrayBuffer);
   const sheet = wb.worksheets[0];
   const cells: string[] = [];
   sheet.eachRow((row) => {
@@ -203,7 +205,7 @@ describe('BookkeepingExportService', () => {
     const { buffer } = await service.exportQuarter(2099, 1);
     // Re-open and locate the Non EU outbound section by walking col A.
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(buffer);
+    await wb.xlsx.load(buffer as unknown as ArrayBuffer);
     const sheet = wb.worksheets[0];
     let nonEuStart = -1;
     let inboundStart = -1;

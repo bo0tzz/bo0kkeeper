@@ -103,19 +103,22 @@
     return `${sign}${major}.${cents} ${currency}`;
   }
 
-  function matchLabel(tx: BankTransaction): { color: 'success' | 'warning' | 'secondary'; text: string } {
-    // auto_low matches are heuristic guesses — surfaced with a warning badge so
-    // they read as "needs your eye" rather than "done".
-    const color = tx.matchConfidence === 'auto_low' ? 'warning' : 'success';
-    const suffix = tx.matchConfidence ? ` · ${tx.matchConfidence}` : '';
-    if (tx.matchedTransferId) {
-      return { color, text: `Wise${suffix}` };
-    }
-    if (tx.matchedInvoiceId) {
-      return { color, text: `Invoice${suffix}` };
-    }
-    if (tx.matchedExpenseId) {
+  function statusLabel(tx: BankTransaction): { color: 'success' | 'warning' | 'secondary'; text: string } {
+    if (tx.matchedTransferId || tx.matchedInvoiceId || tx.matchedExpenseId) {
+      // auto_low matches are heuristic guesses — warning-coloured so they read
+      // as "needs your eye" rather than "done".
+      const color = tx.matchConfidence === 'auto_low' ? 'warning' : 'success';
+      const suffix = tx.matchConfidence ? ` · ${tx.matchConfidence}` : '';
+      if (tx.matchedTransferId) {
+        return { color, text: `Wise${suffix}` };
+      }
+      if (tx.matchedInvoiceId) {
+        return { color, text: `Invoice${suffix}` };
+      }
       return { color, text: `Expense${suffix}` };
+    }
+    if (tx.category) {
+      return { color: 'secondary', text: tx.category.replace('_', ' ') };
     }
     return { color: 'warning', text: 'unmatched' };
   }
@@ -364,14 +367,13 @@
               <TableHeading>Amount</TableHeading>
               <TableHeading>Counterparty</TableHeading>
               <TableHeading>Description</TableHeading>
-              <TableHeading>Match</TableHeading>
-              <TableHeading>Category</TableHeading>
+              <TableHeading>Status</TableHeading>
               <TableHeading></TableHeading>
             </TableRow>
           </TableHeader>
           <TableBody>
             {#each transactions as tx (tx.id)}
-              {@const label = matchLabel(tx)}
+              {@const label = statusLabel(tx)}
               {@const matched = isMatched(tx)}
               <TableRow>
                 <TableCell>{tx.txDate}</TableCell>
@@ -389,14 +391,6 @@
                 <TableCell class="whitespace-normal break-words">{tx.description || '—'}</TableCell>
                 <TableCell><Badge color={label.color}>{label.text}</Badge></TableCell>
                 <TableCell>
-                  <Select
-                    size="small"
-                    value={tx.category ?? ''}
-                    options={categoryOptions}
-                    onChange={(value) => changeCategory(tx, value)}
-                  />
-                </TableCell>
-                <TableCell>
                   {#if matched && tx.matchConfidence === 'auto_low'}
                     <HStack gap={2}>
                       <Button size="small" color="primary" onclick={() => confirmMatch(tx)}>Confirm</Button>
@@ -404,8 +398,26 @@
                     </HStack>
                   {:else if matched}
                     <Button size="small" variant="ghost" onclick={() => unlink(tx)}>Unlink</Button>
+                  {:else if tx.category}
+                    <HStack gap={2}>
+                      <Select
+                        size="small"
+                        value={tx.category}
+                        options={categoryOptions}
+                        onChange={(value) => changeCategory(tx, value)}
+                      />
+                      <Button size="small" variant="ghost" onclick={() => changeCategory(tx, '')}>Clear</Button>
+                    </HStack>
                   {:else}
-                    <Button size="small" onclick={() => openLinkModal(tx)}>Link</Button>
+                    <HStack gap={2}>
+                      <Button size="small" onclick={() => openLinkModal(tx)}>Link</Button>
+                      <Select
+                        size="small"
+                        value=""
+                        options={categoryOptions}
+                        onChange={(value) => changeCategory(tx, value)}
+                      />
+                    </HStack>
                   {/if}
                 </TableCell>
               </TableRow>
