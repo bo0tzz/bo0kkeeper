@@ -42,6 +42,10 @@ description = "Server unit tests"
 run = "pnpm --filter bo0kkeeper test:medium"
 description = "Server integration tests (testcontainers Postgres)"
 
+[tasks."test-e2e"]
+run = "pnpm --filter bo0kkeeper test:e2e"
+description = "Server e2e tests — boots a real Nest app + fake OIDC IDP, drives the auth flow"
+
 [tasks."test-web"]
 run = "pnpm --filter web test"
 description = "Web unit tests"
@@ -50,9 +54,10 @@ description = "Web unit tests"
 run = [
   { task = "test-server" },
   { task = "test-medium" },
+  { task = "test-e2e" },
   { task = "test-web" },
 ]
-description = "Run all tests (unit + integration + web)"
+description = "Run all tests (unit + integration + e2e + web)"
 
 [tasks."lint-server"]
 run = "pnpm --filter bo0kkeeper lint"
@@ -82,6 +87,14 @@ description = "Type-check everything"
 [tasks."open-api"]
 run = "./open-api/bin/generate-open-api.sh"
 description = "Regenerate the OpenAPI spec and rebuild the typed SDK"
+
+[tasks.smoke]
+run = "bash scripts/smoke-dev.sh"
+description = "Smoke-test the running dev stack: db, backend, vite proxy, auth wiring"
+
+[tasks.seed]
+run = "pnpm --filter bo0kkeeper exec tsx src/bin/seed-fake-data.ts"
+description = "Seed the dev DB with synthetic clients/invoices/expenses for UI demos"
 
 [tasks.checklist]
 run = [

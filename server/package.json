@@ -18,6 +18,7 @@
     "test": "vitest --config test/vitest.config.mjs --passWithNoTests",
     "test:cov": "vitest --config test/vitest.config.mjs --passWithNoTests --coverage",
     "test:medium": "vitest --config test/vitest.config.medium.mjs",
+    "test:e2e": "vitest --config test/vitest.config.e2e.mjs",
     "migrations:generate": "sql-tools -u ${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/bo0kkeeper} migrations generate",
     "migrations:create": "sql-tools -u ${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/bo0kkeeper} migrations create",
     "migrations:run": "sql-tools -u ${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/bo0kkeeper} migrations run",

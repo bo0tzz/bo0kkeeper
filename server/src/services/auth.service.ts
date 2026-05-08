@@ -1,6 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { createRemoteJWKSet, JWTPayload, jwtVerify } from 'jose';
 import {
+  allowInsecureRequests,
   authorizationCodeGrant,
   buildAuthorizationUrl,
   calculatePKCECodeChallenge,
@@ -118,11 +119,17 @@ export class AuthService {
 
   private getClient(): Promise<DiscoveredClient> {
     if (!this.clientPromise) {
+      const issuerUrl = new URL(this.oidcConfig.issuer);
+      // openid-client v6 enforces HTTPS by default. For dev (where the IDP
+      // may be on localhost over plain HTTP) and e2e tests (in-process fake
+      // IDP) we opt in to insecure requests when the issuer is HTTP.
+      const execute = issuerUrl.protocol === 'http:' ? [allowInsecureRequests] : undefined;
       this.clientPromise = discovery(
-        new URL(this.oidcConfig.issuer),
+        issuerUrl,
         this.oidcConfig.clientId,
         { client_secret: this.oidcConfig.clientSecret, response_types: ['code'] },
         this.oidcConfig.clientSecret ? ClientSecretBasic(this.oidcConfig.clientSecret) : None(),
+        execute ? { execute } : undefined,
       ).catch((error: unknown) => {
         this.clientPromise = undefined;
         this.logger.error(`OIDC discovery failed: ${(error as Error).message}`);

@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, type ProxyOptions, type UserConfig } from 'vite';
 
 const upstream: ProxyOptions = {
-  target: process.env.SERVER_URL || 'http://server:2283/',
+  target: process.env.SERVER_URL || 'http://localhost:2283/',
   secure: true,
   changeOrigin: true,
   ws: true,
