@@ -63,11 +63,10 @@ Five layers, increasing in scope:
 | E2E auth | `mise run test-e2e` | Boots a real Nest app + an in-process fake OIDC IDP, walks login → callback → `/api/auth/me` with a cookie jar. Catches JWKS, cookie scoping, OIDC discovery, and AuthGuard regressions. |
 | Smoke | `mise run smoke` | Hits the **running** dev stack and asserts wire-up: db reachable, vite proxy targets backend, `/api/auth/login` redirects to the configured IDP, IDP JWKS is non-empty, redirect URI is on the frontend port. Run after any infra/env change. |
 | Web | `mise run test-web` | SvelteKit unit tests (vitest, jsdom). |
+| Browser e2e | `pnpm --filter web test:browser` | Playwright against the **running** dev stack (server + web + IDP). Smokes every nav route and exercises the higher-leverage flows (settings tag-check, system health refresh, compose-form validation). Auth state is reused from `tools/browser-harness/state.json`; bootstrap with `node tools/browser-harness/refresh-state.mjs` if your IDP session has expired. |
 
-`mise run test` runs everything except the smoke test (which assumes a running stack).
+`mise run test` runs everything except smoke + browser e2e (both assume a running stack).
 `mise run checklist` adds format + lint + typecheck.
-
-Browser-level e2e is intentionally not in the suite yet — Playwright is the right tool when the UI surface stabilises.
 
 ## Documentation
 
