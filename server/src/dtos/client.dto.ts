@@ -23,7 +23,6 @@ const ClientCreateSchema = z
     vatId: z.string().optional(),
     wiseSenderPattern: z.string().optional(),
     defaultDescription: z.string().default(''),
-    defaultInvoiceTemplate: z.string().default(''),
   })
   .meta({ id: 'ClientCreateDto' });
 export class ClientCreateDto extends createZodDto(ClientCreateSchema) {}
@@ -36,7 +35,6 @@ const ClientUpdateSchema = nonEmptyPartial({
   vatId: z.string().nullable(),
   wiseSenderPattern: z.string().nullable(),
   defaultDescription: z.string(),
-  defaultInvoiceTemplate: z.string(),
 }).meta({ id: 'ClientUpdateDto' });
 export class ClientUpdateDto extends createZodDto(ClientUpdateSchema) {}
 
@@ -50,7 +48,6 @@ const ClientResponseSchema = z
     vatId: z.string().nullable(),
     wiseSenderPattern: z.string().nullable(),
     defaultDescription: z.string(),
-    defaultInvoiceTemplate: z.string(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
@@ -67,7 +64,6 @@ export function mapClient(client: Client): ClientResponseDto {
     vatId: client.vatId,
     wiseSenderPattern: client.wiseSenderPattern,
     defaultDescription: client.defaultDescription,
-    defaultInvoiceTemplate: client.defaultInvoiceTemplate,
     createdAt: toIso(client.createdAt),
     updatedAt: toIso(client.updatedAt),
   } as ClientResponseDto;

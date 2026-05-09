@@ -53,10 +53,6 @@ export class ClientTable {
   @Column({ type: 'text', default: '' })
   defaultDescription!: Generated<string>;
 
-  /** Path to the Typst template used for this client. */
-  @Column({ type: 'text', default: '' })
-  defaultInvoiceTemplate!: Generated<string>;
-
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;
 

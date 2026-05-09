@@ -12,7 +12,6 @@ export type ClientResponse = {
   vatId: string | null;
   wiseSenderPattern: string | null;
   defaultDescription: string;
-  defaultInvoiceTemplate: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -25,7 +24,6 @@ export type ClientCreateInput = {
   vatId?: string;
   wiseSenderPattern?: string;
   defaultDescription?: string;
-  defaultInvoiceTemplate?: string;
 };
 
 export type ClientPatch = Partial<ClientCreateInput>;
