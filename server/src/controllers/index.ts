@@ -7,6 +7,7 @@ import { ExpensesController } from 'src/controllers/expenses.controller';
 import { HealthController } from 'src/controllers/health.controller';
 import { InvoicesController } from 'src/controllers/invoices.controller';
 import { SettingsController } from 'src/controllers/settings.controller';
+import { SystemController } from 'src/controllers/system.controller';
 import { TransactionsController } from 'src/controllers/transactions.controller';
 import { WebhookController } from 'src/controllers/webhook.controller';
 import { WiseController } from 'src/controllers/wise.controller';
@@ -21,6 +22,7 @@ export const controllers = [
   HealthController,
   InvoicesController,
   SettingsController,
+  SystemController,
   TransactionsController,
   WebhookController,
   WiseController,

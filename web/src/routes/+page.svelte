@@ -8,6 +8,7 @@
   } from '$lib/services/banking.service';
   import { listEvents, type ListEventsResponse } from '$lib/services/events.service';
   import { listExpenses, type ListExpensesResponse } from '$lib/services/expenses.service';
+  import { getSystemInfo, type SystemInfo } from '$lib/services/system.service';
   import {
     Alert,
     Badge,
@@ -26,11 +27,33 @@
     pendingWiseCredits: number;
     pendingExpenseReviews: number;
     unmatchedBankTx: number;
+    failedEvents: number;
+    /** Most recent receivedAt for any Wise event, ISO string. Null if none. */
+    lastWiseEventAt: string | null;
+    /** Most recent receivedAt for any paperless event, ISO string. Null if none. */
+    lastPaperlessEventAt: string | null;
     bankingSession: BankingSession | null;
     aggregate: QuarterlyAggregateResponse | null;
     aggregateYear: number;
     aggregateQuarter: number;
+    systemInfo: SystemInfo;
   };
+
+  /** Days since the given ISO datetime, floored. Null if input is null. */
+  function daysSince(iso: string | null): number | null {
+    if (!iso) {
+      return null;
+    }
+    return Math.floor((Date.now() - new Date(iso).getTime()) / (24 * 60 * 60 * 1000));
+  }
+
+  /**
+   * Quiet thresholds for the per-source webhook canaries. Wise fires twice a
+   * month-ish (paychecks); paperless fires whenever a doc gets tagged through.
+   * Tuned generously so we don't false-positive on a normal quiet week.
+   */
+  const WISE_QUIET_DAYS_WARN = 21;
+  const PAPERLESS_QUIET_DAYS_WARN = 14;
 
   let counts = $state<Counts | null>(null);
   let loading = $state(false);
@@ -43,26 +66,35 @@
       const now = new Date();
       const year = now.getUTCFullYear();
       const quarter = Math.floor(now.getUTCMonth() / 3) + 1;
-      const [wise, expenses, bankTx, bankingSession, agg] = await Promise.all([
-        listEvents({
-          source: 'wise',
-          eventType: 'balances#credit',
-          status: 'pending',
-          limit: 1,
-        }) as Promise<ListEventsResponse>,
-        listExpenses({ status: 'pending_review', limit: 1 }) as Promise<ListExpensesResponse>,
-        listBankTransactions({ status: 'unmatched', limit: 1 }).catch(() => ({ items: [], total: 0 })),
-        getLatestBankingSession().catch(() => null),
-        getQuarterlyAggregate(year, quarter).catch(() => null),
-      ]);
+      const [wise, expenses, bankTx, bankingSession, agg, failed, lastWise, lastPaperless, systemInfo] =
+        await Promise.all([
+          listEvents({
+            source: 'wise',
+            eventType: 'balances#credit',
+            status: 'pending',
+            limit: 1,
+          }) as Promise<ListEventsResponse>,
+          listExpenses({ status: 'pending_review', limit: 1 }) as Promise<ListExpensesResponse>,
+          listBankTransactions({ status: 'unmatched', limit: 1 }).catch(() => ({ items: [], total: 0 })),
+          getLatestBankingSession().catch(() => null),
+          getQuarterlyAggregate(year, quarter).catch(() => null),
+          listEvents({ status: 'failed', limit: 1 }) as Promise<ListEventsResponse>,
+          listEvents({ source: 'wise', limit: 1 }) as Promise<ListEventsResponse>,
+          listEvents({ source: 'paperless', limit: 1 }) as Promise<ListEventsResponse>,
+          getSystemInfo(),
+        ]);
       counts = {
         pendingWiseCredits: wise.total,
         pendingExpenseReviews: expenses.total,
         unmatchedBankTx: bankTx.total,
+        failedEvents: failed.total,
+        lastWiseEventAt: lastWise.items[0]?.receivedAt ?? null,
+        lastPaperlessEventAt: lastPaperless.items[0]?.receivedAt ?? null,
         bankingSession,
         aggregate: agg,
         aggregateYear: year,
         aggregateQuarter: quarter,
+        systemInfo,
       };
     } catch (error_) {
       error = (error_ as Error).message;
@@ -104,8 +136,16 @@
       <Text>Loading…</Text>
     {:else if counts}
       {@const totalThingsToDo =
-        counts.pendingWiseCredits + counts.pendingExpenseReviews + counts.unmatchedBankTx}
+        counts.pendingWiseCredits + counts.pendingExpenseReviews + counts.unmatchedBankTx + counts.failedEvents}
       {@const reconnectDays = bankingExpiryDays(counts.bankingSession)}
+      {@const wiseQuietDays = daysSince(counts.lastWiseEventAt)}
+      {@const paperlessQuietDays = daysSince(counts.lastPaperlessEventAt)}
+      {#if !counts.systemInfo.ingestionEnabled}
+        <Alert color="danger">
+          Ingestion is disabled — <code>CUTOVER_DATE</code> is unset. Webhooks and bank-tx sync silently
+          drop everything until you set it in env. See README → Ingestion floor.
+        </Alert>
+      {/if}
       {#if totalThingsToDo === 0}
         <Alert color="success">Inbox zero — nothing pending review.</Alert>
       {/if}
@@ -224,6 +264,28 @@
 
           <Card>
             <CardHeader>
+              <CardTitle>Failed events</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <Stack gap={3}>
+                <HStack class="items-center justify-between">
+                  <Heading size="medium" tag="h3">{counts.failedEvents}</Heading>
+                  <Badge color={counts.failedEvents === 0 ? 'secondary' : 'danger'}>
+                    {counts.failedEvents === 0 ? 'clean' : 'failed'}
+                  </Badge>
+                </HStack>
+                <Text size="small" color="muted">
+                  Webhook events whose handler threw and pg-boss exhausted retries. Open the event for the stack trace.
+                </Text>
+                {#if counts.failedEvents > 0}
+                  <Button href={resolve('/events')} variant="outline">Investigate →</Button>
+                {/if}
+              </Stack>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Compose invoice</CardTitle>
             </CardHeader>
             <CardBody>
@@ -232,6 +294,63 @@
                   Issue a new invoice (domestic / EU / non-EU). Renders the PDF and pushes to paperless.
                 </Text>
                 <Button href={resolve('/invoices/compose')} color="primary">New invoice →</Button>
+              </Stack>
+            </CardBody>
+          </Card>
+        </div>
+      </Stack>
+
+      <Stack gap={4}>
+        <Heading size="small" tag="h2">Webhook health</Heading>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Wise</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <Stack gap={2}>
+                {#if wiseQuietDays === null}
+                  <Text>No Wise events seen yet.</Text>
+                  <Text size="small" color="muted">
+                    Expected after first paycheck post-cutover. If you've already had one, check the workflow at Wise + the signing-key config.
+                  </Text>
+                {:else}
+                  <HStack class="items-center justify-between">
+                    <Heading size="medium" tag="h3">{wiseQuietDays}d</Heading>
+                    <Badge color={wiseQuietDays > WISE_QUIET_DAYS_WARN ? 'warning' : 'secondary'}>
+                      {wiseQuietDays > WISE_QUIET_DAYS_WARN ? 'quiet' : 'healthy'}
+                    </Badge>
+                  </HStack>
+                  <Text size="small" color="muted">
+                    Since the last Wise webhook. Paychecks land ~twice a month; warns past {WISE_QUIET_DAYS_WARN} days.
+                  </Text>
+                {/if}
+              </Stack>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Paperless</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <Stack gap={2}>
+                {#if paperlessQuietDays === null}
+                  <Text>No paperless events seen yet.</Text>
+                  <Text size="small" color="muted">
+                    Expected after the first tagged document. If you're tagging docs and nothing arrives, check the paperless workflow trigger config.
+                  </Text>
+                {:else}
+                  <HStack class="items-center justify-between">
+                    <Heading size="medium" tag="h3">{paperlessQuietDays}d</Heading>
+                    <Badge color={paperlessQuietDays > PAPERLESS_QUIET_DAYS_WARN ? 'warning' : 'secondary'}>
+                      {paperlessQuietDays > PAPERLESS_QUIET_DAYS_WARN ? 'quiet' : 'healthy'}
+                    </Badge>
+                  </HStack>
+                  <Text size="small" color="muted">
+                    Since the last paperless webhook. Warns past {PAPERLESS_QUIET_DAYS_WARN} days.
+                  </Text>
+                {/if}
               </Stack>
             </CardBody>
           </Card>
