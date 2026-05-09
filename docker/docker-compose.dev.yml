@@ -25,10 +25,25 @@ services:
   # First boot creates an admin user from the env vars below; once you can log
   # in at http://localhost:8000, set up a workflow:
   #   Settings → Workflows → New
-  #     - Trigger: "Document added" (any/all docs you want to surface as expenses)
+  #     - Trigger type: "Document Updated"  (NOT "Document Added" — that one fires
+  #       before paperless's auto-matching task has applied tags/correspondent, so
+  #       our tag-gate would see an empty tag set and drop the doc. See upstream
+  #       issue #12117. "Document Updated" fires after auto-match settles, AND on
+  #       any later manual tagging — both paths reach us.)
+  #     - Advanced Filters → Any Tags: pick the same tag(s) configured in
+  #       Settings → Paperless tags → "Expense ingestion tag-gate" (default
+  #       Business, Bills). Without this filter the webhook fires on EVERY doc
+  #       update; bo0kkeeper would still drop non-matching docs at the gate, but
+  #       you'd flood the audit log with no-op events.
   #     - Action: "Webhook" → POST http://host.docker.internal:2283/api/webhooks/paperless
-  #       with Authorization: Bearer <PAPERLESS_WEBHOOK_TOKEN from .env>
-  #       Body: {"document_id": "{doc_pk}", "correspondent": "{correspondent}", "created": "{created_date}"}
+  #       Webhook headers: Authorization = "Bearer <PAPERLESS_WEBHOOK_TOKEN from .env>"
+  #       Webhook params (the body — keep "Use parameters for webhook body" + JSON on):
+  #         document_id   → {doc_pk}
+  #         correspondent → {correspondent}
+  #         created       → {created_date}
+  #       (document_id is the only required field; the others are nice-to-haves
+  #       for pre-fill. We re-fetch the doc via REST anyway to read live tags,
+  #       since {doc_tags} isn't a supported placeholder.)
   paperless-broker:
     container_name: bo0kkeeper_paperless_broker
     image: docker.io/library/redis:7
