@@ -1,5 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import { formatDate, formatDateTime } from '$lib/format';
   import {
     clearBankTxMatch,
     getLatestBankingSession,
@@ -409,18 +410,18 @@
 
           <HStack gap={2} class="text-sm">
             <Text size="small" color="muted">
-              Connected {new Date(session.createdAt).toLocaleDateString()}
+              Connected {formatDate(new Date(session.createdAt))}
             </Text>
             {#if session.expiresAt}
               <Text size="small" color="muted">·</Text>
               <Text size="small" color="muted">
-                Expires {new Date(session.expiresAt).toLocaleDateString()}
+                Expires {formatDate(new Date(session.expiresAt))}
               </Text>
             {/if}
             {#if session.lastSyncedAt}
               <Text size="small" color="muted">·</Text>
               <Text size="small" color="muted">
-                Last synced {new Date(session.lastSyncedAt).toLocaleString()}
+                Last synced {formatDateTime(new Date(session.lastSyncedAt))}
               </Text>
             {/if}
           </HStack>

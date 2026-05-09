@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import { formatDateTime } from '$lib/format';
   import { getQuarterlyAggregate, type QuarterlyAggregateResponse } from '$lib/services/aggregator.service';
   import {
     getLatestBankingSession,
@@ -191,7 +192,7 @@
                         {eur(account.balance.amountMinor)}
                       </Heading>
                       <Text size="small" color="muted">
-                        as of {new Date(account.balance.asOf).toLocaleString()}
+                        as of {formatDateTime(new Date(account.balance.asOf))}
                       </Text>
                       {#if drift}
                         <Text size="small" color="warning">

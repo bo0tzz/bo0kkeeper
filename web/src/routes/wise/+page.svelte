@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatDateTime } from '$lib/format';
   import { listEvents, type EventResponse, type ListEventsResponse } from '$lib/services/events.service';
   import { draftFromEvent, reconcileWise, type WiseTransferResponse } from '$lib/services/wise.service';
   import {
@@ -140,7 +141,7 @@
           <TableBody>
             {#each data.items as event (event.id)}
               <TableRow>
-                <TableCell>{new Date(event.occurredAt).toLocaleString()}</TableCell>
+                <TableCell class="whitespace-nowrap">{formatDateTime(new Date(event.occurredAt))}</TableCell>
                 <TableCell>{creditAmount(event)}</TableCell>
                 <TableCell><Badge color="warning">{event.status}</Badge></TableCell>
                 <TableCell>

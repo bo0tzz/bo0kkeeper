@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatDate } from '$lib/format';
   import {
     closePeriod,
     getQuarterlyAggregate,
@@ -117,7 +118,7 @@
         <Select bind:value={year} options={yearOptions} />
         <Select bind:value={quarter} options={quarterOptions} />
         {#if data?.closedAt}
-          <Badge color="success">closed {new Date(data.closedAt).toLocaleDateString()}</Badge>
+          <Badge color="success">closed {formatDate(new Date(data.closedAt))}</Badge>
         {/if}
       </HStack>
       <HStack gap={2}>
