@@ -95,3 +95,13 @@ Migrations are *applied* via Kysely's `Migrator` + `FileMigrationProvider`:
 **Why generated files (not direct schema-from-code apply):** sql-tools is designed around versioned migration files. The direct-apply path through `schemaFromCode + schemaDiff(...).asSql()` produced incorrect SQL (it emitted DROP for declared extensions). The CLI path is the canonical and supported workflow.
 
 **Watch-for:** sql-tools reads compiled JS from `dist/schema/`, which depends on `tsconfig.build.json` having `rootDir: "./src"` — without that, output lands in `dist/src/schema/` and the CLI can't find it. `tsconfig.json` keeps `rootDir: "."` so `tsc --noEmit` covers both `src/` and `test/`.
+
+## 2026-05-09 — Native `Date` + ISO strings; pull in `luxon` only on demand
+
+Supersedes the date half of the 2026-05-07 money-and-dates entry ("`Temporal` polyfill or `date-fns`; never native `Date`"). That was aspirational; through Phase 1–9 we never hit a need that justified it, and the codebase ended up using native `Date` everywhere. Settling on what's there.
+
+**Decision:** native JS `Date` for in-memory values, ISO 8601 strings on the wire (DTOs and HTTP), `YYYY-MM-DD` slices for date-only fields. No date library imported by default.
+
+**Why:** our date handling is shallow — parse-from-ISO, take `Date.now()`, compare, format. No multi-timezone display, no calendar arithmetic past `Date.UTC(year, 0, 1)` for year-bucketing. Adding luxon/date-fns/Temporal up front would buy nothing and add a dependency surface.
+
+**When to revisit:** if and when we need real timezone-aware ops (e.g. surfacing rows in the user's local tz, or computing quarters on a non-UTC fiscal calendar), reach for **`luxon`** — that's what Immich uses, our reference architecture. Don't reach for `Temporal` (still stage-3, polyfill churn) or `date-fns` (function-per-import shape; awkward for a few helpers). The migration would be selective: keep native `Date` for storage/marshalling, use `DateTime` from luxon at the points that actually need arithmetic — same shape Immich runs.
