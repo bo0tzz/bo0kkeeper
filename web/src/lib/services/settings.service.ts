@@ -1,4 +1,4 @@
-import { apiGet, apiPatch } from '$lib/services/api';
+import { apiGet, apiPatch, apiPost } from '$lib/services/api';
 
 export type SettingsResponse = {
   issuer: {
@@ -27,3 +27,16 @@ export const getSettings = (fetchFn?: typeof fetch) =>
 
 export const updateSettings = (body: UpdateSettingsBody, fetchFn?: typeof fetch) =>
   apiPatch<SettingsResponse>('/api/settings', body, { fetch: fetchFn });
+
+export type PaperlessTagCheckResult = {
+  name: string;
+  exists: boolean;
+  id: number | null;
+};
+
+export type PaperlessTagCheckResponse = {
+  results: PaperlessTagCheckResult[];
+};
+
+export const checkPaperlessTags = (tags: string[], fetchFn?: typeof fetch) =>
+  apiPost<PaperlessTagCheckResponse>('/api/settings/paperless/tag-check', { tags }, { fetch: fetchFn });

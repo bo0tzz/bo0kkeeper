@@ -44,3 +44,23 @@ const UpdateSettingsBodySchema = z
   .partial()
   .meta({ id: 'UpdateSettingsDto' });
 export class UpdateSettingsDto extends createZodDto(UpdateSettingsBodySchema) {}
+
+const PaperlessTagCheckBodySchema = z
+  .object({
+    tags: z.array(z.string()).min(1).max(50),
+  })
+  .meta({ id: 'PaperlessTagCheckDto' });
+export class PaperlessTagCheckDto extends createZodDto(PaperlessTagCheckBodySchema) {}
+
+const PaperlessTagCheckResponseSchema = z
+  .object({
+    results: z.array(
+      z.object({
+        name: z.string(),
+        exists: z.boolean(),
+        id: z.number().int().nullable(),
+      }),
+    ),
+  })
+  .meta({ id: 'PaperlessTagCheckResponseDto' });
+export class PaperlessTagCheckResponseDto extends createZodDto(PaperlessTagCheckResponseSchema) {}

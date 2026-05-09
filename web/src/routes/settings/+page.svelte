@@ -2,8 +2,10 @@
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
   import { ApiError, type ApiFieldIssue } from '$lib/services/api';
   import {
+    checkPaperlessTags,
     getSettings,
     updateSettings,
+    type PaperlessTagCheckResult,
     type SettingsResponse,
   } from '$lib/services/settings.service';
   import {
@@ -24,6 +26,10 @@
   let error = $state<string | null>(null);
   let issues = $state<ApiFieldIssue[]>([]);
   let info = $state<string | null>(null);
+
+  let tagCheckResults = $state<PaperlessTagCheckResult[] | null>(null);
+  let tagCheckRunning = $state(false);
+  let tagCheckError = $state<string | null>(null);
 
   // Local draft state (so the user can edit without touching the server until Save).
   let kvk = $state('');
@@ -107,6 +113,25 @@
       info = null;
     }
   }
+
+  async function runTagCheck() {
+    tagCheckRunning = true;
+    tagCheckError = null;
+    tagCheckResults = null;
+    try {
+      const tags = [...new Set([...splitTags(expenseTagsRaw), ...splitTags(outgoingInvoiceTagsRaw)])];
+      if (tags.length === 0) {
+        tagCheckResults = [];
+        return;
+      }
+      const response = await checkPaperlessTags(tags);
+      tagCheckResults = response.results;
+    } catch (error_) {
+      tagCheckError = (error_ as Error).message;
+    } finally {
+      tagCheckRunning = false;
+    }
+  }
 </script>
 
 <main class="mx-auto max-w-3xl px-6 py-10">
@@ -157,6 +182,33 @@
           <Field label="Outgoing invoice tags (applied when an invoice is uploaded)">
             <Textarea bind:value={outgoingInvoiceTagsRaw} placeholder="Business, Invoice, bo0kkeeper" />
           </Field>
+          <HStack gap={3} class="items-center">
+            <Button size="small" variant="ghost" disabled={tagCheckRunning} onclick={runTagCheck}>
+              {tagCheckRunning ? 'Checking…' : 'Check tags exist in paperless'}
+            </Button>
+            <Text size="small" color="muted">
+              Catches typos before save (e.g. <code>Buisness</code> vs <code>Business</code>).
+            </Text>
+          </HStack>
+          {#if tagCheckError}
+            <Alert color="danger">Tag check failed: {tagCheckError}</Alert>
+          {/if}
+          {#if tagCheckResults}
+            {#if tagCheckResults.length === 0}
+              <Text size="small" color="muted">No tags configured.</Text>
+            {:else}
+              {@const missing = tagCheckResults.filter((r) => !r.exists)}
+              {#if missing.length === 0}
+                <Alert color="success">
+                  All {tagCheckResults.length} tag{tagCheckResults.length === 1 ? '' : 's'} exist in paperless.
+                </Alert>
+              {:else}
+                <Alert color="warning">
+                  {missing.length} of {tagCheckResults.length} tag{tagCheckResults.length === 1 ? '' : 's'} not found in paperless: {missing.map((r) => r.name).join(', ')}.
+                </Alert>
+              {/if}
+            {/if}
+          {/if}
         </Stack>
       </div>
 

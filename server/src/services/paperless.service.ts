@@ -172,6 +172,23 @@ export class PaperlessService {
   }
 
   /**
+   * Read-only existence check against the live tag set. Does NOT create.
+   * Returns a per-name result so the operator can spot typos like
+   * `Buisness` vs `Business`. Useful for the Settings page tag-gate
+   * preview button.
+   */
+  async checkTagsExist(names: string[]): Promise<{ name: string; exists: boolean; id: number | null }[]> {
+    if (names.length === 0) {
+      return [];
+    }
+    const cache = await this.loadTagCache();
+    return names.map((name) => {
+      const id = cache.get(name);
+      return id === undefined ? { name, exists: false, id: null } : { name, exists: true, id };
+    });
+  }
+
+  /**
    * Resolve a list of tag names to their numeric ids. Tags that don't exist
    * are created (unless `createMissing` is false, in which case missing
    * tags throw).

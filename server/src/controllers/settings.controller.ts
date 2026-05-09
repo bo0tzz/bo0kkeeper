@@ -1,10 +1,16 @@
-import { Body, Controller, Get, Patch } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Authenticated } from 'src/decorators';
-import { SettingsResponseDto, UpdateSettingsDto } from 'src/dtos/settings.dto';
+import {
+  PaperlessTagCheckDto,
+  PaperlessTagCheckResponseDto,
+  SettingsResponseDto,
+  UpdateSettingsDto,
+} from 'src/dtos/settings.dto';
 import { EventSource } from 'src/enum';
 import { AppSettings } from 'src/repositories/app-settings.repository';
 import { EventRepository } from 'src/repositories/event.repository';
+import { PaperlessService } from 'src/services/paperless.service';
 import { SettingsService } from 'src/services/settings.service';
 
 /**
@@ -18,6 +24,7 @@ export class SettingsController {
   constructor(
     private readonly settingsService: SettingsService,
     private readonly eventRepository: EventRepository,
+    private readonly paperlessService: PaperlessService,
   ) {}
 
   @Get()
@@ -73,6 +80,20 @@ export class SettingsController {
       payload: { keys: Object.keys(patch) },
     });
     return toDto(updated);
+  }
+
+  /**
+   * Read-only existence check against the live paperless tag set. Lets the
+   * operator verify they typed the gate names correctly before saving — a
+   * typo in `paperlessExpenseTags` silently breaks the expense pipeline
+   * (tag-gate falls open and ingests every doc, or fails-and-warns on
+   * every webhook depending on env). Does not create tags.
+   */
+  @Post('/paperless/tag-check')
+  @Authenticated()
+  async checkPaperlessTags(@Body() body: PaperlessTagCheckDto): Promise<PaperlessTagCheckResponseDto> {
+    const results = await this.paperlessService.checkTagsExist(body.tags);
+    return { results };
   }
 }
 
