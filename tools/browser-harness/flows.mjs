@@ -71,22 +71,65 @@ const flows = {
   async 'banking-link-modal'(page) {
     await page.goto(`${BASE_URL}/banking`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(800);
-    const linkBtn = page.locator('button:has-text("Link")').first();
+    // Exact-text match — `:has-text` is substring, would catch "Unlink" too.
+    const linkBtn = page.getByRole('button', { name: /^Link$/, exact: true }).first();
     if ((await linkBtn.count()) === 0) {
-      return 'no Link button (everything matched/categorized)';
+      return 'no exact-text Link button (everything matched/categorized)';
     }
     await linkBtn.click();
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${SCREENSHOT_DIR}/banking-link_1_modal_open.png`, fullPage: true });
-    // Try a search.
+    // Search for a known TXN ref.
     const search = page.locator('input[placeholder*="TXN"]').first();
     if ((await search.count()) > 0) {
       await search.fill('TXN-0046');
-      await page.click('button:has-text("Search")');
+      await page.getByRole('button', { name: /^Search$/ }).click();
       await page.waitForTimeout(1000);
       await page.screenshot({ path: `${SCREENSHOT_DIR}/banking-link_2_after_search.png`, fullPage: true });
     }
     return 'modal exercised';
+  },
+
+  async 'compose-add-remove-line'(page) {
+    await page.goto(`${BASE_URL}/invoices/compose`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+
+    // Add line, screenshot, then remove via Remove button.
+    await page.getByRole('button', { name: /^Add line$/ }).click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/compose-line_1_two_lines.png`, fullPage: true });
+
+    await page.getByRole('button', { name: /^Remove$/ }).first().click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/compose-line_2_after_remove.png`, fullPage: true });
+    return 'compose line add/remove exercised';
+  },
+
+  async 'aggregator-quarter'(page) {
+    await page.goto(`${BASE_URL}/aggregator`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/aggregator_1_initial.png`, fullPage: true });
+
+    // Immich UI Select renders a button + popup; click the trigger then the option.
+    const quarterTrigger = page.locator('[data-select-trigger]').nth(1);
+    await quarterTrigger.click();
+    await page.waitForTimeout(300);
+    await page.locator('[role="option"]', { hasText: 'Q1' }).click();
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/aggregator_2_q1.png`, fullPage: true });
+    return 'aggregator quarter changed';
+  },
+
+  async 'expenses-status-filter'(page) {
+    await page.goto(`${BASE_URL}/expenses`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(500);
+    const statusTrigger = page.locator('[data-select-trigger]').first();
+    await statusTrigger.click();
+    await page.waitForTimeout(300);
+    await page.locator('[role="option"]', { hasText: 'Approved' }).click();
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/expenses_1_approved.png`, fullPage: true });
+    return 'expenses status filter exercised';
   },
 
   async 'expense-edit'(page) {

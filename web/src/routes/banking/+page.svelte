@@ -189,6 +189,19 @@
     return tx.matchedTransferId !== null || tx.matchedInvoiceId !== null || tx.matchedExpenseId !== null;
   }
 
+  /** Map raw Wise state names to the friendly labels used in /wise/transfers. */
+  function wiseStateLabel(state: string): string {
+    const labels: Record<string, string> = {
+      incoming_payment_waiting: 'Incoming payment waiting',
+      processing: 'Processing',
+      funds_converted: 'Funds converted',
+      outgoing_payment_sent: 'Outgoing payment sent',
+      cancelled: 'Cancelled',
+      failed: 'Failed',
+    };
+    return labels[state] ?? state;
+  }
+
   const categoryOptions = [
     { value: '', label: '— Set category —' },
     { value: 'tax', label: 'Tax' },
@@ -586,7 +599,7 @@
               {#each candidates.transfers as t (t.id)}
                 <HStack class="justify-between rounded border px-3 py-2">
                   <div class="text-sm">
-                    <div><strong>{t.ourReference ?? t.wiseTransferId}</strong> <span class="text-muted-foreground">· {t.state}</span></div>
+                    <div><strong>{t.ourReference ?? t.wiseTransferId}</strong> <span class="text-muted-foreground">· {wiseStateLabel(t.state)}</span></div>
                     <div class="text-muted-foreground">
                       {formatAmount(t.sourceAmountMinor, t.sourceCurrency)} → {formatAmount(t.targetAmountMinor, t.targetCurrency)}
                     </div>
