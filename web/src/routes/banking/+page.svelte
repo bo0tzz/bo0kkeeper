@@ -204,9 +204,9 @@
   }
 
   const categoryOptions = [
-    { value: '', label: '— Set category —' },
+    { value: '', label: 'Categorize…' },
     { value: 'tax', label: 'Tax' },
-    { value: 'drawings', label: 'Drawings (to personal)' },
+    { value: 'drawings', label: 'Drawings' },
     { value: 'self_transfer', label: 'Self-transfer' },
     { value: 'fee', label: 'Fee' },
     { value: 'ignored', label: 'Ignored' },
@@ -497,36 +497,36 @@
                 </TableCell>
                 <TableCell class="whitespace-normal break-words">{tx.description || '—'}</TableCell>
                 <TableCell><Badge color={label.color}>{label.text}</Badge></TableCell>
-                <TableCell class="whitespace-nowrap">
+                <TableCell>
                   {#if matched && tx.matchConfidence === 'auto_low'}
-                    <HStack gap={2}>
+                    <div class="flex flex-wrap items-center gap-2">
                       <Button size="small" color="primary" onclick={() => confirmMatch(tx)}>Confirm</Button>
                       <Button size="small" variant="ghost" onclick={() => unlink(tx)}>Unlink</Button>
-                    </HStack>
+                    </div>
                   {:else if matched}
                     <Button size="small" variant="ghost" onclick={() => unlink(tx)}>Unlink</Button>
                   {:else if tx.category}
-                    <HStack gap={2}>
+                    <div class="flex flex-wrap items-center gap-2">
                       <Select
                         size="small"
-                        class="min-w-44"
+                        class="min-w-32"
                         value={tx.category}
                         options={categoryOptions}
                         onChange={(value) => changeCategory(tx, value)}
                       />
                       <Button size="small" variant="ghost" onclick={() => changeCategory(tx, '')}>Clear</Button>
-                    </HStack>
+                    </div>
                   {:else}
-                    <HStack gap={2}>
+                    <div class="flex flex-wrap items-center gap-2">
                       <Button size="small" onclick={() => openLinkModal(tx)}>Link</Button>
                       <Select
                         size="small"
-                        class="min-w-44"
+                        class="min-w-32"
                         value=""
                         options={categoryOptions}
                         onChange={(value) => changeCategory(tx, value)}
                       />
-                    </HStack>
+                    </div>
                   {/if}
                 </TableCell>
               </TableRow>
