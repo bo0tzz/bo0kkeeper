@@ -14,4 +14,17 @@ test.describe('Clients page', () => {
     // At least one of the friendly labels lands somewhere.
     await expect(table).toContainText(/IT Services|3D|Domestic|Non-EU/);
   });
+
+  test('New client button opens the create form, Cancel closes it', async ({ page }) => {
+    await page.goto('/clients');
+    await page.getByRole('button', { name: /^New client$/ }).click();
+
+    // Form heading + a Name input + a Create button surface.
+    await expect(page.getByRole('heading', { name: /^New client$/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Create client$/ })).toBeVisible();
+
+    // Cancel collapses the form.
+    await page.getByRole('button', { name: /^Cancel$/ }).click();
+    await expect(page.getByRole('heading', { name: /^New client$/ })).toHaveCount(0);
+  });
 });
