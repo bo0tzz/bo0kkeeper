@@ -1,5 +1,6 @@
 <script lang="ts">
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
+  import { formatDateTime, formatTime } from '$lib/format';
   import { ApiError, type ApiFieldIssue } from '$lib/services/api';
   import {
     checkPaperlessTags,
@@ -114,16 +115,6 @@
     }
   }
 
-  /** YYYY-MM-DD HH:MM in local time — matches the rest of the app's date format. */
-  function formatDateTime(d: Date): string {
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  }
-  function formatTime(d: Date): string {
-    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  }
-  function pad2(n: number): string {
-    return String(n).padStart(2, '0');
-  }
 
   async function runTagCheck() {
     tagCheckRunning = true;

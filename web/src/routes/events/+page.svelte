@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatDateTime } from '$lib/format';
   import {
     listEvents,
     type EventResponse,
@@ -94,6 +95,10 @@
     return id.slice(0, 8);
   }
 
+  function sourceLabel(s: EventSource): string {
+    return sourceOptions.find((o) => o.value === s)?.label ?? s;
+  }
+
   function preview(event: EventResponse): string {
     const keys = Object.keys(event.payload).slice(0, 3);
     return keys.length > 0 ? keys.join(', ') : '—';
@@ -151,9 +156,9 @@
               <TableCell>
                 <code class="text-xs">{shorten(event.id)}</code>
               </TableCell>
-              <TableCell>{event.source}</TableCell>
+              <TableCell>{sourceLabel(event.source)}</TableCell>
               <TableCell><code class="text-xs">{event.eventType}</code></TableCell>
-              <TableCell>{new Date(event.occurredAt).toLocaleString()}</TableCell>
+              <TableCell class="whitespace-nowrap">{formatDateTime(new Date(event.occurredAt))}</TableCell>
               <TableCell>
                 <Badge color={statusColor(event.status)}>{event.status}</Badge>
               </TableCell>

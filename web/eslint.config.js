@@ -30,6 +30,14 @@ export default typescriptEslint.config(
       '**/svelte.config.js',
       'eslint.config.js',
       'coverage',
+      // Playwright e2e specs run under @playwright/test, not SvelteKit's
+      // tsconfig — they have their own (TS still typechecks via the runner).
+      // eslint's tsconfig-aware rules need the file to be in the project,
+      // which we don't want to widen for what's effectively a separate runtime.
+      'e2e',
+      'playwright.config.ts',
+      'playwright-report',
+      'test-results',
     ],
   },
   typescriptEslint.configs.recommended,
