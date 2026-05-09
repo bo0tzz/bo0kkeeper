@@ -187,9 +187,11 @@
           <Field label="Amount" invalid={hasIssue(`lines[${index}].lineTotalMinor`)}>
             <Input bind:value={lines[index].amount} placeholder="0.00" />
           </Field>
-          <Button variant="ghost" color="danger" onclick={() => removeLine(index)} disabled={lines.length === 1}>
-            Remove
-          </Button>
+          {#if lines.length > 1}
+            <Button variant="ghost" color="danger" onclick={() => removeLine(index)}>
+              Remove
+            </Button>
+          {/if}
         </HStack>
       {/each}
 

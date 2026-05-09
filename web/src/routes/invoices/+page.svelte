@@ -150,9 +150,9 @@
                   {inv.paid ? 'paid' : 'open'}
                 </Badge>
               </TableCell>
-              <TableCell>
+              <TableCell class="whitespace-nowrap">
                 <HStack gap={2}>
-                  <Button size="small" variant="ghost" href={`/api/invoices/${inv.id}/pdf`}>PDF ↓</Button>
+                  <Button size="small" variant="ghost" href={`/api/invoices/${inv.id}/pdf`}>PDF</Button>
                   {#if inv.paperlessDocId}
                     <Button
                       size="small"
@@ -160,7 +160,7 @@
                       href={`/api/invoices/${inv.id}/paperless`}
                       target="_blank"
                     >
-                      Paperless ↗
+                      Paperless
                     </Button>
                   {/if}
                 </HStack>

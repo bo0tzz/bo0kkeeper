@@ -152,8 +152,8 @@
       {@const paperlessQuietDays = daysSince(counts.lastPaperlessEventAt)}
       {#if !counts.systemInfo.ingestionEnabled}
         <Alert color="danger">
-          Ingestion is disabled — <code>CUTOVER_DATE</code> is unset. Webhooks and bank-tx sync silently
-          drop everything until you set it in env. See README → Ingestion floor.
+          Ingestion is disabled — CUTOVER_DATE is unset. Webhooks and bank-tx sync silently drop
+          everything until you set it in env. See README → Ingestion floor.
         </Alert>
       {/if}
       {#if totalThingsToDo === 0}
@@ -222,7 +222,6 @@
                     {counts.pendingWiseCredits === 0 ? 'none' : 'pending'}
                   </Badge>
                 </HStack>
-                <Text size="small" color="muted">USD credits waiting to be drafted as transfers.</Text>
                 {#if counts.pendingWiseCredits > 0}
                   <Button href={resolve('/wise')} variant="outline">Review →</Button>
                 {/if}
@@ -242,7 +241,6 @@
                     {counts.pendingExpenseReviews === 0 ? 'none' : 'pending'}
                   </Badge>
                 </HStack>
-                <Text size="small" color="muted">Receipts ingested by paperless awaiting amount + BTW + approval.</Text>
                 {#if counts.pendingExpenseReviews > 0}
                   <Button href={resolve('/expenses')} variant="outline">Review →</Button>
                 {/if}
@@ -262,9 +260,6 @@
                     {counts.unmatchedBankTx === 0 ? 'all matched' : 'unmatched'}
                   </Badge>
                 </HStack>
-                <Text size="small" color="muted">
-                  Recent bank rows without an automatic match — link them to a transfer or invoice.
-                </Text>
                 {#if counts.unmatchedBankTx > 0}
                   <Button href={resolve('/banking')} variant="outline">Review →</Button>
                 {/if}
@@ -296,12 +291,7 @@
               <CardTitle>Compose invoice</CardTitle>
             </CardHeader>
             <CardBody>
-              <Stack gap={3}>
-                <Text size="small" color="muted">
-                  Issue a new invoice (domestic / EU / non-EU). Renders the PDF and pushes to paperless.
-                </Text>
-                <Button href={resolve('/invoices/compose')} color="primary">New invoice →</Button>
-              </Stack>
+              <Button href={resolve('/invoices/compose')} color="primary">New invoice →</Button>
             </CardBody>
           </Card>
         </div>

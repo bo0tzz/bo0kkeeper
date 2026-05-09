@@ -10,5 +10,8 @@
   },
   "scripts": {
     "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.1"
   }
 }

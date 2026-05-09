@@ -175,7 +175,12 @@ async function parse<T>(res: Response): Promise<T> {
     if (res.status === 401 && globalThis.location && !globalThis.location.pathname.startsWith('/api/auth/')) {
       const returnTo = globalThis.location.pathname + globalThis.location.search;
       globalThis.location.replace(`/api/auth/login?return_to=${encodeURIComponent(returnTo)}`);
-      // Fall through and throw so the awaiting code unwinds — the navigation may not be instant.
+      // Halt the in-flight Promise rather than throwing — SvelteKit's
+      // load-error pipeline would otherwise try to render an error page
+      // (and emit a noisy "Not found: /api/auth/login" in the console)
+      // before the browser-level navigation completes. This await never
+      // resolves; the page navigates away.
+      await new Promise<never>(() => {});
     }
     const obj = (data && typeof data === 'object' ? (data as Record<string, unknown>) : null) ?? null;
     const message = (obj && typeof obj.message === 'string' ? obj.message : null) ?? `HTTP ${res.status}`;

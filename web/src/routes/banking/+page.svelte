@@ -483,7 +483,7 @@
                 </TableCell>
                 <TableCell class="whitespace-normal break-words">{tx.description || '—'}</TableCell>
                 <TableCell><Badge color={label.color}>{label.text}</Badge></TableCell>
-                <TableCell>
+                <TableCell class="whitespace-nowrap">
                   {#if matched && tx.matchConfidence === 'auto_low'}
                     <HStack gap={2}>
                       <Button size="small" color="primary" onclick={() => confirmMatch(tx)}>Confirm</Button>
@@ -495,6 +495,7 @@
                     <HStack gap={2}>
                       <Select
                         size="small"
+                        class="min-w-44"
                         value={tx.category}
                         options={categoryOptions}
                         onChange={(value) => changeCategory(tx, value)}
@@ -506,6 +507,7 @@
                       <Button size="small" onclick={() => openLinkModal(tx)}>Link</Button>
                       <Select
                         size="small"
+                        class="min-w-44"
                         value=""
                         options={categoryOptions}
                         onChange={(value) => changeCategory(tx, value)}
