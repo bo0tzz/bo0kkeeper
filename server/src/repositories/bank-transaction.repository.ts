@@ -46,15 +46,6 @@ export class BankTransactionRepository {
     >;
   }
 
-  /** Lookup by description substring — used by matchers (e.g. TXN-NNNN). */
-  findByDescriptionContaining(needle: string): Promise<BankTransaction[]> {
-    return this.db
-      .selectFrom('bank_transaction')
-      .selectAll()
-      .where('description', 'like', `%${needle}%`)
-      .execute() as Promise<BankTransaction[]>;
-  }
-
   findUnmatched(limit = 50): Promise<BankTransaction[]> {
     return this.db
       .selectFrom('bank_transaction')

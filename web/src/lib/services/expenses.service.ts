@@ -55,9 +55,6 @@ export type ExpensePatch = {
 export const listExpenses = (query: ListExpensesQuery, fetchFn?: typeof fetch) =>
   apiGet<ListExpensesResponse>('/api/expenses', { fetch: fetchFn, query });
 
-export const getExpense = (id: string, fetchFn?: typeof fetch) =>
-  apiGet<ExpenseResponse>(`/api/expenses/${id}`, { fetch: fetchFn });
-
 export const updateExpense = (id: string, patch: ExpensePatch, fetchFn?: typeof fetch) =>
   apiPatch<ExpenseResponse>(`/api/expenses/${id}`, patch, { fetch: fetchFn });
 

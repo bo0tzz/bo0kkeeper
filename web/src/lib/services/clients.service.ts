@@ -30,9 +30,6 @@ export type ClientPatch = Partial<ClientCreateInput>;
 
 export const listClients = (fetchFn?: typeof fetch) => apiGet<ClientResponse[]>('/api/clients', { fetch: fetchFn });
 
-export const getClient = (id: string, fetchFn?: typeof fetch) =>
-  apiGet<ClientResponse>(`/api/clients/${id}`, { fetch: fetchFn });
-
 export const createClient = (input: ClientCreateInput, fetchFn?: typeof fetch) =>
   apiPost<ClientResponse>('/api/clients', input, { fetch: fetchFn });
 

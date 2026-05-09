@@ -1,18 +1,3 @@
-export enum ExitCode {
-  Success = 0,
-  Failure = 1,
-  AppRestart = 250,
-}
-
-export enum LogLevel {
-  Verbose = 'verbose',
-  Debug = 'debug',
-  Log = 'log',
-  Warn = 'warn',
-  Error = 'error',
-  Fatal = 'fatal',
-}
-
 /** Source of an event in the durable event log. */
 export enum EventSource {
   Wise = 'wise',

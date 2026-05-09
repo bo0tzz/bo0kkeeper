@@ -35,6 +35,3 @@ export type ListEventsQuery = {
 
 export const listEvents = (query: ListEventsQuery, fetchFn?: typeof fetch) =>
   apiGet<ListEventsResponse>('/api/events', { fetch: fetchFn, query });
-
-export const getEvent = (id: string, fetchFn?: typeof fetch) =>
-  apiGet<EventResponse>(`/api/events/${id}`, { fetch: fetchFn });

@@ -87,9 +87,6 @@ export type ListInvoicesResponse = {
 export const composeInvoice = (input: InvoiceComposeInput, fetchFn?: typeof fetch) =>
   apiPost<InvoiceComposeResponse>('/api/invoices/compose', input, { fetch: fetchFn });
 
-export const getInvoice = (id: string, fetchFn?: typeof fetch) =>
-  apiGet<InvoiceResponse>(`/api/invoices/${id}`, { fetch: fetchFn });
-
 export const listInvoices = (params: ListInvoicesParams = {}, fetchFn?: typeof fetch) =>
   apiGet<ListInvoicesResponse>('/api/invoices', {
     fetch: fetchFn,
