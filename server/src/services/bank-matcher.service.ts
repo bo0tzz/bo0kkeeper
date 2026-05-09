@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { ClientClass, EventSource, MatchConfidence } from 'src/enum';
+import { BankTxCategory, ClientClass, EventSource, MatchConfidence } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
@@ -10,6 +10,40 @@ import { SheetWriterService } from 'src/services/sheet-writer.service';
 
 const TXN_REF_PATTERN = /\bTXN-\d{4,}\b/;
 const INVOICE_NUMBER_PATTERN = /\b\d{4}\/\d{3}\b/;
+
+/**
+ * Description-substring rules for recurring rows that aren't a real
+ * income/expense and should skip the matcher entirely. Fees here are SNS-
+ * specific monthly charges (Klantonderzoek, account maintenance,
+ * payment-request) — the user's bank, not Wise. Add patterns as new
+ * recurring rows show up; deliberately a code constant rather than a DB
+ * table because the set is small, stable, and reviewed in PR.
+ */
+type AutoCategoryRule = {
+  /** Substring match against bank description, case-insensitive. */
+  descriptionContains: string;
+  category: BankTxCategory;
+  /** Operator-readable explanation that lands in the audit event. */
+  reason: string;
+};
+
+const AUTO_CATEGORY_RULES: readonly AutoCategoryRule[] = [
+  {
+    descriptionContains: 'klantonderzoek',
+    category: BankTxCategory.Fee,
+    reason: 'SNS Klantonderzoek monthly fee',
+  },
+  {
+    descriptionContains: 'kosten rekening',
+    category: BankTxCategory.Fee,
+    reason: 'SNS account maintenance fee',
+  },
+  {
+    descriptionContains: 'kosten betaalverzoek',
+    category: BankTxCategory.Fee,
+    reason: 'SNS payment-request fee',
+  },
+];
 
 export type MatchResult =
   | { matched: true; type: 'wise_transfer'; transferId: string; confidence: MatchConfidence }
@@ -101,6 +135,13 @@ export class BankMatcherService {
       return { matched: false, reason: `categorized as ${bankTx.category}` };
     }
 
+    // Recognized recurring fees / known-pattern rows are auto-categorized
+    // and bypass the matcher entirely — they have no counterpart to link to.
+    const autocat = await this.tryAutoCategorize(bankTx);
+    if (autocat.categorized) {
+      return { matched: false, reason: `auto-categorized as ${autocat.category}` };
+    }
+
     const description = bankTx.description ?? '';
 
     const txnRef = TXN_REF_PATTERN.exec(description)?.[0];
@@ -145,6 +186,32 @@ export class BankMatcherService {
     }
 
     return { matched: false, reason: 'no high-confidence signal' };
+  }
+
+  /**
+   * Set the category on rows whose description matches a known recurring-fee
+   * pattern. Audit-trails as a `banking.tx.auto_categorized` system event.
+   * Returns whether anything was applied.
+   */
+  async tryAutoCategorize(
+    bankTx: BankTransaction,
+  ): Promise<{ categorized: true; category: BankTxCategory; reason: string } | { categorized: false }> {
+    if (bankTx.matchedAt || bankTx.category) {
+      return { categorized: false };
+    }
+    const description = (bankTx.description ?? '').toLowerCase();
+    const rule = AUTO_CATEGORY_RULES.find((r) => description.includes(r.descriptionContains));
+    if (!rule) {
+      return { categorized: false };
+    }
+    await this.bankTransactionRepository.setCategory(bankTx.id, rule.category);
+    await this.eventRepository.recordAction({
+      source: EventSource.System,
+      eventType: 'banking.tx.auto_categorized',
+      payload: { bankTxId: bankTx.id, category: rule.category, reason: rule.reason },
+    });
+    this.logger.log(`bank_tx ${bankTx.id} auto-categorized as ${rule.category} (${rule.reason})`);
+    return { categorized: true, category: rule.category, reason: rule.reason };
   }
 
   private async tryExpenseHeuristic(bankTx: BankTransaction): Promise<MatchResult | null> {

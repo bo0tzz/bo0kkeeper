@@ -26,6 +26,24 @@ beforeEach(() => {
   process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
 });
 
+async function ingestSnsFeeRow(repo: BankTransactionRepository, externalId: string, description: string) {
+  const result = await repo.ingest({
+    source: BankSource.SnsCsv,
+    externalId,
+    txDate: new Date('2099-04-01'),
+    amountMinor: -182n,
+    currency: 'EUR',
+    counterpartyName: 'SNS Bank',
+    counterpartyIban: null,
+    description,
+    rawPayload: {},
+  });
+  if (!result.ingested) {
+    throw new Error('precondition');
+  }
+  return result.row;
+}
+
 describe('BankMatcherService', () => {
   let db: Kysely<DB>;
   let bankRepo: BankTransactionRepository;
@@ -308,6 +326,81 @@ describe('BankMatcherService', () => {
     const summary = await matcher.matchAllUnmatched();
     expect(summary.matched).toBe(1);
     expect(summary.unmatched).toBe(1);
+  });
+
+  describe('auto-categorize recurring fee patterns', () => {
+    it('sets fee category and emits a system event for known SNS patterns', async () => {
+      const row = await ingestSnsFeeRow(bankRepo, 'fee:klantonderzoek', 'Kosten Klantonderzoek');
+
+      const result = await matcher.tryAutoCategorize(row);
+      expect(result.categorized).toBe(true);
+      if (result.categorized) {
+        expect(result.category).toBe('fee');
+      }
+
+      const refetched = await bankRepo.findById(row.id);
+      expect(refetched?.category).toBe('fee');
+      expect(refetched?.matchedAt).toBeNull();
+    });
+
+    it('matches case-insensitively across the SNS fee patterns', async () => {
+      const a = await ingestSnsFeeRow(bankRepo, 'fee:rekening', 'KOSTEN REKENING April');
+      const b = await ingestSnsFeeRow(bankRepo, 'fee:betaalverzoek', 'Kosten betaalverzoek');
+
+      const aResult = await matcher.tryAutoCategorize(a);
+      const bResult = await matcher.tryAutoCategorize(b);
+      expect(aResult.categorized).toBe(true);
+      expect(bResult.categorized).toBe(true);
+
+      const ar = await bankRepo.findById(a.id);
+      const br = await bankRepo.findById(b.id);
+      expect(ar?.category).toBe('fee');
+      expect(br?.category).toBe('fee');
+    });
+
+    it('leaves rows alone when no pattern matches', async () => {
+      const row = await ingestSnsFeeRow(bankRepo, 'fee:none', 'Just a normal payment');
+      const result = await matcher.tryAutoCategorize(row);
+      expect(result.categorized).toBe(false);
+      const refetched = await bankRepo.findById(row.id);
+      expect(refetched?.category).toBeNull();
+    });
+
+    it('skips already-categorized rows (idempotent)', async () => {
+      const row = await ingestSnsFeeRow(bankRepo, 'fee:already', 'Kosten rekening');
+      await matcher.tryAutoCategorize(row);
+      const refetched = await bankRepo.findById(row.id);
+      // Calling again should be a no-op rather than another setCategory write.
+      const result = await matcher.tryAutoCategorize(refetched!);
+      expect(result.categorized).toBe(false);
+    });
+
+    it('skips already-matched rows', async () => {
+      const row = await ingestSnsFeeRow(bankRepo, 'fee:matched', 'Kosten Klantonderzoek');
+      await db
+        .updateTable('bank_transaction')
+        .set({
+          matchedAt: new Date(),
+          matchConfidence: MatchConfidence.Manual,
+          matchedExpenseId: '00000000-0000-0000-0000-000000000099',
+        })
+        .where('id', '=', row.id)
+        .execute();
+      const refetched = await bankRepo.findById(row.id);
+      const result = await matcher.tryAutoCategorize(refetched!);
+      expect(result.categorized).toBe(false);
+    });
+
+    it('tryMatch short-circuits when a row is auto-categorized first', async () => {
+      const row = await ingestSnsFeeRow(bankRepo, 'fee:via-trymatch', 'Kosten betaalverzoek');
+      const result = await matcher.tryMatch(row);
+      expect(result.matched).toBe(false);
+      if (!result.matched) {
+        expect(result.reason).toContain('auto-categorized');
+      }
+      const refetched = await bankRepo.findById(row.id);
+      expect(refetched?.category).toBe('fee');
+    });
   });
 
   describe('heuristic fallback (auto_low)', () => {
