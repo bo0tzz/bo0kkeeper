@@ -509,7 +509,7 @@
                     <div class="flex flex-wrap items-center gap-2">
                       <Select
                         size="small"
-                        class="min-w-32"
+                        class="min-w-28"
                         value={tx.category}
                         options={categoryOptions}
                         onChange={(value) => changeCategory(tx, value)}
@@ -521,7 +521,7 @@
                       <Button size="small" onclick={() => openLinkModal(tx)}>Link</Button>
                       <Select
                         size="small"
-                        class="min-w-32"
+                        class="min-w-28"
                         value=""
                         options={categoryOptions}
                         onChange={(value) => changeCategory(tx, value)}
