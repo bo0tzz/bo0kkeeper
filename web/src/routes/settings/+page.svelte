@@ -1,6 +1,7 @@
 <script lang="ts">
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
   import { ApiError, type ApiFieldIssue } from '$lib/services/api';
+  import { rescanPaperless, type RescanPaperlessResponse } from '$lib/services/expenses.service';
   import {
     checkPaperlessTags,
     getSettings,
@@ -30,6 +31,10 @@
   let tagCheckResults = $state<PaperlessTagCheckResult[] | null>(null);
   let tagCheckRunning = $state(false);
   let tagCheckError = $state<string | null>(null);
+
+  let rescanRunning = $state(false);
+  let rescanResult = $state<RescanPaperlessResponse | null>(null);
+  let rescanError = $state<string | null>(null);
 
   // Local draft state (so the user can edit without touching the server until Save).
   let kvk = $state('');
@@ -111,6 +116,19 @@
     if (loaded) {
       applyToDraft(loaded);
       info = null;
+    }
+  }
+
+  async function runRescan() {
+    rescanRunning = true;
+    rescanError = null;
+    rescanResult = null;
+    try {
+      rescanResult = await rescanPaperless();
+    } catch (error_) {
+      rescanError = (error_ as Error).message;
+    } finally {
+      rescanRunning = false;
     }
   }
 
@@ -208,6 +226,37 @@
                 </Alert>
               {/if}
             {/if}
+          {/if}
+        </Stack>
+      </div>
+
+      <div class="rounded border p-4">
+        <Stack gap={4}>
+          <Heading size="medium" tag="h2">Paperless backfill</Heading>
+          <Text size="small" color="muted">
+            Walks paperless for documents that carry the expense tag-gate and were created on or after
+            <code>CUTOVER_DATE</code>, then runs each through the regular ingestion pipeline. Use this
+            after wiring up the workflow against an inbox of pre-tagged docs, or to recover from a
+            dropped webhook delivery. Idempotent — re-runs are safe.
+          </Text>
+          <HStack gap={3} class="items-center">
+            <Button size="small" disabled={rescanRunning} onclick={runRescan}>
+              {rescanRunning ? 'Scanning…' : 'Backfill from paperless'}
+            </Button>
+            <Text size="small" color="muted">May take a moment for large inboxes.</Text>
+          </HStack>
+          {#if rescanError}
+            <Alert color="danger">{rescanError}</Alert>
+          {/if}
+          {#if rescanResult}
+            <Alert color={rescanResult.enqueued > 0 ? 'success' : 'secondary'}>
+              Scanned {rescanResult.scanned} doc{rescanResult.scanned === 1 ? '' : 's'};
+              {rescanResult.enqueued} new event{rescanResult.enqueued === 1 ? '' : 's'} enqueued,
+              {rescanResult.alreadyIngested} already ingested.
+              {#if rescanResult.droppedBeforeCutover > 0}
+                {rescanResult.droppedBeforeCutover} dropped (date before cutover — should be 0).
+              {/if}
+            </Alert>
           {/if}
         </Stack>
       </div>

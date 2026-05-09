@@ -172,6 +172,58 @@ export class PaperlessService {
   }
 
   /**
+   * List documents that carry every tag in `tagNames` and were created on or
+   * after `since` (ISO YYYY-MM-DD). Walks paperless's pagination and yields
+   * the full set. Used by the operator-driven backfill flow — the live
+   * webhook path doesn't need this.
+   *
+   * Skips silently if any of the requested tags don't exist (returns []),
+   * since the gate is "must carry all of these tags" and a non-existent
+   * tag means no document can possibly carry it.
+   */
+  async listDocumentsTaggedAllOf(tagNames: string[], since: string): Promise<PaperlessDocument[]> {
+    if (tagNames.length === 0) {
+      return [];
+    }
+    const baseUrl = this.requireBaseUrl();
+    const token = this.requireToken();
+
+    const checked = await this.checkTagsExist(tagNames);
+    const missing = checked.filter((c) => !c.exists);
+    if (missing.length > 0) {
+      this.logger.warn(`listDocumentsTaggedAllOf: tags missing in paperless: ${missing.map((m) => m.name).join(', ')}`);
+      return [];
+    }
+    const tagIds = checked.map((c) => c.id!);
+
+    const all: PaperlessDocument[] = [];
+    // paperless's filter uses `tags__id__all` for "must contain all of these
+    // tag ids" — Django ORM convention. The DRF list endpoint paginates by
+    // `next` URL; walk until null.
+    const params = new URLSearchParams({
+      'tags__id__all': tagIds.join(','),
+      'created__date__gte': since,
+      'page_size': '100',
+      'ordering': 'created',
+    });
+    let url: string | null = `${baseUrl}/api/documents/?${params.toString()}`;
+    while (url) {
+      const response = await this.fetchFn(url, {
+        method: 'GET',
+        headers: { Authorization: `Token ${token}` },
+      });
+      const text = await response.text();
+      if (!response.ok) {
+        throw new PaperlessApiError(response.status, safeJson(text), `Paperless documents list failed: ${response.status}`);
+      }
+      const page = safeJson(text) as { results: PaperlessDocument[]; next: string | null };
+      all.push(...page.results);
+      url = page.next;
+    }
+    return all;
+  }
+
+  /**
    * Read-only existence check against the live tag set. Does NOT create.
    * Returns a per-name result so the operator can spot typos like
    * `Buisness` vs `Business`. Useful for the Settings page tag-gate

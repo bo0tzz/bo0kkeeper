@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { loadConfig } from 'src/config';
@@ -13,8 +13,12 @@ import {
   ListExpensesQueryDto,
   ListExpensesResponseDto,
   mapExpense,
+  RescanPaperlessResponseDto,
 } from 'src/dtos/expense.dto';
 import { ExpenseRepository, ExpenseUpdate } from 'src/repositories/expense.repository';
+import { PaperlessService } from 'src/services/paperless.service';
+import { SettingsService } from 'src/services/settings.service';
+import { WebhookService } from 'src/services/webhook.service';
 
 @ApiTags('Expenses')
 @Controller('/api/expenses')
@@ -22,6 +26,9 @@ export class ExpensesController {
   constructor(
     private readonly expenseRepository: ExpenseRepository,
     private readonly eventRepository: EventRepository,
+    private readonly paperlessService: PaperlessService,
+    private readonly settingsService: SettingsService,
+    private readonly webhookService: WebhookService,
   ) {}
 
   @Get()
@@ -119,6 +126,63 @@ export class ExpensesController {
       throw new NotFoundException('Paperless not configured');
     }
     res.redirect(302, `${baseUrl.replace(/\/$/, '')}/documents/${expense.paperlessDocId}/`);
+  }
+
+  /**
+   * Operator-driven backfill — walk paperless's REST API for documents that
+   * carry every configured gate tag and were created on or after CUTOVER_DATE,
+   * then synthesize a webhook event per doc through the existing pipeline.
+   *
+   * Use cases:
+   *  - paperless's webhook delivery dropped (no retry on transport-level
+   *    failures past 3 HTTP-error retries).
+   *  - operator tagged a doc AFTER the workflow trigger window — Document
+   *    Updated re-fires for live updates only.
+   *  - first time wiring up the workflow against an inbox of pre-tagged docs.
+   *
+   * Idempotent: events are keyed on `paperless:<doc_id>`, expenses on
+   * `paperlessDocId`. Re-running is safe.
+   */
+  @Post('rescan-paperless')
+  @Authenticated()
+  async rescanPaperless(): Promise<RescanPaperlessResponseDto> {
+    const cutover = loadConfig().cutoverDate;
+    if (!cutover) {
+      throw new BadRequestException(
+        'CUTOVER_DATE is unset — set it in env before running a backfill so historical docs stay out',
+      );
+    }
+    const tags = await this.settingsService.getPaperlessExpenseTags();
+    if (tags.length === 0) {
+      throw new BadRequestException(
+        'No expense tag-gate configured. Set Settings → Paperless tags → Expense ingestion tag-gate first.',
+      );
+    }
+
+    const docs = await this.paperlessService.listDocumentsTaggedAllOf(tags, cutover);
+    let enqueued = 0;
+    let alreadyIngested = 0;
+    let droppedBeforeCutover = 0;
+    for (const doc of docs) {
+      const result = await this.webhookService.ingestPaperlessEvent({
+        document_id: doc.id,
+        created: doc.created,
+      });
+      if (result.ingested) {
+        enqueued += 1;
+      } else if (result.reason === 'duplicate') {
+        alreadyIngested += 1;
+      } else if (result.reason === 'before_cutover') {
+        droppedBeforeCutover += 1;
+      }
+    }
+
+    await this.eventRepository.recordAction({
+      source: EventSource.Manual,
+      eventType: 'expenses.rescan_paperless',
+      payload: { scanned: docs.length, enqueued, alreadyIngested, droppedBeforeCutover, since: cutover },
+    });
+    return { scanned: docs.length, enqueued, alreadyIngested, droppedBeforeCutover };
   }
 
   /** Reject the expense (paperless doc was misclassified, isn't a business expense, etc). */

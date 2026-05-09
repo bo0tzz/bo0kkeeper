@@ -63,3 +63,13 @@ export const approveExpense = (id: string, patch: ExpensePatch = {}, fetchFn?: t
 
 export const rejectExpense = (id: string, notes?: string, fetchFn?: typeof fetch) =>
   apiPost<ExpenseResponse>(`/api/expenses/${id}/reject`, { notes }, { fetch: fetchFn });
+
+export type RescanPaperlessResponse = {
+  scanned: number;
+  enqueued: number;
+  alreadyIngested: number;
+  droppedBeforeCutover: number;
+};
+
+export const rescanPaperless = (fetchFn?: typeof fetch) =>
+  apiPost<RescanPaperlessResponse>('/api/expenses/rescan-paperless', {}, { fetch: fetchFn });

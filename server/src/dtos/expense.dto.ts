@@ -74,6 +74,20 @@ const ListExpensesResponseSchema = z
   .meta({ id: 'ListExpensesResponseDto' });
 export class ListExpensesResponseDto extends createZodDto(ListExpensesResponseSchema) {}
 
+const RescanPaperlessResponseSchema = z
+  .object({
+    /** Documents returned by the paperless query. */
+    scanned: z.number().int().nonnegative(),
+    /** New events created (and ProcessPaperlessDocument enqueued for each). */
+    enqueued: z.number().int().nonnegative(),
+    /** Docs whose paperless event already existed (idempotent no-op). */
+    alreadyIngested: z.number().int().nonnegative(),
+    /** Docs whose `created` was before CUTOVER_DATE — defensive count, should be 0 since the query also filters. */
+    droppedBeforeCutover: z.number().int().nonnegative(),
+  })
+  .meta({ id: 'RescanPaperlessResponseDto' });
+export class RescanPaperlessResponseDto extends createZodDto(RescanPaperlessResponseSchema) {}
+
 export function mapExpense(row: Expense): ExpenseResponseDto {
   return {
     id: row.id,
