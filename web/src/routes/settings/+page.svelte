@@ -94,7 +94,7 @@
       });
       loaded = updated;
       applyToDraft(updated);
-      info = `Saved ${new Date(updated.updatedAt).toLocaleTimeString()}`;
+      info = `Saved at ${formatTime(new Date(updated.updatedAt))}`;
     } catch (error_) {
       if (error_ instanceof ApiError) {
         error = error_.message;
@@ -112,6 +112,17 @@
       applyToDraft(loaded);
       info = null;
     }
+  }
+
+  /** YYYY-MM-DD HH:MM in local time — matches the rest of the app's date format. */
+  function formatDateTime(d: Date): string {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  }
+  function formatTime(d: Date): string {
+    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  }
+  function pad2(n: number): string {
+    return String(n).padStart(2, '0');
   }
 
   async function runTagCheck() {
@@ -221,7 +232,7 @@
       </HStack>
 
       <Text size="small" color="muted">
-        Last saved {new Date(loaded.updatedAt).toLocaleString()}.
+        Last saved {formatDateTime(new Date(loaded.updatedAt))}.
       </Text>
     {/if}
   </Stack>

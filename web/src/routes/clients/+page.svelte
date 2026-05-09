@@ -178,6 +178,13 @@
     { value: 'it_services', label: 'IT Services' },
     { value: '3d', label: '3D' },
   ];
+
+  function classLabel(c: ClientClass): string {
+    return classOptions.find((o) => o.value === c)?.label ?? c;
+  }
+  function tradeLabel(t: TradeName): string {
+    return tradeOptions.find((o) => o.value === t)?.label ?? t;
+  }
 </script>
 
 <main class="mx-auto max-w-6xl px-6 py-10">
@@ -209,8 +216,8 @@
           {#each clients as client (client.id)}
             <TableRow>
               <TableCell>{client.name}</TableCell>
-              <TableCell><Badge color={classColor(client.class)}>{client.class}</Badge></TableCell>
-              <TableCell>{client.tradeName}</TableCell>
+              <TableCell><Badge color={classColor(client.class)}>{classLabel(client.class)}</Badge></TableCell>
+              <TableCell>{tradeLabel(client.tradeName)}</TableCell>
               <TableCell>{client.vatId ?? '—'}</TableCell>
               <TableCell>{(client.address as Record<string, string>)?.['city'] ?? ''}</TableCell>
               <TableCell>

@@ -38,12 +38,12 @@
 
   const stateOptions = [
     { value: '', label: 'Any state' },
-    { value: 'incoming_payment_waiting', label: 'incoming_payment_waiting' },
-    { value: 'processing', label: 'processing' },
-    { value: 'funds_converted', label: 'funds_converted' },
-    { value: 'outgoing_payment_sent', label: 'outgoing_payment_sent' },
-    { value: 'cancelled', label: 'cancelled' },
-    { value: 'failed', label: 'failed' },
+    { value: 'incoming_payment_waiting', label: 'Incoming payment waiting' },
+    { value: 'processing', label: 'Processing' },
+    { value: 'funds_converted', label: 'Funds converted' },
+    { value: 'outgoing_payment_sent', label: 'Outgoing payment sent' },
+    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'failed', label: 'Failed' },
   ];
 
   async function load() {
