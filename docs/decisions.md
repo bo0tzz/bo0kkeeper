@@ -112,6 +112,16 @@ Operator-editable values that used to live as env vars (issuer KvK / VAT id / ad
 
 **How to apply:** any new write surface (sheet writes, invoice edits, expense approval) that targets a row inside a closed period should at least *log* the event (audit), and the UI should warn. Don't add hard guards.
 
+## 2026-05-09 — k8s deploy strategy: `Recreate`, not `RollingUpdate`
+
+Single-replica homelab deploy. Default `RollingUpdate` (with `maxSurge=1`) creates a brief overlap window where old + new pods coexist; both run pg-boss workers pulling from the same queue. pg-boss claims via `FOR UPDATE SKIP LOCKED` so any individual job is processed exactly once, but two separately-queued jobs (cron + manual fire) can run concurrently across the two pods during the rollout window.
+
+In practice the race is benign for our flows — bank-tx ingest is uniquely-keyed and only the winning insert proceeds to the matcher, and session metadata writes are last-writer-wins — but keeping it that way relies on every future writer thinking about it. Cleaner to avoid the overlap entirely.
+
+**Decision:** k8s `Deployment.spec.strategy.type: Recreate`. Old pod stops cleanly before new pod starts. Trades a few seconds of API downtime, which is irrelevant for a bookkeeping app, in exchange for never having two pg-boss workers live at once.
+
+**Watch-for:** if/when the deployment scales to multiple replicas (not planned), revisit. At that point pg-boss workers across pods are an intentional design property and the in-process invariants need a second look.
+
 ## 2026-05-09 — Native `Date` + ISO strings; pull in `luxon` only on demand
 
 Supersedes the date half of the 2026-05-07 money-and-dates entry ("`Temporal` polyfill or `date-fns`; never native `Date`"). That was aspirational; through Phase 1–9 we never hit a need that justified it, and the codebase ended up using native `Date` everywhere. Settling on what's there.

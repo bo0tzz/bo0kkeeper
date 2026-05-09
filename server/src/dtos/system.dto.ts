@@ -10,3 +10,19 @@ const SystemInfoSchema = z
   })
   .meta({ id: 'SystemInfoDto' });
 export class SystemInfoDto extends createZodDto(SystemInfoSchema) {}
+
+const IntegrationCheckSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  status: z.enum(['healthy', 'degraded', 'broken', 'not_configured']),
+  configured: z.boolean(),
+  lastActivityAt: z.iso.datetime().nullable(),
+  message: z.string(),
+});
+
+const IntegrationsResponseSchema = z
+  .object({
+    checks: z.array(IntegrationCheckSchema),
+  })
+  .meta({ id: 'IntegrationsResponseDto' });
+export class IntegrationsResponseDto extends createZodDto(IntegrationsResponseSchema) {}

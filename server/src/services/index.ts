@@ -12,6 +12,7 @@ import { RenderService } from 'src/services/render.service';
 import { SettingsService } from 'src/services/settings.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { SheetsService } from 'src/services/sheets.service';
+import { SystemHealthService } from 'src/services/system-health.service';
 import { WebhookService } from 'src/services/webhook.service';
 import { WiseApiService } from 'src/services/wise-api.service';
 import { WiseDraftService } from 'src/services/wise-draft.service';
@@ -33,6 +34,7 @@ export const services = [
   SettingsService,
   SheetsService,
   SheetWriterService,
+  SystemHealthService,
   WebhookService,
   WiseApiService,
   WiseDraftService,

@@ -106,6 +106,17 @@ export class WiseApiService {
     return mapTransfer(response);
   }
 
+  /**
+   * Cheap GET against the configured profile to verify the API token is
+   * accepted and the profile id exists. Used by the system health page.
+   * Throws on any non-200 — caller's job to translate into a user-facing
+   * status.
+   */
+  async ping(): Promise<void> {
+    const profileId = this.requireProfileId();
+    await this.request(`/v1/profiles/${profileId}`, { method: 'GET' });
+  }
+
   private requireProfileId(): number {
     if (this.config.profileId === undefined) {
       throw new Error('WISE_PROFILE_ID is not configured');

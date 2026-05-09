@@ -20,6 +20,7 @@
     { href: resolve('/clients'), label: 'Clients' },
     { href: resolve('/banking'), label: 'Banking' },
     { href: resolve('/events'), label: 'Events' },
+    { href: resolve('/system'), label: 'System' },
     { href: resolve('/settings'), label: 'Settings' },
   ];
 </script>
