@@ -21,4 +21,5 @@ test.describe('Invoice composer', () => {
     await page.getByRole('button', { name: /^Remove$/ }).first().click();
     await expect(page.getByRole('button', { name: /^Remove$/ })).toHaveCount(0);
   });
+
 });
