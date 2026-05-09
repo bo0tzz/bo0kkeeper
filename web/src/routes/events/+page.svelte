@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import { formatDateTime } from '$lib/format';
   import {
     listEvents,
@@ -25,8 +26,14 @@
 
   const PAGE_SIZE = 50;
 
-  let source = $state<EventSource | ''>('');
-  let status = $state<EventStatus | ''>('');
+  // Initial filter values from URL query — lets the dashboard's "Failed events
+  // → Investigate" link land directly on /events?status=failed instead of the
+  // operator having to re-pick the filter.
+  const initialSource = (page.url.searchParams.get('source') ?? '') as EventSource | '';
+  const initialStatus = (page.url.searchParams.get('status') ?? '') as EventStatus | '';
+
+  let source = $state<EventSource | ''>(initialSource);
+  let status = $state<EventStatus | ''>(initialStatus);
   let offset = $state(0);
   let data = $state<ListEventsResponse | null>(null);
   let loading = $state(false);

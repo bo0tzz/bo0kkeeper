@@ -280,7 +280,7 @@
                   </Badge>
                 </HStack>
                 {#if counts.failedEvents > 0}
-                  <Button href={resolve('/events')} variant="outline">Investigate →</Button>
+                  <Button href={`${resolve('/events')}?status=failed`} variant="outline">Investigate →</Button>
                 {/if}
               </Stack>
             </CardBody>
