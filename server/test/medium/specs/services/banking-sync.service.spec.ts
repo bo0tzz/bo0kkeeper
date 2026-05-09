@@ -238,7 +238,7 @@ describe('BankingSyncService', () => {
   });
 
   describe('cutover gate', () => {
-    it('drops bank tx whose booking_date is before CUTOVER_DATE', async () => {
+    it('drops bank tx whose booking_date is before CUTOVER_DATE and audit-trails them', async () => {
       api.listTransactions.mockResolvedValue({
         transactions: [
           tx({ entry_reference: 'before', booking_date: '2026-04-15' }),
@@ -253,6 +253,17 @@ describe('BankingSyncService', () => {
       const result = await service.syncSession(session, {});
 
       expect(result.ingested).toBe(1);
+
+      const drops = await new EventRepository(db).findMany({
+        eventType: 'ingest.dropped_before_cutover',
+        limit: 10,
+        offset: 0,
+      });
+      expect(drops.total).toBe(1);
+      expect(drops.items[0].payload).toMatchObject({
+        droppedSource: BankSource.EnableBanking,
+        droppedExternalId: 'before',
+      });
 
       // Reset for downstream tests.
       process.env.CUTOVER_DATE = '2000-01-01';

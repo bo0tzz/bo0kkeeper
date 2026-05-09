@@ -174,6 +174,20 @@ VwIDAQAB
       }
       expect(jobRepository.queue).not.toHaveBeenCalled();
 
+      // The drop is audit-trailed as a system event so the dashboard counter
+      // can surface it.
+      const drops = await eventRepository.findMany({
+        eventType: 'ingest.dropped_before_cutover',
+        limit: 10,
+        offset: 0,
+      });
+      expect(drops.total).toBe(1);
+      expect(drops.items[0].source).toBe(EventSource.System);
+      expect(drops.items[0].payload).toMatchObject({
+        droppedSource: EventSource.Wise,
+        droppedExternalId: 'pre-cutover-1',
+      });
+
       // No row was inserted — the same delivery id ingested with a fresh
       // (post-cutover) date should succeed rather than 'duplicate'.
       const fresh = { ...parsed, data: { ...parsed.data, occurred_at: '2026-06-01T00:00:00Z' } };
@@ -184,7 +198,7 @@ VwIDAQAB
       process.env.CUTOVER_DATE = '2000-01-01';
     });
 
-    it('refuses every Wise event when CUTOVER_DATE is unset', async () => {
+    it('refuses every Wise event when CUTOVER_DATE is unset, without audit-trailing it', async () => {
       const { parsed } = await loadFixture('balance-credit.example.json');
       const original = process.env.CUTOVER_DATE;
       delete process.env.CUTOVER_DATE;
@@ -194,6 +208,15 @@ VwIDAQAB
         if (!result.ingested) {
           expect(result.reason).toBe('no_cutover_configured');
         }
+        // no_cutover_configured is shouted via the dashboard banner; no need
+        // to bloat the events table with a drop event per webhook while in
+        // setup mode.
+        const drops = await eventRepository.findMany({
+          eventType: 'ingest.dropped_before_cutover',
+          limit: 10,
+          offset: 0,
+        });
+        expect(drops.total).toBe(0);
       } finally {
         if (original !== undefined) {
           process.env.CUTOVER_DATE = original;

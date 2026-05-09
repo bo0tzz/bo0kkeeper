@@ -8,6 +8,8 @@ const ListEventsQuerySchema = z
     source: z.enum(EventSource).optional(),
     eventType: z.string().optional(),
     status: z.enum(EventStatus).optional(),
+    /** Inclusive lower bound on receivedAt. ISO date or datetime. */
+    since: z.iso.datetime().or(z.iso.date()).optional(),
     limit: z.coerce.number().int().min(1).max(200).default(50),
     offset: z.coerce.number().int().min(0).default(0),
   })

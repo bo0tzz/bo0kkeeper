@@ -29,6 +29,8 @@ export type ListEventsQuery = {
   source?: EventSource;
   eventType?: string;
   status?: EventStatus;
+  /** Inclusive lower bound on receivedAt; ISO date or datetime. */
+  since?: string;
   limit?: number;
   offset?: number;
 };

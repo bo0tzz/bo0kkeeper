@@ -125,7 +125,8 @@ export class EventRepository {
       .selectFrom('event')
       .$if(!!filter.source, (qb) => qb.where('source', '=', filter.source!))
       .$if(!!filter.eventType, (qb) => qb.where('eventType', '=', filter.eventType!))
-      .$if(!!filter.status, (qb) => qb.where('status', '=', filter.status!));
+      .$if(!!filter.status, (qb) => qb.where('status', '=', filter.status!))
+      .$if(!!filter.since, (qb) => qb.where('receivedAt', '>=', new Date(filter.since!)));
 
     const [items, totalRow] = await Promise.all([
       baseQuery.selectAll().orderBy('receivedAt', 'desc').limit(filter.limit).offset(filter.offset).execute(),
@@ -145,6 +146,8 @@ export type EventListFilter = {
   source?: import('src/enum').EventSource;
   eventType?: string;
   status?: import('src/enum').EventStatus;
+  /** Inclusive lower bound on receivedAt. ISO date or datetime. */
+  since?: string;
   limit: number;
   offset: number;
 };

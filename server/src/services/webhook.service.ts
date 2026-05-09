@@ -72,6 +72,9 @@ export class WebhookService {
     const decision = checkCutover(occurredDate);
     if (!decision.allowed) {
       this.logger.log(`wise event ${externalId} skipped: ${decision.reason}`);
+      if (decision.reason === 'before_cutover') {
+        await this.recordCutoverDrop(EventSource.Wise, externalId, occurredAt);
+      }
       return { ingested: false, reason: decision.reason };
     }
 
@@ -91,6 +94,20 @@ export class WebhookService {
       return { ingested: true, event: result.event };
     }
     return { ingested: false, reason: 'duplicate' };
+  }
+
+  /**
+   * Audit-trail an `ingest.dropped_before_cutover` system event. The
+   * dashboard counts these to surface "stuff is being silently rejected
+   * at the cutover gate" — useful for catching mis-configured cutovers
+   * or unexpected upstream backfilling.
+   */
+  private async recordCutoverDrop(source: EventSource, droppedExternalId: string, droppedOccurredAt: string): Promise<void> {
+    await this.eventRepository.recordAction({
+      source: EventSource.System,
+      eventType: 'ingest.dropped_before_cutover',
+      payload: { droppedSource: source, droppedExternalId, droppedOccurredAt },
+    });
   }
 
   private async enqueueFollowUp(eventType: string, eventId: string): Promise<void> {
@@ -138,6 +155,9 @@ export class WebhookService {
     const decision = checkCutover(occurredDate);
     if (!decision.allowed) {
       this.logger.log(`paperless event ${externalId} skipped: ${decision.reason}`);
+      if (decision.reason === 'before_cutover') {
+        await this.recordCutoverDrop(EventSource.Paperless, externalId, occurredAt);
+      }
       return { ingested: false, reason: decision.reason };
     }
 

@@ -188,6 +188,15 @@ export class BankingSyncService {
         if (!decision.allowed) {
           if (decision.reason === 'before_cutover') {
             droppedBefore += 1;
+            await this.eventRepository.recordAction({
+              source: EventSource.System,
+              eventType: 'ingest.dropped_before_cutover',
+              payload: {
+                droppedSource: BankSource.EnableBanking,
+                droppedExternalId: String(newRow.externalId),
+                droppedOccurredAt: new Date(newRow.txDate as Date).toISOString(),
+              },
+            });
           } else {
             droppedNoCutover += 1;
           }

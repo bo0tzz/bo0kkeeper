@@ -5,12 +5,14 @@
     approveExpense,
     listExpenses,
     rejectExpense,
+    rescanPaperless,
     updateExpense,
     type ExpenseLocationClass,
     type ExpensePatch,
     type ExpenseResponse,
     type ExpenseStatus,
     type ListExpensesResponse,
+    type RescanPaperlessResponse,
   } from '$lib/services/expenses.service';
   import {
     Alert,
@@ -41,6 +43,25 @@
   let error = $state<string | null>(null);
   let issues = $state<ApiFieldIssue[]>([]);
   let expandedId = $state<string | null>(null);
+
+  let rescanRunning = $state(false);
+  let rescanResult = $state<RescanPaperlessResponse | null>(null);
+  let rescanError = $state<string | null>(null);
+
+  async function runRescan() {
+    rescanRunning = true;
+    rescanError = null;
+    rescanResult = null;
+    try {
+      rescanResult = await rescanPaperless();
+      // Refresh the list so newly-ingested rows show up.
+      await load();
+    } catch (error_) {
+      rescanError = (error_ as Error).message;
+    } finally {
+      rescanRunning = false;
+    }
+  }
 
   function hasIssue(prefix: string): boolean {
     return issues.some((issue) => formatIssuePath(issue.path).startsWith(prefix));
@@ -277,9 +298,14 @@
   <Stack gap={6}>
     <div class="flex items-center justify-between">
       <Heading size="large" tag="h1">Expenses</Heading>
-      <Text size="small" color="muted">
-        {data ? `${data.total} total` : ''}
-      </Text>
+      <HStack gap={3} class="items-center">
+        <Text size="small" color="muted">
+          {data ? `${data.total} total` : ''}
+        </Text>
+        <Button size="small" variant="ghost" disabled={rescanRunning} onclick={runRescan}>
+          {rescanRunning ? 'Scanning…' : 'Backfill from paperless'}
+        </Button>
+      </HStack>
     </div>
 
     <HStack gap={3}>
@@ -291,6 +317,15 @@
         }}
       />
     </HStack>
+
+    {#if rescanError}
+      <Alert color="danger">{rescanError}</Alert>
+    {/if}
+    {#if rescanResult}
+      <Alert color={rescanResult.enqueued > 0 ? 'success' : 'secondary'}>
+        Scanned {rescanResult.scanned}; {rescanResult.enqueued} enqueued, {rescanResult.alreadyIngested} already ingested.
+      </Alert>
+    {/if}
 
     {#if error}
       <ApiErrorAlert message={error} {issues} />

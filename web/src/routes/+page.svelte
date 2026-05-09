@@ -28,6 +28,8 @@
     pendingExpenseReviews: number;
     unmatchedBankTx: number;
     failedEvents: number;
+    /** Count of ingest.dropped_before_cutover system events in the last 30 days. */
+    cutoverDrops30d: number;
     /** Most recent receivedAt for any Wise event, ISO string. Null if none. */
     lastWiseEventAt: string | null;
     /** Most recent receivedAt for any paperless event, ISO string. Null if none. */
@@ -66,7 +68,8 @@
       const now = new Date();
       const year = now.getUTCFullYear();
       const quarter = Math.floor(now.getUTCMonth() / 3) + 1;
-      const [wise, expenses, bankTx, bankingSession, agg, failed, lastWise, lastPaperless, systemInfo] =
+      const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const [wise, expenses, bankTx, bankingSession, agg, failed, lastWise, lastPaperless, drops, systemInfo] =
         await Promise.all([
           listEvents({
             source: 'wise',
@@ -81,6 +84,12 @@
           listEvents({ status: 'failed', limit: 1 }) as Promise<ListEventsResponse>,
           listEvents({ source: 'wise', limit: 1 }) as Promise<ListEventsResponse>,
           listEvents({ source: 'paperless', limit: 1 }) as Promise<ListEventsResponse>,
+          listEvents({
+            source: 'system',
+            eventType: 'ingest.dropped_before_cutover',
+            since: since30d,
+            limit: 1,
+          }) as Promise<ListEventsResponse>,
           getSystemInfo(),
         ]);
       counts = {
@@ -88,6 +97,7 @@
         pendingExpenseReviews: expenses.total,
         unmatchedBankTx: bankTx.total,
         failedEvents: failed.total,
+        cutoverDrops30d: drops.total,
         lastWiseEventAt: lastWise.items[0]?.receivedAt ?? null,
         lastPaperlessEventAt: lastPaperless.items[0]?.receivedAt ?? null,
         bankingSession,
@@ -274,9 +284,6 @@
                     {counts.failedEvents === 0 ? 'clean' : 'failed'}
                   </Badge>
                 </HStack>
-                <Text size="small" color="muted">
-                  Webhook events whose handler threw and pg-boss exhausted retries. Open the event for the stack trace.
-                </Text>
                 {#if counts.failedEvents > 0}
                   <Button href={resolve('/events')} variant="outline">Investigate →</Button>
                 {/if}
@@ -302,30 +309,22 @@
 
       <Stack gap={4}>
         <Heading size="small" tag="h2">Webhook health</Heading>
-        <div class="grid gap-4 sm:grid-cols-2">
+        <div class="grid gap-4 sm:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Wise</CardTitle>
             </CardHeader>
             <CardBody>
-              <Stack gap={2}>
-                {#if wiseQuietDays === null}
-                  <Text>No Wise events seen yet.</Text>
-                  <Text size="small" color="muted">
-                    Expected after first paycheck post-cutover. If you've already had one, check the workflow at Wise + the signing-key config.
-                  </Text>
-                {:else}
-                  <HStack class="items-center justify-between">
-                    <Heading size="medium" tag="h3">{wiseQuietDays}d</Heading>
-                    <Badge color={wiseQuietDays > WISE_QUIET_DAYS_WARN ? 'warning' : 'secondary'}>
-                      {wiseQuietDays > WISE_QUIET_DAYS_WARN ? 'quiet' : 'healthy'}
-                    </Badge>
-                  </HStack>
-                  <Text size="small" color="muted">
-                    Since the last Wise webhook. Paychecks land ~twice a month; warns past {WISE_QUIET_DAYS_WARN} days.
-                  </Text>
-                {/if}
-              </Stack>
+              {#if wiseQuietDays === null}
+                <Text color="muted">no events yet</Text>
+              {:else}
+                <HStack class="items-center justify-between">
+                  <Heading size="medium" tag="h3">{wiseQuietDays}d</Heading>
+                  <Badge color={wiseQuietDays > WISE_QUIET_DAYS_WARN ? 'warning' : 'secondary'}>
+                    {wiseQuietDays > WISE_QUIET_DAYS_WARN ? 'quiet' : 'healthy'}
+                  </Badge>
+                </HStack>
+              {/if}
             </CardBody>
           </Card>
 
@@ -334,24 +333,30 @@
               <CardTitle>Paperless</CardTitle>
             </CardHeader>
             <CardBody>
-              <Stack gap={2}>
-                {#if paperlessQuietDays === null}
-                  <Text>No paperless events seen yet.</Text>
-                  <Text size="small" color="muted">
-                    Expected after the first tagged document. If you're tagging docs and nothing arrives, check the paperless workflow trigger config.
-                  </Text>
-                {:else}
-                  <HStack class="items-center justify-between">
-                    <Heading size="medium" tag="h3">{paperlessQuietDays}d</Heading>
-                    <Badge color={paperlessQuietDays > PAPERLESS_QUIET_DAYS_WARN ? 'warning' : 'secondary'}>
-                      {paperlessQuietDays > PAPERLESS_QUIET_DAYS_WARN ? 'quiet' : 'healthy'}
-                    </Badge>
-                  </HStack>
-                  <Text size="small" color="muted">
-                    Since the last paperless webhook. Warns past {PAPERLESS_QUIET_DAYS_WARN} days.
-                  </Text>
-                {/if}
-              </Stack>
+              {#if paperlessQuietDays === null}
+                <Text color="muted">no events yet</Text>
+              {:else}
+                <HStack class="items-center justify-between">
+                  <Heading size="medium" tag="h3">{paperlessQuietDays}d</Heading>
+                  <Badge color={paperlessQuietDays > PAPERLESS_QUIET_DAYS_WARN ? 'warning' : 'secondary'}>
+                    {paperlessQuietDays > PAPERLESS_QUIET_DAYS_WARN ? 'quiet' : 'healthy'}
+                  </Badge>
+                </HStack>
+              {/if}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Dropped at cutover</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <HStack class="items-center justify-between">
+                <Heading size="medium" tag="h3">{counts.cutoverDrops30d}</Heading>
+                <Badge color={counts.cutoverDrops30d === 0 ? 'secondary' : 'warning'}>
+                  {counts.cutoverDrops30d === 0 ? 'none' : '30d'}
+                </Badge>
+              </HStack>
             </CardBody>
           </Card>
         </div>

@@ -17,6 +17,7 @@ export class EventsController {
       source: query.source,
       eventType: query.eventType,
       status: query.status,
+      since: query.since,
       limit: query.limit,
       offset: query.offset,
     });
