@@ -3,8 +3,20 @@ import { createVerify, timingSafeEqual } from 'node:crypto';
 import { loadConfig } from 'src/config';
 import { PaperlessWebhookDto, WiseWebhookDto } from 'src/dtos/webhook.dto';
 import { EventSource, JobName } from 'src/enum';
-import { EventRepository, IngestResult, NewEvent } from 'src/repositories/event.repository';
+import { Event, EventRepository, NewEvent } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
+import { checkCutover } from 'src/utils/cutover';
+
+/**
+ * Outcome of a webhook ingest attempt. Both webhook controllers respond
+ * with `{ ingested }` to the external system regardless of which `false`
+ * reason fired — duplicate retry, pre-cutover event, or no cutover
+ * configured all want the same upstream behaviour: 200, don't retry. The
+ * `reason` is logged for visibility.
+ */
+export type WebhookIngestResult =
+  | { ingested: true; event: Event }
+  | { ingested: false; reason: 'duplicate' | 'before_cutover' | 'no_cutover_configured' };
 
 @Injectable()
 export class WebhookService {
@@ -52,15 +64,22 @@ export class WebhookService {
    * `subscription_id + sent_at + resource.id` → `subscription_id + event_type + sent_at`.
    * Whichever is unique enough to deduplicate retries.
    */
-  async ingestWiseEvent(payload: WiseWebhookDto, deliveryId?: string): Promise<IngestResult> {
+  async ingestWiseEvent(payload: WiseWebhookDto, deliveryId?: string): Promise<WebhookIngestResult> {
     const externalId = deliveryId ?? deriveWiseExternalId(payload);
     const occurredAt = payload.data.occurred_at ?? payload.sent_at ?? new Date().toISOString();
+    const occurredDate = new Date(occurredAt);
+
+    const decision = checkCutover(occurredDate);
+    if (!decision.allowed) {
+      this.logger.log(`wise event ${externalId} skipped: ${decision.reason}`);
+      return { ingested: false, reason: decision.reason };
+    }
 
     const event: NewEvent = {
       source: EventSource.Wise,
       eventType: payload.event_type,
       externalId,
-      occurredAt: new Date(occurredAt),
+      occurredAt: occurredDate,
       payload: payload as unknown as Record<string, unknown>,
       correlationId: deriveCorrelationId(payload),
     };
@@ -69,9 +88,9 @@ export class WebhookService {
 
     if (result.ingested) {
       await this.enqueueFollowUp(payload.event_type, result.event.id);
+      return { ingested: true, event: result.event };
     }
-
-    return result;
+    return { ingested: false, reason: 'duplicate' };
   }
 
   private async enqueueFollowUp(eventType: string, eventId: string): Promise<void> {
@@ -105,7 +124,7 @@ export class WebhookService {
    * enqueue ProcessPaperlessDocument on first sight. The `externalId` is the
    * document id — paperless guarantees one consume callback per document.
    */
-  async ingestPaperlessEvent(payload: PaperlessWebhookDto, deliveryId?: string): Promise<IngestResult> {
+  async ingestPaperlessEvent(payload: PaperlessWebhookDto, deliveryId?: string): Promise<WebhookIngestResult> {
     const documentId = payload.document_id ?? payload.id ?? payload.doc_pk;
     if (documentId === undefined) {
       // Schema-level refine catches this; defensive guard for direct callers.
@@ -115,11 +134,18 @@ export class WebhookService {
     const externalId = deliveryId ?? `paperless:${documentId}`;
     const eventType = payload.event_type ?? 'document.consumed';
 
+    const occurredDate = parseDateOrNow(occurredAt);
+    const decision = checkCutover(occurredDate);
+    if (!decision.allowed) {
+      this.logger.log(`paperless event ${externalId} skipped: ${decision.reason}`);
+      return { ingested: false, reason: decision.reason };
+    }
+
     const event: NewEvent = {
       source: EventSource.Paperless,
       eventType,
       externalId,
-      occurredAt: parseDateOrNow(occurredAt),
+      occurredAt: occurredDate,
       payload: payload as unknown as Record<string, unknown>,
       correlationId: null,
     };
@@ -127,8 +153,9 @@ export class WebhookService {
     const result = await this.eventRepository.ingest(event);
     if (result.ingested) {
       await this.jobRepository.queue(JobName.ProcessPaperlessDocument, { eventId: result.event.id });
+      return { ingested: true, event: result.event };
     }
-    return result;
+    return { ingested: false, reason: 'duplicate' };
   }
 }
 

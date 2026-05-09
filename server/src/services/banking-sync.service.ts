@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Config, loadConfig } from 'src/config';
 import { OnJob } from 'src/decorators';
 import { BankingSessionStatus, BankSource, EventSource, JobName, QueueName } from 'src/enum';
 import {
@@ -42,6 +41,7 @@ type AccountWithBalance = EnableBankingAccount & {
   };
 };
 import { JobOf } from 'src/types';
+import { checkCutover } from 'src/utils/cutover';
 
 /**
  * Pulls Enable Banking transactions for every active session, ingests them
@@ -63,7 +63,6 @@ export class BankingSyncService {
   private readonly logger = new Logger(BankingSyncService.name);
   /** Days of overlap on each pull to catch back-dated postings. */
   private static readonly LOOKBACK_DAYS = 3;
-  private readonly config: Config['enableBanking'];
 
   constructor(
     private readonly sessionRepository: BankingSessionRepository,
@@ -71,9 +70,7 @@ export class BankingSyncService {
     private readonly apiService: EnableBankingApiService,
     private readonly matcher: BankMatcherService,
     private readonly eventRepository: EventRepository,
-  ) {
-    this.config = loadConfig().enableBanking;
-  }
+  ) {}
 
   @OnJob({ name: JobName.BankingSyncAll, queue: QueueName.Default })
   async handleSyncAll(data: JobOf<JobName.BankingSyncAll>): Promise<void> {
@@ -170,11 +167,11 @@ export class BankingSyncService {
     opts: { psuIpAddress?: string },
   ): Promise<{ ingested: number; matched: number }> {
     const dateFrom = this.computeDateFrom(session);
-    const cutoff = this.config.ingestFrom ? new Date(this.config.ingestFrom) : null;
     let cursor: string | undefined;
     let ingested = 0;
     let matched = 0;
-    let dropped = 0;
+    let droppedBefore = 0;
+    let droppedNoCutover = 0;
     do {
       const page = await this.apiService.listTransactions({
         accountUid: account.uid,
@@ -187,8 +184,13 @@ export class BankingSyncService {
         if (!newRow) {
           continue;
         }
-        if (cutoff && new Date(newRow.txDate as Date) < cutoff) {
-          dropped += 1;
+        const decision = checkCutover(new Date(newRow.txDate as Date));
+        if (!decision.allowed) {
+          if (decision.reason === 'before_cutover') {
+            droppedBefore += 1;
+          } else {
+            droppedNoCutover += 1;
+          }
           continue;
         }
         const result = await this.bankTransactionRepository.ingest(newRow);
@@ -202,9 +204,12 @@ export class BankingSyncService {
       }
       cursor = page.continuationKey ?? undefined;
     } while (cursor);
-    if (dropped > 0) {
-      this.logger.log(
-        `account ${account.uid}: dropped ${dropped} tx with txDate < ${this.config.ingestFrom} (cutover guard)`,
+    if (droppedBefore > 0) {
+      this.logger.log(`account ${account.uid}: dropped ${droppedBefore} tx with txDate before cutover`);
+    }
+    if (droppedNoCutover > 0) {
+      this.logger.warn(
+        `account ${account.uid}: dropped ${droppedNoCutover} tx because CUTOVER_DATE is unset — set it in env to enable ingestion`,
       );
     }
     return { ingested, matched };

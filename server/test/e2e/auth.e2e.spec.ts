@@ -45,6 +45,7 @@ describe('Auth E2E (real Nest app + fake OIDC IDP)', () => {
     delete process.env.OIDC_CLIENT_SECRET;
     process.env.OIDC_REDIRECT_URI = `http://localhost:${appPort}/api/auth/callback`;
     process.env.OIDC_SCOPES = 'openid email profile offline_access';
+    process.env.CUTOVER_DATE = '2000-01-01';
     process.env.OIDC_POST_LOGIN_PATH = '/';
     process.env.COOKIE_SECURE = 'false';
     process.env.WISE_WEBHOOK_VERIFY = 'false';

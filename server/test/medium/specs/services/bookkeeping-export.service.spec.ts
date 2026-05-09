@@ -13,6 +13,7 @@ beforeEach(() => {
   process.env.OIDC_ISSUER ??= 'http://idp.test';
   process.env.OIDC_CLIENT_ID ??= 'test';
   process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
+  process.env.CUTOVER_DATE ??= '2000-01-01';
 });
 
 async function readXlsxStrings(buffer: Buffer): Promise<string[]> {

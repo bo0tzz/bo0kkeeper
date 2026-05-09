@@ -18,6 +18,7 @@ beforeEach(() => {
   process.env.OIDC_ISSUER ??= 'http://idp.test';
   process.env.OIDC_CLIENT_ID ??= 'test';
   process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
+  process.env.CUTOVER_DATE ??= '2000-01-01';
   process.env.ENABLE_BANKING_REDIRECT_URI = 'http://localhost:3000/api/banking/auth/callback';
   process.env.ENABLE_BANKING_CONSENT_DAYS = '90';
 });

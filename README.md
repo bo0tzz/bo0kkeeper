@@ -28,6 +28,12 @@ Open http://localhost:3000. The vite dev server proxies `/api/*` to the backend,
 
 The OIDC client must allow **`http://localhost:3000/api/auth/callback`** as a redirect URI — the callback runs through the vite proxy so cookies stay on the frontend origin. The provider also needs a **Signing Key** configured on the OIDC provider; without it `/jwks` returns `{}` and JWT verification fails (the smoke-test script catches this).
 
+The default `OIDC_SCOPES` includes **`offline_access`** so the IDP issues a refresh token (the silent-refresh path on the API client uses it to swap in a fresh ID token without bouncing the user through the login flow). The OIDC client at the IDP must allow that scope; otherwise refresh fails and the client falls through to the existing login redirect on each cookie expiry.
+
+### Ingestion floor — `CUTOVER_DATE`
+
+Every live ingestion path (Wise webhooks, paperless webhooks, Enable-Banking sync) drops events whose own date is before `CUTOVER_DATE` (`YYYY-MM-DD`). When the env var is **unset, ingestion is disabled entirely** — a fresh deployment can't start eating pre-go-live data before the operator's set things up. Set it to your go-live date in prod; set it permissively (`2000-01-01`) in dev so synthetic fixtures and replay flows just work.
+
 ### Resetting state
 
 ```bash

@@ -23,6 +23,7 @@ beforeEach(() => {
   process.env.OIDC_ISSUER ??= 'http://idp.test';
   process.env.OIDC_CLIENT_ID ??= 'test';
   process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
+  process.env.CUTOVER_DATE ??= '2000-01-01';
 });
 
 const ACC: EnableBankingAccount = { uid: 'acct-1', currency: 'EUR', name: 'Business' };
@@ -234,5 +235,46 @@ describe('BankingSyncService', () => {
 
     expect(result.ingested).toBe(1);
     expect(result.matched).toBe(1);
+  });
+
+  describe('cutover gate', () => {
+    it('drops bank tx whose booking_date is before CUTOVER_DATE', async () => {
+      api.listTransactions.mockResolvedValue({
+        transactions: [
+          tx({ entry_reference: 'before', booking_date: '2026-04-15' }),
+          tx({ entry_reference: 'after', booking_date: '2026-05-15' }),
+        ],
+        continuationKey: null,
+      });
+      process.env.CUTOVER_DATE = '2026-05-01';
+
+      const sessionId = await makeActiveSession([ACC]);
+      const session = (await sessionRepo.findById(sessionId))!;
+      const result = await service.syncSession(session, {});
+
+      expect(result.ingested).toBe(1);
+
+      // Reset for downstream tests.
+      process.env.CUTOVER_DATE = '2000-01-01';
+    });
+
+    it('refuses every bank tx when CUTOVER_DATE is unset', async () => {
+      api.listTransactions.mockResolvedValue({
+        transactions: [tx({ entry_reference: 'no-cutover-1' })],
+        continuationKey: null,
+      });
+      const original = process.env.CUTOVER_DATE;
+      delete process.env.CUTOVER_DATE;
+      try {
+        const sessionId = await makeActiveSession([ACC]);
+        const session = (await sessionRepo.findById(sessionId))!;
+        const result = await service.syncSession(session, {});
+        expect(result.ingested).toBe(0);
+      } finally {
+        if (original !== undefined) {
+          process.env.CUTOVER_DATE = original;
+        }
+      }
+    });
   });
 });

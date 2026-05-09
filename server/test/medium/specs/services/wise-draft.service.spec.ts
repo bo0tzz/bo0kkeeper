@@ -21,6 +21,7 @@ beforeEach(() => {
   process.env.OIDC_ISSUER ??= 'http://idp.test';
   process.env.OIDC_CLIENT_ID ??= 'test';
   process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
+  process.env.CUTOVER_DATE ??= '2000-01-01';
   process.env.WISE_API_BASE_URL = 'https://api.fake.wise';
   process.env.WISE_API_TOKEN = 'fake-token';
   process.env.WISE_PROFILE_ID = '12345';

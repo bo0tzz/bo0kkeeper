@@ -34,6 +34,7 @@ describe('WebhookService — Wise ingestion', () => {
     process.env.OIDC_ISSUER ??= 'http://idp.test';
     process.env.OIDC_CLIENT_ID ??= 'test-client';
     process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
+    process.env.CUTOVER_DATE ??= '2000-01-01';
     db = await getKyselyDB();
     eventRepository = new EventRepository(db);
     jobRepository = fakeJobRepo();
@@ -159,6 +160,47 @@ VwIDAQAB
     await service.ingestWiseEvent(parsed, 'state-change-2');
     expect(jobRepository.queue).toHaveBeenCalledOnce();
   });
+
+  describe('cutover gate', () => {
+    it('drops Wise events whose occurred_at is before CUTOVER_DATE', async () => {
+      const { parsed } = await loadFixture('balance-credit.example.json');
+      const oldEvent = { ...parsed, data: { ...parsed.data, occurred_at: '1999-12-31T00:00:00Z' } };
+      process.env.CUTOVER_DATE = '2026-05-01';
+
+      const result = await service.ingestWiseEvent(oldEvent, 'pre-cutover-1');
+      expect(result.ingested).toBe(false);
+      if (!result.ingested) {
+        expect(result.reason).toBe('before_cutover');
+      }
+      expect(jobRepository.queue).not.toHaveBeenCalled();
+
+      // No row was inserted — the same delivery id ingested with a fresh
+      // (post-cutover) date should succeed rather than 'duplicate'.
+      const fresh = { ...parsed, data: { ...parsed.data, occurred_at: '2026-06-01T00:00:00Z' } };
+      const second = await service.ingestWiseEvent(fresh, 'pre-cutover-1');
+      expect(second.ingested).toBe(true);
+
+      // Reset for the next test.
+      process.env.CUTOVER_DATE = '2000-01-01';
+    });
+
+    it('refuses every Wise event when CUTOVER_DATE is unset', async () => {
+      const { parsed } = await loadFixture('balance-credit.example.json');
+      const original = process.env.CUTOVER_DATE;
+      delete process.env.CUTOVER_DATE;
+      try {
+        const result = await service.ingestWiseEvent(parsed, 'no-cutover-1');
+        expect(result.ingested).toBe(false);
+        if (!result.ingested) {
+          expect(result.reason).toBe('no_cutover_configured');
+        }
+      } finally {
+        if (original !== undefined) {
+          process.env.CUTOVER_DATE = original;
+        }
+      }
+    });
+  });
 });
 
 describe('WebhookService — Paperless ingestion', () => {
@@ -172,6 +214,7 @@ describe('WebhookService — Paperless ingestion', () => {
     process.env.OIDC_ISSUER ??= 'http://idp.test';
     process.env.OIDC_CLIENT_ID ??= 'test-client';
     process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
+    process.env.CUTOVER_DATE ??= '2000-01-01';
     delete process.env.PAPERLESS_WEBHOOK_TOKEN;
     db = await getKyselyDB();
     eventRepository = new EventRepository(db);
@@ -235,5 +278,22 @@ describe('WebhookService — Paperless ingestion', () => {
     expect(() => guardedService.verifyPaperlessAuthorization('Bearer wrong')).toThrow(/Invalid Paperless/);
     expect(() => guardedService.verifyPaperlessAuthorization()).toThrow(/Invalid Paperless/);
     expect(() => guardedService.verifyPaperlessAuthorization('Bearer shared-secret')).not.toThrow();
+  });
+
+  describe('cutover gate', () => {
+    it('drops paperless events whose created date is before CUTOVER_DATE', async () => {
+      const { parsed } = await loadFixture('document-consumed.example.json', PAPERLESS_FIXTURES);
+      const oldEvent = { ...parsed, created: '1999-06-15T00:00:00Z' };
+      process.env.CUTOVER_DATE = '2026-05-01';
+
+      const result = await service.ingestPaperlessEvent(oldEvent, 'pre-cutover-paperless-1');
+      expect(result.ingested).toBe(false);
+      if (!result.ingested) {
+        expect(result.reason).toBe('before_cutover');
+      }
+      expect(jobRepository.queue).not.toHaveBeenCalled();
+
+      process.env.CUTOVER_DATE = '2000-01-01';
+    });
   });
 });

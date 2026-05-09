@@ -65,14 +65,15 @@ const ConfigSchema = z.object({
   ENABLE_BANKING_API_BASE_URL: z.url().default('https://api.enablebanking.com'),
   /** Public callback URL the bank redirects back to after PSU consent. */
   ENABLE_BANKING_REDIRECT_URI: z.url().optional(),
+
   /**
-   * Cutover date — bank transactions with a bookingDate before this are
-   * silently dropped at sync time. AISP returns ~90 days of history and we
-   * don't want pre-cutover txns to (a) clutter the queue or (b) fire the
-   * matcher against any data that happens to be in the system. ISO YYYY-MM-DD;
-   * unset = ingest everything (the dev default).
+   * System-wide cutover date — every live ingestion path drops events whose
+   * own date is before this floor: Wise webhooks (occurredAt), paperless
+   * webhooks (created), bank-tx sync (txDate). When unset, ingestion is
+   * disabled entirely so a freshly-deployed system can't start eating
+   * pre-go-live data before the operator's set things up. ISO YYYY-MM-DD.
    */
-  ENABLE_BANKING_INGEST_FROM: z
+  CUTOVER_DATE: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'Expected ISO YYYY-MM-DD' })
     .optional(),
@@ -130,9 +131,13 @@ export type Config = {
     apiBaseUrl: string;
     /** Public callback URL bank redirects to. Required to start auth. */
     redirectUri?: string;
-    /** Cutover date as ISO YYYY-MM-DD; bank tx before this are dropped. */
-    ingestFrom?: string;
   };
+  /**
+   * System-wide cutover floor as ISO YYYY-MM-DD. Every ingest path drops
+   * events older than this. Unset = ingestion disabled (intentional safety
+   * net for fresh deployments).
+   */
+  cutoverDate?: string;
   sheets: {
     serviceAccountEmail?: string;
     serviceAccountPrivateKey?: string;
@@ -192,8 +197,8 @@ export function loadConfig(): Config {
       privateKey: result.data.ENABLE_BANKING_PRIVATE_KEY,
       apiBaseUrl: result.data.ENABLE_BANKING_API_BASE_URL,
       redirectUri: result.data.ENABLE_BANKING_REDIRECT_URI,
-      ingestFrom: result.data.ENABLE_BANKING_INGEST_FROM,
     },
+    cutoverDate: result.data.CUTOVER_DATE,
     sheets: {
       serviceAccountEmail: result.data.SHEETS_SERVICE_ACCOUNT_EMAIL,
       serviceAccountPrivateKey: result.data.SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY,
