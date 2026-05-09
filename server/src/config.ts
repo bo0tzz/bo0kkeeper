@@ -17,7 +17,7 @@ const ConfigSchema = z.object({
   OIDC_CLIENT_ID: z.string().min(1),
   OIDC_CLIENT_SECRET: z.string().optional(),
   OIDC_REDIRECT_URI: z.url(),
-  OIDC_SCOPES: z.string().default('openid email profile'),
+  OIDC_SCOPES: z.string().default('openid email profile offline_access'),
   /** Where to send the user after successful login (within our app). */
   OIDC_POST_LOGIN_PATH: z.string().default('/'),
   /** Cookies; non-prod can use insecure cookies. */

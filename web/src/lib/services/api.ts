@@ -3,6 +3,11 @@
  *
  * Adds default error handling and JSON parsing. Cookies (auth) are sent
  * automatically by the browser since same-origin.
+ *
+ * On 401, attempts a silent refresh against `/api/auth/refresh` (which
+ * uses the path-scoped refresh-token cookie set at login) and retries
+ * the original request once. If the refresh itself fails, falls through
+ * to the login redirect.
  */
 type ApiOptions = {
   fetch?: typeof fetch;
@@ -52,57 +57,121 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiGet<T>(path: string, options: ApiOptions = {}): Promise<T> {
+/**
+ * Single in-flight refresh promise: when N requests fire concurrently and
+ * all hit a 401, only one /api/auth/refresh round trip happens; the rest
+ * await the same promise. Cleared after the refresh resolves either way
+ * so a later 401 (e.g. another expiry cycle) re-triggers a fresh refresh.
+ */
+let refreshInFlight: Promise<boolean> | null = null;
+
+function attemptRefresh(fetchFn: typeof fetch): Promise<boolean> {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetchFn('/api/auth/refresh', { method: 'POST' });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      // Defer the clear by a microtask so siblings that await this call
+      // observe the same result; the next call (after they all resolve)
+      // gets a fresh promise.
+      queueMicrotask(() => {
+        refreshInFlight = null;
+      });
+    }
+  })();
+  return refreshInFlight;
+}
+
+type RequestSpec = {
+  url: string;
+  init: RequestInit;
+};
+
+async function request<T>(spec: RequestSpec, options: ApiOptions): Promise<T> {
   const fetchFn = options.fetch ?? fetch;
+  const first = await fetchFn(spec.url, spec.init);
+  if (first.status !== 401) {
+    return parse<T>(first);
+  }
+
+  // The 401 happened on a non-auth endpoint — try to silently refresh and
+  // replay the original. Skip the refresh if we're already inside an auth
+  // route (e.g. the refresh endpoint itself returning 401), otherwise we'd
+  // loop on the same request.
+  if (globalThis.location !== undefined && globalThis.location.pathname.startsWith('/api/auth/')) {
+    return parse<T>(first);
+  }
+  const refreshed = await attemptRefresh(fetchFn);
+  if (!refreshed) {
+    return parse<T>(first);
+  }
+  const second = await fetchFn(spec.url, spec.init);
+  return parse<T>(second);
+}
+
+export async function apiGet<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const url = options.query ? `${path}?${buildQuery(options.query)}` : path;
-  const res = await fetchFn(url, { method: 'GET' });
-  return parse<T>(res);
+  return request<T>({ url, init: { method: 'GET' } }, options);
 }
 
 export async function apiPost<T>(path: string, body: unknown, options: ApiOptions = {}): Promise<T> {
-  const fetchFn = options.fetch ?? fetch;
-  const res = await fetchFn(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body ?? {}),
-  });
-  return parse<T>(res);
+  return request<T>(
+    {
+      url: path,
+      init: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body ?? {}),
+      },
+    },
+    options,
+  );
 }
 
 export async function apiPatch<T>(path: string, body: unknown, options: ApiOptions = {}): Promise<T> {
-  const fetchFn = options.fetch ?? fetch;
-  const res = await fetchFn(path, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body ?? {}),
-  });
-  return parse<T>(res);
+  return request<T>(
+    {
+      url: path,
+      init: {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body ?? {}),
+      },
+    },
+    options,
+  );
 }
 
 export async function apiPut<T>(path: string, body: unknown, options: ApiOptions = {}): Promise<T> {
-  const fetchFn = options.fetch ?? fetch;
-  const res = await fetchFn(path, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body ?? {}),
-  });
-  return parse<T>(res);
+  return request<T>(
+    {
+      url: path,
+      init: {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body ?? {}),
+      },
+    },
+    options,
+  );
 }
 
 export async function apiDelete<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  const fetchFn = options.fetch ?? fetch;
-  const res = await fetchFn(path, { method: 'DELETE' });
-  return parse<T>(res);
+  return request<T>({ url: path, init: { method: 'DELETE' } }, options);
 }
 
 async function parse<T>(res: Response): Promise<T> {
   const text = await res.text();
   const data: unknown = text ? safeParseJson(text) : undefined;
   if (!res.ok) {
-    // 401 mid-session typically means the ID-token cookie expired. Bounce the
-    // user through /api/auth/login → IDP → callback so we get a fresh cookie
-    // and they end up back where they were. Skip if we're already in the auth
-    // flow, otherwise we'd loop.
+    // 401 reaching here means either the original request 401'd AND silent
+    // refresh failed, OR we're inside an auth flow already. Bounce the user
+    // through the login redirect so they end up back where they started.
     if (res.status === 401 && globalThis.location && !globalThis.location.pathname.startsWith('/api/auth/')) {
       const returnTo = globalThis.location.pathname + globalThis.location.search;
       globalThis.location.replace(`/api/auth/login?return_to=${encodeURIComponent(returnTo)}`);

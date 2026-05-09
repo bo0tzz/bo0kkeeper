@@ -11,6 +11,7 @@ import {
   None,
   randomPKCECodeVerifier,
   randomState,
+  refreshTokenGrant,
 } from 'openid-client';
 import { Config, loadConfig } from 'src/config';
 import { AuthUser } from 'src/types';
@@ -51,9 +52,15 @@ export class AuthService {
 
   /**
    * Exchange the authorization code for tokens, validating state and PKCE.
-   * Returns the raw ID token (a JWT) for storage in an HttpOnly cookie.
+   * Returns the raw ID token (a JWT) and the refresh token (when the IDP
+   * issued one — only happens if the `offline_access` scope is requested
+   * and the IDP allows refresh tokens for this client).
    */
-  async exchangeCode(callbackUrl: URL, expectedState: string, codeVerifier: string): Promise<{ idToken: string }> {
+  async exchangeCode(
+    callbackUrl: URL,
+    expectedState: string,
+    codeVerifier: string,
+  ): Promise<{ idToken: string; refreshToken: string | null }> {
     const client = await this.getClient();
     try {
       const tokens = await authorizationCodeGrant(client, callbackUrl, {
@@ -63,10 +70,34 @@ export class AuthService {
       if (!tokens.id_token) {
         throw new Error('IDP did not return an id_token');
       }
-      return { idToken: tokens.id_token };
+      return { idToken: tokens.id_token, refreshToken: tokens.refresh_token ?? null };
     } catch (error: unknown) {
       this.logger.error(`OAuth callback failed: ${(error as Error).message}`);
       throw new UnauthorizedException('OAuth login failed');
+    }
+  }
+
+  /**
+   * Use a refresh token to obtain a fresh id_token (and possibly a rotated
+   * refresh_token, depending on IDP config). Used by the silent refresh
+   * endpoint — short-lived id_tokens expire quickly, but the user keeps
+   * working as long as the refresh token is valid.
+   *
+   * Throws UnauthorizedException on any failure (refresh token expired,
+   * revoked, or rejected) — caller's job to clear cookies and bounce to
+   * the login flow.
+   */
+  async refreshTokens(refreshToken: string): Promise<{ idToken: string; refreshToken: string | null }> {
+    const client = await this.getClient();
+    try {
+      const tokens = await refreshTokenGrant(client, refreshToken);
+      if (!tokens.id_token) {
+        throw new Error('IDP refresh did not return an id_token');
+      }
+      return { idToken: tokens.id_token, refreshToken: tokens.refresh_token ?? null };
+    } catch (error: unknown) {
+      this.logger.debug(`OAuth refresh failed: ${(error as Error).message}`);
+      throw new UnauthorizedException('Refresh failed');
     }
   }
 

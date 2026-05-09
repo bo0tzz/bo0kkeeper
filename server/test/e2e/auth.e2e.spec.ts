@@ -44,7 +44,7 @@ describe('Auth E2E (real Nest app + fake OIDC IDP)', () => {
     process.env.OIDC_CLIENT_ID = CLIENT_ID;
     delete process.env.OIDC_CLIENT_SECRET;
     process.env.OIDC_REDIRECT_URI = `http://localhost:${appPort}/api/auth/callback`;
-    process.env.OIDC_SCOPES = 'openid email profile';
+    process.env.OIDC_SCOPES = 'openid email profile offline_access';
     process.env.OIDC_POST_LOGIN_PATH = '/';
     process.env.COOKIE_SECURE = 'false';
     process.env.WISE_WEBHOOK_VERIFY = 'false';
@@ -173,6 +173,101 @@ describe('Auth E2E (real Nest app + fake OIDC IDP)', () => {
     expect(callbackRes.status).toBe(400);
   });
 
+  it('callback also stores a refresh token cookie scoped to /api/auth/refresh', async () => {
+    const jar = new CookieJar();
+    const loginRes = await fetch(`${baseUrl}/api/auth/login?return_to=/`, { redirect: 'manual' });
+    jar.ingest(loginRes.headers);
+    const authRes = await fetch(loginRes.headers.get('location')!, { redirect: 'manual' });
+    const callbackRes = await fetch(authRes.headers.get('location')!, {
+      redirect: 'manual',
+      headers: { cookie: jar.asHeader() },
+    });
+    expect(callbackRes.status).toBe(302);
+
+    // The Set-Cookie for the refresh token has Path=/api/auth/refresh — assert
+    // on the raw header rather than going through the cookie jar (which
+    // ignores path attributes for our single-host test).
+    const setCookies = callbackRes.headers.getSetCookie();
+    const refreshSetCookie = setCookies.find((c) => c.startsWith('bo0kkeeper.refresh_token='));
+    expect(refreshSetCookie).toBeTruthy();
+    expect(refreshSetCookie).toMatch(/Path=\/api\/auth\/refresh/);
+  });
+
+  it('refresh swaps in a fresh id_token cookie using the refresh-token cookie', async () => {
+    const jar = new CookieJar();
+    const loginRes = await fetch(`${baseUrl}/api/auth/login?return_to=/`, { redirect: 'manual' });
+    jar.ingest(loginRes.headers);
+    const authRes = await fetch(loginRes.headers.get('location')!, { redirect: 'manual' });
+    const callbackRes = await fetch(authRes.headers.get('location')!, {
+      redirect: 'manual',
+      headers: { cookie: jar.asHeader() },
+    });
+    jar.ingest(callbackRes.headers);
+    const originalIdToken = jar.get('bo0kkeeper.id_token');
+    const originalRefreshToken = jar.get('bo0kkeeper.refresh_token');
+    expect(originalIdToken).toBeTruthy();
+    expect(originalRefreshToken).toBeTruthy();
+
+    // The IDP issues fresh id_tokens stamped with the current second; pause a
+    // beat so the rotated id_token has a strictly later iat than the original.
+    await new Promise((r) => setTimeout(r, 1100));
+
+    const refreshRes = await fetch(`${baseUrl}/api/auth/refresh`, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: { cookie: jar.asHeader() },
+    });
+    expect(refreshRes.status).toBe(204);
+
+    jar.ingest(refreshRes.headers);
+    const newIdToken = jar.get('bo0kkeeper.id_token');
+    const newRefreshToken = jar.get('bo0kkeeper.refresh_token');
+    expect(newIdToken).toBeTruthy();
+    expect(newIdToken).not.toBe(originalIdToken);
+    // IDP rotates refresh tokens by default in our fake (matches Authentik),
+    // so the new one must differ from the original.
+    expect(newRefreshToken).toBeTruthy();
+    expect(newRefreshToken).not.toBe(originalRefreshToken);
+
+    // The new id_token still authenticates /api/auth/me successfully.
+    const meAfter = await fetch(`${baseUrl}/api/auth/me`, { headers: { cookie: jar.asHeader() } });
+    expect(meAfter.status).toBe(200);
+  });
+
+  it('refresh returns 401 when the refresh-token cookie is missing', async () => {
+    const refreshRes = await fetch(`${baseUrl}/api/auth/refresh`, { method: 'POST', redirect: 'manual' });
+    expect(refreshRes.status).toBe(401);
+  });
+
+  it('refresh clears cookies when the IDP rejects the refresh token', async () => {
+    const jar = new CookieJar();
+    const loginRes = await fetch(`${baseUrl}/api/auth/login?return_to=/`, { redirect: 'manual' });
+    jar.ingest(loginRes.headers);
+    const authRes = await fetch(loginRes.headers.get('location')!, { redirect: 'manual' });
+    const callbackRes = await fetch(authRes.headers.get('location')!, {
+      redirect: 'manual',
+      headers: { cookie: jar.asHeader() },
+    });
+    jar.ingest(callbackRes.headers);
+    expect(jar.get('bo0kkeeper.refresh_token')).toBeTruthy();
+
+    // Revoke the token at the IDP — next refresh attempt gets invalid_grant.
+    idp.revokeAllRefreshTokens();
+
+    const refreshRes = await fetch(`${baseUrl}/api/auth/refresh`, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: { cookie: jar.asHeader() },
+    });
+    expect(refreshRes.status).toBe(401);
+
+    // Both cookies were cleared so the next API call will redirect to login
+    // rather than loop on 401 → refresh → 401.
+    jar.ingest(refreshRes.headers);
+    expect(jar.get('bo0kkeeper.id_token')).toBeFalsy();
+    expect(jar.get('bo0kkeeper.refresh_token')).toBeFalsy();
+  });
+
   it('logout clears the id token cookie and returns the end-session URL', async () => {
     // Re-auth a session for this test.
     const jar = new CookieJar();
@@ -197,5 +292,6 @@ describe('Auth E2E (real Nest app + fake OIDC IDP)', () => {
 
     jar.ingest(logoutRes.headers);
     expect(jar.get('bo0kkeeper.id_token')).toBeFalsy();
+    expect(jar.get('bo0kkeeper.refresh_token')).toBeFalsy();
   });
 });

@@ -27,6 +27,8 @@ export type FakeIdp = {
   close(): Promise<void>;
   /** Override the user the next /authorize call will grant (default: a synthetic test user). */
   setNextUser(user: { sub: string; email?: string; name?: string }): void;
+  /** Mark every currently-outstanding refresh token as revoked so the next refresh fails. */
+  revokeAllRefreshTokens(): void;
 };
 
 type IssuedCode = {
@@ -38,6 +40,12 @@ type IssuedCode = {
   // verifier here — that's the backend's job to send correctly. Tracked only
   // so future tests could assert on it.
   codeChallenge?: string;
+};
+
+type IssuedRefreshToken = {
+  token: string;
+  user: { sub: string; email?: string; name?: string };
+  audience: string;
 };
 
 export async function startFakeIdp(opts: { port: number; clientId: string }): Promise<FakeIdp> {
@@ -54,6 +62,10 @@ export async function startFakeIdp(opts: { port: number; clientId: string }): Pr
     name: 'Test User',
   };
   const issuedCodes = new Map<string, IssuedCode>();
+  const issuedRefreshTokens = new Map<string, IssuedRefreshToken>();
+  // Refresh tokens that have been administratively revoked — used to test the
+  // refresh-failure path (e.g. user logged out from the IDP, token expired).
+  const revokedRefreshTokens = new Set<string>();
 
   const handler = async (
     req: import('node:http').IncomingMessage,
@@ -111,6 +123,52 @@ export async function startFakeIdp(opts: { port: number; clientId: string }): Pr
       if (url.pathname === '/token' && req.method === 'POST') {
         const body = await readBody(req);
         const params = new URLSearchParams(body);
+        const grantType = params.get('grant_type');
+
+        const issueIdToken = async (user: IssuedCode['user'], audience: string) => {
+          const now = Math.floor(Date.now() / 1000);
+          return new SignJWT({ email: user.email, name: user.name })
+            .setProtectedHeader({ alg: 'RS256', kid })
+            .setIssuer(`http://localhost:${opts.port}`)
+            .setSubject(user.sub)
+            .setAudience(audience)
+            .setIssuedAt(now)
+            .setExpirationTime(now + 3600)
+            .sign(privateKey as KeyLike);
+        };
+
+        if (grantType === 'refresh_token') {
+          const refreshToken = params.get('refresh_token');
+          if (!refreshToken) {
+            send(400, { error: 'invalid_request', detail: 'missing refresh_token' });
+            return;
+          }
+          if (revokedRefreshTokens.has(refreshToken)) {
+            send(400, { error: 'invalid_grant', detail: 'refresh token revoked' });
+            return;
+          }
+          const existing = issuedRefreshTokens.get(refreshToken);
+          if (!existing) {
+            send(400, { error: 'invalid_grant', detail: 'unknown refresh_token' });
+            return;
+          }
+          // Rotate the refresh token — the old one is consumed, a new one is
+          // issued. Mirrors how Authentik / most modern IDPs behave.
+          issuedRefreshTokens.delete(refreshToken);
+          const newRefreshToken = randomUUID();
+          issuedRefreshTokens.set(newRefreshToken, existing);
+          const idToken = await issueIdToken(existing.user, existing.audience);
+          send(200, {
+            access_token: 'fake-access-token',
+            token_type: 'Bearer',
+            expires_in: 3600,
+            id_token: idToken,
+            refresh_token: newRefreshToken,
+            scope: 'openid email profile offline_access',
+          });
+          return;
+        }
+
         const code = params.get('code');
         if (!code) {
           send(400, { error: 'invalid_request', detail: 'missing code' });
@@ -123,25 +181,21 @@ export async function startFakeIdp(opts: { port: number; clientId: string }): Pr
         }
         issuedCodes.delete(code);
 
-        const now = Math.floor(Date.now() / 1000);
-        const idToken = await new SignJWT({
-          email: issued.user.email,
-          name: issued.user.name,
-        })
-          .setProtectedHeader({ alg: 'RS256', kid })
-          .setIssuer(`http://localhost:${opts.port}`)
-          .setSubject(issued.user.sub)
-          .setAudience(issued.audience)
-          .setIssuedAt(now)
-          .setExpirationTime(now + 3600)
-          .sign(privateKey as KeyLike);
+        const idToken = await issueIdToken(issued.user, issued.audience);
+        const refreshToken = randomUUID();
+        issuedRefreshTokens.set(refreshToken, {
+          token: refreshToken,
+          user: issued.user,
+          audience: issued.audience,
+        });
 
         send(200, {
           access_token: 'fake-access-token',
           token_type: 'Bearer',
           expires_in: 3600,
           id_token: idToken,
-          scope: 'openid email profile',
+          refresh_token: refreshToken,
+          scope: 'openid email profile offline_access',
         });
         return;
       }
@@ -180,6 +234,11 @@ export async function startFakeIdp(opts: { port: number; clientId: string }): Pr
     endSessionUri: `${issuer}/end-session`,
     setNextUser(user) {
       nextUser = user;
+    },
+    revokeAllRefreshTokens() {
+      for (const token of issuedRefreshTokens.keys()) {
+        revokedRefreshTokens.add(token);
+      }
     },
     async close() {
       await new Promise<void>((resolve) => server.close(() => resolve()));
