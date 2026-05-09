@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
-import { ClientClass, TradeName } from 'src/enum';
+import { BankSource, ClientClass, MatchConfidence, TradeName } from 'src/enum';
+import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { DB } from 'src/schema';
@@ -10,12 +11,14 @@ describe('InvoiceRepository', () => {
   let db: Kysely<DB>;
   let clientRepo: ClientRepository;
   let invoiceRepo: InvoiceRepository;
+  let bankTxRepo: BankTransactionRepository;
   let clientId: string;
 
   beforeEach(async () => {
     db = await getKyselyDB();
     clientRepo = new ClientRepository(db);
     invoiceRepo = new InvoiceRepository(db);
+    bankTxRepo = new BankTransactionRepository(db);
     const client = await clientRepo.create({
       name: 'Test Client',
       class: ClientClass.NonEu,
@@ -28,6 +31,48 @@ describe('InvoiceRepository', () => {
   afterEach(async () => {
     await db.destroy();
   });
+
+  /** Issue a no-line invoice on the given date — terse helper for filter tests. */
+  async function issueOn(year: number, isoDate: string, totalMinor = 1n) {
+    return invoiceRepo.issue({
+      year,
+      invoice: {
+        clientId,
+        issuedAt: new Date(isoDate),
+        currency: 'EUR',
+        totalMinor,
+        sourceEventId: null,
+      },
+      lines: [],
+    });
+  }
+
+  /** Create + match a bank_transaction row to mark the given invoice as paid. */
+  async function markPaid(invoiceId: string, externalId: string) {
+    const ingest = await bankTxRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId,
+      txDate: new Date('2099-06-01'),
+      amountMinor: 1n,
+      currency: 'EUR',
+      counterpartyName: null,
+      counterpartyIban: null,
+      description: '',
+      rawPayload: {},
+    });
+    if (!ingest.ingested) {
+      throw new Error('bank tx ingest precondition');
+    }
+    await db
+      .updateTable('bank_transaction')
+      .set({
+        matchedInvoiceId: invoiceId,
+        matchedAt: new Date(),
+        matchConfidence: MatchConfidence.Manual,
+      })
+      .where('id', '=', ingest.row.id)
+      .execute();
+  }
 
   it('issues invoices with year-restarted, gap-free numbering', async () => {
     const a = await invoiceRepo.issue({
@@ -121,5 +166,71 @@ describe('InvoiceRepository', () => {
     await invoiceRepo.setPaperlessDocId(issued.id, 'paperless-doc-42');
     const fetched = await invoiceRepo.findByNumber(issued.number);
     expect(fetched?.paperlessDocId).toBe('paperless-doc-42');
+  });
+
+  describe('findPaginated', () => {
+    it('returns newest issuedAt first with total reflecting the unsliced count', async () => {
+      await issueOn(2099, '2099-01-15');
+      await issueOn(2099, '2099-03-15');
+      await issueOn(2099, '2099-02-15');
+
+      const page1 = await invoiceRepo.findPaginated({ offset: 0, limit: 2 });
+      expect(page1.total).toBe(3);
+      expect(page1.items.map((i) => i.number)).toEqual(['2099/002', '2099/003']);
+
+      const page2 = await invoiceRepo.findPaginated({ offset: 2, limit: 2 });
+      expect(page2.total).toBe(3);
+      expect(page2.items.map((i) => i.number)).toEqual(['2099/001']);
+    });
+
+    it('year filter buckets on UTC year boundaries', async () => {
+      // The Dec 31 row is the boundary case — invoice.issuedAt is a date column,
+      // so any TZ slip in the slice query would either drop this row from 2099
+      // or pull it into 2100.
+      await issueOn(2099, '2099-12-31');
+      await issueOn(2100, '2100-01-01');
+      await issueOn(2100, '2100-06-15');
+
+      const inA = await invoiceRepo.findPaginated({ year: 2099, offset: 0, limit: 50 });
+      expect(inA.total).toBe(1);
+      expect(inA.items[0].issuedAt).toEqual(new Date('2099-12-31'));
+
+      const inB = await invoiceRepo.findPaginated({ year: 2100, offset: 0, limit: 50 });
+      expect(inB.total).toBe(2);
+      expect(inB.items.map((i) => i.number)).toEqual(['2100/002', '2100/001']);
+    });
+
+    it('status=paid / status=open partition by matched bank_transaction presence', async () => {
+      const paidA = await issueOn(2099, '2099-02-01');
+      const paidB = await issueOn(2099, '2099-03-01');
+      await issueOn(2099, '2099-04-01'); // open
+      await markPaid(paidA.id, 'paid-a');
+      await markPaid(paidB.id, 'paid-b');
+
+      const paid = await invoiceRepo.findPaginated({ status: 'paid', offset: 0, limit: 50 });
+      expect(paid.total).toBe(2);
+      expect(paid.items.every((i) => i.matchedBankTxId !== null)).toBe(true);
+
+      const open = await invoiceRepo.findPaginated({ status: 'open', offset: 0, limit: 50 });
+      expect(open.total).toBe(1);
+      expect(open.items[0].matchedBankTxId).toBeNull();
+    });
+
+    it('combines year + status filters', async () => {
+      const paid2099 = await issueOn(2099, '2099-05-01');
+      await issueOn(2099, '2099-06-01'); // open 2099
+      const paid2100 = await issueOn(2100, '2100-05-01');
+      await markPaid(paid2099.id, 'paid-2099');
+      await markPaid(paid2100.id, 'paid-2100');
+
+      const result = await invoiceRepo.findPaginated({
+        year: 2099,
+        status: 'paid',
+        offset: 0,
+        limit: 50,
+      });
+      expect(result.total).toBe(1);
+      expect(result.items[0].id).toBe(paid2099.id);
+    });
   });
 });
