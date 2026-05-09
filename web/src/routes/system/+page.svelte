@@ -105,7 +105,7 @@
               <TableCell>{check.name}</TableCell>
               <TableCell><Badge color={badge.color}>{badge.label}</Badge></TableCell>
               <TableCell>{formatLastActivity(check.lastActivityAt)}</TableCell>
-              <TableCell class="whitespace-normal break-words">{check.message}</TableCell>
+              <TableCell class="whitespace-normal break-anywhere">{check.message}</TableCell>
             </TableRow>
           {/each}
         </TableBody>
