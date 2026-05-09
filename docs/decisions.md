@@ -96,6 +96,22 @@ Migrations are *applied* via Kysely's `Migrator` + `FileMigrationProvider`:
 
 **Watch-for:** sql-tools reads compiled JS from `dist/schema/`, which depends on `tsconfig.build.json` having `rootDir: "./src"` — without that, output lands in `dist/src/schema/` and the CLI can't find it. `tsconfig.json` keeps `rootDir: "."` so `tsc --noEmit` covers both `src/` and `test/`.
 
+## 2026-05-08 — DB-backed `app_settings`, env seeds at boot then drops out
+
+Operator-editable values that used to live as env vars (issuer KvK / VAT id / address / IBAN, paperless tag-gate names) move into a single-row `app_settings` table. `SettingsService.ensureInitialized` seeds the row from `process.env.*` on first boot; subsequent boots read from the DB and ignore env entirely.
+
+**Why:** redeploying the pod every time the issuer's address changes was the wrong workflow — these are settings, not infra. A single-row table keeps the code simple (no per-key API), and seeding-once-from-env gives a clean migration without forcing a manual setup step on first boot. Secrets (Wise key, IDP client secret, Enable Banking creds) and infra config (DB URL, base URLs) explicitly stay in env — never displayed in the UI, never hot-editable.
+
+**Watch-for:** the seed migration originally tried to populate the row via raw SQL with `${JSON.stringify(...)}::jsonb` in the migration template — Kysely/sql parameter-bound it and the array landed double-stringified. Fix was to do the seed via `SettingsService` using Kysely's typed query builder (which knows how to serialize jsonb). Same shape for any future single-row config tables.
+
+## 2026-05-08 — Period close model: soft warning, not a hard block
+
+`period_close` row per `(year, quarter)` marks a quarter as filed-with-the-accountant. Editing rows that fall inside a closed period surfaces a badge + warning on the aggregator page; nothing actually blocks the edit.
+
+**Why:** corrections happen — mis-categorized rows surface weeks later, an expense gets re-OCR'd. A hard block would force the user to either reopen the period or work around the system; both are worse than a deliberate soft warning that says "the accountant has already used these numbers, are you sure?" The reopen path exists explicitly so the operator can take the action when needed.
+
+**How to apply:** any new write surface (sheet writes, invoice edits, expense approval) that targets a row inside a closed period should at least *log* the event (audit), and the UI should warn. Don't add hard guards.
+
 ## 2026-05-09 — Native `Date` + ISO strings; pull in `luxon` only on demand
 
 Supersedes the date half of the 2026-05-07 money-and-dates entry ("`Temporal` polyfill or `date-fns`; never native `Date`"). That was aspirational; through Phase 1–9 we never hit a need that justified it, and the codebase ended up using native `Date` everywhere. Settling on what's there.
