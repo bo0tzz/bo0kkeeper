@@ -9,17 +9,7 @@
     type PaperlessTagCheckResult,
     type SettingsResponse,
   } from '$lib/services/settings.service';
-  import {
-    Alert,
-    Button,
-    Field,
-    Heading,
-    HStack,
-    Input,
-    Stack,
-    Text,
-    Textarea,
-  } from '@immich/ui';
+  import { Alert, Button, Field, Heading, HStack, Input, Stack, Text, Textarea } from '@immich/ui';
 
   let loaded = $state<SettingsResponse | null>(null);
   let loading = $state(false);
@@ -115,7 +105,6 @@
     }
   }
 
-
   async function runTagCheck() {
     tagCheckRunning = true;
     tagCheckError = null;
@@ -153,9 +142,7 @@
       <div class="rounded border p-4">
         <Stack gap={4}>
           <Heading size="medium" tag="h2">Issuer</Heading>
-          <Text size="small" color="muted">
-            Printed on every invoice. KvK + VAT id are required by Dutch tax law.
-          </Text>
+          <Text size="small" color="muted">Printed on every invoice. KvK + VAT id are required by Dutch tax law.</Text>
           <HStack gap={3}>
             <Field label="KvK"><Input bind:value={kvk} /></Field>
             <Field label="VAT id"><Input bind:value={vatId} /></Field>
@@ -206,14 +193,14 @@
                 </Alert>
               {:else}
                 <Alert color="warning">
-                  {missing.length} of {tagCheckResults.length} tag{tagCheckResults.length === 1 ? '' : 's'} not found in paperless: {missing.map((r) => r.name).join(', ')}.
+                  {missing.length} of {tagCheckResults.length} tag{tagCheckResults.length === 1 ? '' : 's'} not found in paperless:
+                  {missing.map((r) => r.name).join(', ')}.
                 </Alert>
               {/if}
             {/if}
           {/if}
         </Stack>
       </div>
-
 
       <HStack gap={3}>
         <Button variant="ghost" onclick={reset} disabled={saving}>Reset</Button>

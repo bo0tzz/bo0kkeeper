@@ -18,8 +18,10 @@ test.describe('Invoice composer', () => {
     // Two lines now, Remove on each.
     await expect(page.getByRole('button', { name: /^Remove$/ })).toHaveCount(2);
 
-    await page.getByRole('button', { name: /^Remove$/ }).first().click();
+    await page
+      .getByRole('button', { name: /^Remove$/ })
+      .first()
+      .click();
     await expect(page.getByRole('button', { name: /^Remove$/ })).toHaveCount(0);
   });
-
 });

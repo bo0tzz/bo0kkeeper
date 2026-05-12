@@ -188,9 +188,7 @@
             <Input bind:value={lines[index].amount} placeholder="0.00" />
           </Field>
           {#if lines.length > 1}
-            <Button variant="ghost" color="danger" onclick={() => removeLine(index)}>
-              Remove
-            </Button>
+            <Button variant="ghost" color="danger" onclick={() => removeLine(index)}>Remove</Button>
           {/if}
         </HStack>
       {/each}

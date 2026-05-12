@@ -1,10 +1,6 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import {
-    listInvoices,
-    type InvoiceListItem,
-    type ListInvoicesResponse,
-  } from '$lib/services/invoices.service';
+  import { listInvoices, type InvoiceListItem, type ListInvoicesResponse } from '$lib/services/invoices.service';
   import {
     Alert,
     Badge,
@@ -154,12 +150,7 @@
                 <HStack gap={2}>
                   <Button size="small" variant="ghost" href={`/api/invoices/${inv.id}/pdf`}>PDF</Button>
                   {#if inv.paperlessDocId}
-                    <Button
-                      size="small"
-                      variant="ghost"
-                      href={`/api/invoices/${inv.id}/paperless`}
-                      target="_blank"
-                    >
+                    <Button size="small" variant="ghost" href={`/api/invoices/${inv.id}/paperless`} target="_blank">
                       Paperless
                     </Button>
                   {/if}

@@ -2,19 +2,10 @@
   import { resolve } from '$app/paths';
   import { formatDateTime } from '$lib/format';
   import { getQuarterlyAggregate, type QuarterlyAggregateResponse } from '$lib/services/aggregator.service';
-  import {
-    getLatestBankingSession,
-    listBankTransactions,
-    type BankingSession,
-  } from '$lib/services/banking.service';
+  import { getLatestBankingSession, listBankTransactions, type BankingSession } from '$lib/services/banking.service';
   import { listEvents, type ListEventsResponse } from '$lib/services/events.service';
   import { listExpenses, type ListExpensesResponse } from '$lib/services/expenses.service';
-  import {
-    getSheetWriteStatus,
-    getSystemInfo,
-    retrySheetWrites,
-    type SystemInfo,
-  } from '$lib/services/system.service';
+  import { getSheetWriteStatus, getSystemInfo, retrySheetWrites, type SystemInfo } from '$lib/services/system.service';
   import {
     Alert,
     Badge,
@@ -215,8 +206,8 @@
       {@const paperlessQuietDays = daysSince(counts.lastPaperlessEventAt)}
       {#if !counts.systemInfo.ingestionEnabled}
         <Alert color="danger">
-          Ingestion is disabled — CUTOVER_DATE is unset. Webhooks and bank-tx sync silently drop
-          everything until you set it in env. See README → Ingestion floor.
+          Ingestion is disabled — CUTOVER_DATE is unset. Webhooks and bank-tx sync silently drop everything until you
+          set it in env. See README → Ingestion floor.
         </Alert>
       {/if}
       {#if totalThingsToDo === 0}
@@ -388,7 +379,6 @@
               </Stack>
             </CardBody>
           </Card>
-
         </div>
       </Stack>
 

@@ -46,7 +46,4 @@ export const closePeriod = (year: number, quarter: number, notes?: string, fetch
   );
 
 export const reopenPeriod = (year: number, quarter: number, fetchFn?: typeof fetch) =>
-  apiDelete<{ reopened: true }>(
-    `/api/aggregator/quarterly/close?year=${year}&quarter=${quarter}`,
-    { fetch: fetchFn },
-  );
+  apiDelete<{ reopened: true }>(`/api/aggregator/quarterly/close?year=${year}&quarter=${quarter}`, { fetch: fetchFn });

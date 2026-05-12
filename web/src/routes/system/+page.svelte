@@ -1,9 +1,5 @@
 <script lang="ts">
-  import {
-    getIntegrations,
-    type IntegrationCheck,
-    type IntegrationStatus,
-  } from '$lib/services/system.service';
+  import { getIntegrations, type IntegrationCheck, type IntegrationStatus } from '$lib/services/system.service';
   import {
     Alert,
     Badge,
@@ -41,7 +37,10 @@
     void load();
   });
 
-  function statusBadge(status: IntegrationStatus): { color: 'success' | 'warning' | 'danger' | 'secondary'; label: string } {
+  function statusBadge(status: IntegrationStatus): {
+    color: 'success' | 'warning' | 'danger' | 'secondary';
+    label: string;
+  } {
     switch (status) {
       case 'healthy': {
         return { color: 'success', label: 'healthy' };

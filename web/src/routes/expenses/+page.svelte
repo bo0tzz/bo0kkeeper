@@ -43,7 +43,9 @@
   const initialMatched = page.url.searchParams.get('matched');
 
   let status = $state<ExpenseStatus | ''>(initialStatus);
-  let matched = $state<'' | 'true' | 'false'>(initialMatched === 'true' || initialMatched === 'false' ? initialMatched : '');
+  let matched = $state<'' | 'true' | 'false'>(
+    initialMatched === 'true' || initialMatched === 'false' ? initialMatched : '',
+  );
   let offset = $state(0);
   let data = $state<ListExpensesResponse | null>(null);
   let loading = $state(false);
@@ -388,12 +390,7 @@
               <TableCell><code class="text-xs">{expense.locationClass}</code></TableCell>
               <TableCell><Badge color={statusColor(expense.status)}>{expense.status}</Badge></TableCell>
               <TableCell>
-                <Button
-                  size="tiny"
-                  variant="ghost"
-                  href={`/api/expenses/${expense.id}/paperless`}
-                  target="_blank"
-                >
+                <Button size="tiny" variant="ghost" href={`/api/expenses/${expense.id}/paperless`} target="_blank">
                   {expense.paperlessDocId} ↗
                 </Button>
               </TableCell>
@@ -419,13 +416,11 @@
               <Heading size="small" tag="h2">Editing {expense.vendor || expense.paperlessDocId}</Heading>
               {#if expense.status === 'approved'}
                 <Alert color="warning">
-                  This expense is already approved. Edits update the database only — the accountant
-                  sheet row was written at approve time and isn't rewritten.
+                  This expense is already approved. Edits update the database only — the accountant sheet row was
+                  written at approve time and isn't rewritten.
                 </Alert>
               {:else if expense.status === 'rejected'}
-                <Alert color="warning">
-                  This expense is rejected. Re-saving doesn't restore it to pending review.
-                </Alert>
+                <Alert color="warning">This expense is rejected. Re-saving doesn't restore it to pending review.</Alert>
               {/if}
               <HStack gap={3}>
                 <Field label="Vendor" invalid={hasIssue('vendor')}>

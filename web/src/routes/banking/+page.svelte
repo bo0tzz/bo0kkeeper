@@ -337,9 +337,7 @@
       <div class="rounded-lg border border-dashed p-6">
         <Stack gap={3}>
           <Heading size="medium" tag="h2">No bank connected</Heading>
-          <Text color="muted">
-            Connect a bank via Enable Banking to start ingesting transactions automatically.
-          </Text>
+          <Text color="muted">Connect a bank via Enable Banking to start ingesting transactions automatically.</Text>
           <HStack>
             <Button color="primary" disabled={starting} onclick={connect}>
               {starting ? 'Starting…' : 'Connect bank'}
@@ -366,8 +364,8 @@
 
           {#if reconnectSoon}
             <Alert color="warning">
-              Consent expires in {remaining} day{remaining === 1 ? '' : 's'}. Reconnect to keep
-              syncing without interruption.
+              Consent expires in {remaining} day{remaining === 1 ? '' : 's'}. Reconnect to keep syncing without
+              interruption.
             </Alert>
           {/if}
           {#if needsReconnect}
@@ -398,8 +396,8 @@
                       <Text size="small" color="warning">
                         Drift: bank says {formatAmount(account.balance!.amountMinor, account.balance!.currency)},
                         expected {formatAmount(account.expectedBalanceMinor!, account.currency)}
-                        (diff {formatAmount(account.balanceDiscrepancyMinor, account.currency)}). A sync may
-                        catch up; if persistent, an ingest is missing.
+                        (diff {formatAmount(account.balanceDiscrepancyMinor, account.currency)}). A sync may catch up;
+                        if persistent, an ingest is missing.
                       </Text>
                     {/if}
                   </li>
@@ -600,9 +598,15 @@
               {#each candidates.transfers as t (t.id)}
                 <HStack class="justify-between rounded border px-3 py-2">
                   <div class="text-sm">
-                    <div><strong>{t.ourReference ?? t.wiseTransferId}</strong> <span class="text-muted-foreground">· {wiseStateLabel(t.state)}</span></div>
+                    <div>
+                      <strong>{t.ourReference ?? t.wiseTransferId}</strong>
+                      <span class="text-muted-foreground">· {wiseStateLabel(t.state)}</span>
+                    </div>
                     <div class="text-muted-foreground">
-                      {formatAmount(t.sourceAmountMinor, t.sourceCurrency)} → {formatAmount(t.targetAmountMinor, t.targetCurrency)}
+                      {formatAmount(t.sourceAmountMinor, t.sourceCurrency)} → {formatAmount(
+                        t.targetAmountMinor,
+                        t.targetCurrency,
+                      )}
                     </div>
                   </div>
                   <Button size="small" disabled={linking} onclick={() => link('wise_transfer', t.id)}>Link</Button>
@@ -617,7 +621,10 @@
               {#each candidates.invoices as i (i.id)}
                 <HStack class="justify-between rounded border px-3 py-2">
                   <div class="text-sm">
-                    <div><strong>{i.number}</strong> {#if i.clientName}<span class="text-muted-foreground">· {i.clientName}</span>{/if}</div>
+                    <div>
+                      <strong>{i.number}</strong>
+                      {#if i.clientName}<span class="text-muted-foreground">· {i.clientName}</span>{/if}
+                    </div>
                     <div class="text-muted-foreground">
                       {i.issuedAt} · {formatAmount(i.totalMinor, i.currency)}
                     </div>

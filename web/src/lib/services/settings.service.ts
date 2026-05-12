@@ -22,8 +22,7 @@ export type UpdateSettingsBody = {
   paperless?: Partial<SettingsResponse['paperless']>;
 };
 
-export const getSettings = (fetchFn?: typeof fetch) =>
-  apiGet<SettingsResponse>('/api/settings', { fetch: fetchFn });
+export const getSettings = (fetchFn?: typeof fetch) => apiGet<SettingsResponse>('/api/settings', { fetch: fetchFn });
 
 export const updateSettings = (body: UpdateSettingsBody, fetchFn?: typeof fetch) =>
   apiPatch<SettingsResponse>('/api/settings', body, { fetch: fetchFn });
