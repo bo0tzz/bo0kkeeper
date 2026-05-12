@@ -36,6 +36,7 @@ export async function runMigrations(connection: DatabaseConnectionParams): Promi
         // Relative to this file's compiled location (dist/utils/) →
         // dist/schema/migrations/*.js. In dev (tsx) the same relative path
         // resolves to src/schema/migrations/*.ts; tsx handles loading.
+        // eslint-disable-next-line unicorn/prefer-module
         migrationFolder: join(__dirname, '..', 'schema/migrations'),
       }),
     });
