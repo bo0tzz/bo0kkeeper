@@ -151,6 +151,8 @@ describe('BankMatcherService', () => {
         issuedAt: new Date('2099-03-05'),
         currency: 'EUR',
         totalMinor: 23_898n,
+        btwRateBps: 2100,
+        btwMinor: 4148n,
         sourceEventId: null,
       },
       lines: [{ ordinal: 0, description: 'Services', lineTotalMinor: 23_898n, unitLabel: null, quantity: null }],
@@ -188,6 +190,8 @@ describe('BankMatcherService', () => {
       client: { name: string; class: ClientClass };
       from: string;
       source: string;
+      vatPercent: string | undefined;
+      vatMinor: bigint | undefined;
     };
     expect(args.invoiceNumber).toBe(invoice.number);
     expect(args.eurAmountMinor).toBe(23_898n);
@@ -195,6 +199,9 @@ describe('BankMatcherService', () => {
     expect(args.client.class).toBe(ClientClass.Domestic);
     expect(args.from).toBe('F. Acme Studio');
     expect(args.source).toBe(`bank_tx/${ingest.row.id}`);
+    // VAT plumbed through from the invoice row (21% / €41.48).
+    expect(args.vatPercent).toBe('21%');
+    expect(args.vatMinor).toBe(4148n);
   });
 
   it('absorbs sheet write failures so the match still persists', async () => {

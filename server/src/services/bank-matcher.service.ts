@@ -314,7 +314,15 @@ export class BankMatcherService {
    * Date convention: the bank tx date is the kasstelsel "payment received"
    * date, which is what the sheet is keyed on.
    */
-  private async appendIncomeRow(bankTx: BankTransaction, invoice: { clientId: string; number: string }) {
+  private async appendIncomeRow(
+    bankTx: BankTransaction,
+    invoice: {
+      clientId: string;
+      number: string;
+      btwRateBps: number | null;
+      btwMinor: bigint | string | null;
+    },
+  ) {
     try {
       const client = await this.clientRepository.findById(invoice.clientId);
       if (!client) {
@@ -323,12 +331,16 @@ export class BankMatcherService {
       }
       const rawMinor = BigInt(bankTx.amountMinor as bigint | number | string);
       const eurAmountMinor = rawMinor < 0n ? -rawMinor : rawMinor;
+      const vatPercent = invoice.btwRateBps == null ? undefined : `${invoice.btwRateBps / 100}%`;
+      const vatMinor = invoice.btwMinor == null ? undefined : BigInt(invoice.btwMinor);
       await this.sheetWriter.writeIncomeRow({
         date: bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate),
         invoiceNumber: invoice.number,
         eurAmountMinor,
         client: { name: client.name, class: client.class as ClientClass },
         from: bankTx.counterpartyName ?? client.name,
+        vatPercent,
+        vatMinor,
         source: `bank_tx/${bankTx.id}`,
       });
     } catch (error) {
