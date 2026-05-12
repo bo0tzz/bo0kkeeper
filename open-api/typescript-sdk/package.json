@@ -16,10 +16,10 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@oazapfts/runtime": "^1.0.2"
+    "@oazapfts/runtime": "^1.2.0"
   },
   "devDependencies": {
-    "@types/node": "^24.10.9",
-    "typescript": "^6.0.0"
+    "@types/node": "^24.12.4",
+    "typescript": "^6.0.3"
   }
 }

@@ -13,7 +13,7 @@
  * requested. ID tokens are signed RS256 (matches Authentik defaults), and the
  * public JWK is exposed at /jwks so the backend's `jwtVerify` succeeds.
  */
-import { exportJWK, generateKeyPair, KeyLike, SignJWT } from 'jose';
+import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 
@@ -134,7 +134,7 @@ export async function startFakeIdp(opts: { port: number; clientId: string }): Pr
             .setAudience(audience)
             .setIssuedAt(now)
             .setExpirationTime(now + 3600)
-            .sign(privateKey as KeyLike);
+            .sign(privateKey);
         };
 
         if (grantType === 'refresh_token') {

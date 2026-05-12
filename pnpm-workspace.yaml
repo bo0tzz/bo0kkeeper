@@ -2,6 +2,10 @@ packages:
   - server
   - web
   - open-api/typescript-sdk
+overrides:
+  # Pin cookie ≥0.7.0 to fix CVE-2024-47764. SvelteKit (and any other transitive
+  # consumer) gets the patched version; revisit when SvelteKit's own bound moves.
+  cookie: ">=0.7.0"
 ignoredBuiltDependencies:
   - "@nestjs/core"
   - "@swc/core"

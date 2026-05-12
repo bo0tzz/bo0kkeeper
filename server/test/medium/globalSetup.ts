@@ -1,5 +1,6 @@
 import { DatabaseConnectionParams } from '@immich/sql-tools';
-import { FileMigrationProvider, Kysely, Migrator } from 'kysely';
+import { Kysely } from 'kysely';
+import { FileMigrationProvider, Migrator } from 'kysely/migration';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { DB } from 'src/schema';
