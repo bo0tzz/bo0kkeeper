@@ -379,7 +379,7 @@ describe('BankMatcherService', () => {
     expect(args.source).toBe(`expense/${expense.row.id}`);
   });
 
-  it('manualMatch to an already-approved expense does NOT re-write the sheet row', async () => {
+  it('manualMatch to an already-approved expense writes the sheet row (approval no longer writes)', async () => {
     const expenseRepo = new ExpenseRepository(db);
     const expense = await expenseRepo.ingest({
       paperlessDocId: 'manual-doc-2',
@@ -397,7 +397,9 @@ describe('BankMatcherService', () => {
     if (!expense.ingested) {
       throw new Error('precondition');
     }
-    // Pre-flip to approved (simulating a prior approval).
+    // Pre-flip to approved (the approval flow itself no longer writes a
+    // sheet row, so we should still get exactly one write — from the
+    // bank-tx match below).
     await expenseRepo.approve(expense.row.id);
     const bankIngest = await bankRepo.ingest({
       source: BankSource.SnsCsv,
@@ -416,7 +418,50 @@ describe('BankMatcherService', () => {
 
     await matcher.manualMatch(bankIngest.row.id, { type: 'expense', targetId: expense.row.id });
 
-    // No sheet write — the row already exists from the original approval.
+    // Sheet row fires here (the canonical kasstelsel write); approval was
+    // a no-op for the sheet.
+    expect(sheetWriter.writeExpenseRow).toHaveBeenCalledOnce();
+  });
+
+  it('manualMatch to a rejected expense persists the link but skips the sheet row', async () => {
+    const expenseRepo = new ExpenseRepository(db);
+    const expense = await expenseRepo.ingest({
+      paperlessDocId: 'manual-doc-3',
+      vendor: 'TombstoneCo',
+      expenseDate: new Date('2099-04-05'),
+      amountMinor: 5000n,
+      currency: 'EUR',
+      btwRateBps: null,
+      btwMinor: null,
+      locationClass: ExpenseLocationClass.Domestic,
+      category: '',
+      notes: null,
+      sourceEventId: null,
+    });
+    if (!expense.ingested) {
+      throw new Error('precondition');
+    }
+    await expenseRepo.reject(expense.row.id);
+    const bankIngest = await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'manual-bank-3',
+      txDate: new Date('2099-04-10'),
+      amountMinor: -5000n,
+      currency: 'EUR',
+      counterpartyName: 'TombstoneCo',
+      counterpartyIban: null,
+      description: 'card payment',
+      rawPayload: {},
+    });
+    if (!bankIngest.ingested) {
+      throw new Error('precondition');
+    }
+
+    await matcher.manualMatch(bankIngest.row.id, { type: 'expense', targetId: expense.row.id });
+
+    // Link is recorded but rejected expenses don't make it to the books.
+    const refetched = await bankRepo.findById(bankIngest.row.id);
+    expect(refetched?.matchedExpenseId).toBe(expense.row.id);
     expect(sheetWriter.writeExpenseRow).not.toHaveBeenCalled();
   });
 

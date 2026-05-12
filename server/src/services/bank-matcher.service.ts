@@ -583,19 +583,21 @@ export class BankMatcherService {
       }
       await this.persistExpenseMatch(bankTxId, expense.id, MatchConfidence.Manual);
       this.logger.log(`bank_tx ${bankTxId} → expense ${expense.id} (manual)`);
-      // Manual-match is itself the operator's "this expense really happened"
-      // signal under kasstelsel — the bank tx is the canonical money-out
-      // event. If the expense was still pending_review we promote it to
-      // approved AND write the sheet row (dated by bank_tx.txDate, which is
-      // the kasstelsel date). If it was already approved, the sheet row
-      // already exists from the approval flow; skip to avoid a duplicate.
-      if (expense.status === ExpenseStatus.PendingReview) {
-        const now = new Date();
-        await this.db
-          .updateTable('expense')
-          .set({ status: ExpenseStatus.Approved, reviewedAt: now, updatedAt: now })
-          .where('id', '=', expense.id)
-          .execute();
+      // Bank-tx match is the canonical kasstelsel money-out signal — this
+      // is where the sheet row fires for expenses. Approval (in the admin
+      // UI) intentionally does NOT write a sheet row anymore. If the
+      // expense was still pending_review, the match implicitly approves
+      // it. Rejected expenses are skipped (a tombstone shouldn't end up
+      // on the books).
+      if (expense.status !== ExpenseStatus.Rejected) {
+        if (expense.status === ExpenseStatus.PendingReview) {
+          const now = new Date();
+          await this.db
+            .updateTable('expense')
+            .set({ status: ExpenseStatus.Approved, reviewedAt: now, updatedAt: now })
+            .where('id', '=', expense.id)
+            .execute();
+        }
         const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
         try {
           await this.sheetWriter.writeExpenseRow(expenseToSheetRow(expense, txDate));

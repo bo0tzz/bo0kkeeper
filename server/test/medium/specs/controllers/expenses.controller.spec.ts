@@ -15,7 +15,6 @@ import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
 import { PaperlessDocument, PaperlessService } from 'src/services/paperless.service';
 import { SettingsService } from 'src/services/settings.service';
-import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { WebhookService } from 'src/services/webhook.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -39,7 +38,6 @@ describe('ExpensesController', () => {
   let db: Kysely<DB>;
   let repo: ExpenseRepository;
   let controller: ExpensesController;
-  let sheetWriter: SheetWriterService & { writeExpenseRow: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
     db = await getKyselyDB();
@@ -49,16 +47,12 @@ describe('ExpensesController', () => {
     const stubPaperless = {} as unknown as PaperlessService;
     const stubSettings = {} as unknown as SettingsService;
     const stubWebhook = {} as unknown as WebhookService;
-    sheetWriter = {
-      writeExpenseRow: vi.fn().mockResolvedValue(void 0),
-    } as unknown as SheetWriterService & { writeExpenseRow: ReturnType<typeof vi.fn> };
     controller = new ExpensesController(
       repo,
       new EventRepository(db),
       stubPaperless,
       stubSettings,
       stubWebhook,
-      sheetWriter,
     );
   });
 
@@ -114,45 +108,6 @@ describe('ExpensesController', () => {
     expect(result.amountMinor).toBe('9999');
     expect(result.category).toBe('hardware');
     expect(result.reviewedAt).not.toBeNull();
-
-    // Approval also appends the expense row to the quarter sheet.
-    expect(sheetWriter.writeExpenseRow).toHaveBeenCalledOnce();
-    const args = sheetWriter.writeExpenseRow.mock.calls[0][0] as {
-      paperlessDocId: string;
-      vendor: string;
-      eurAmountMinor: bigint;
-      locationClass: ExpenseLocationClass;
-      vatPercent: string | undefined;
-      vatMinor: bigint | undefined;
-      source: string;
-    };
-    expect(args.paperlessDocId).toBe('approve-test');
-    expect(args.vendor).toBe('Acme Cables BV');
-    expect(args.eurAmountMinor).toBe(9999n);
-    expect(args.locationClass).toBe(ExpenseLocationClass.Domestic);
-    expect(args.vatPercent).toBe('21%');
-    expect(args.vatMinor).toBe(3634n);
-    expect(args.source).toBe(`expense/${ingest.row.id}`);
-  });
-
-  it('approve does not write a sheet row when the patched expense is missing', async () => {
-    const missingId = '00000000-0000-0000-0000-000000000000';
-    await expect(controller.approveExpense(missingId, {} as ExpenseApproveDto)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
-    expect(sheetWriter.writeExpenseRow).not.toHaveBeenCalled();
-  });
-
-  it('approve still succeeds when the sheet write throws (sheet outage)', async () => {
-    sheetWriter.writeExpenseRow.mockRejectedValueOnce(new Error('sheets api down'));
-    const ingest = await repo.ingest(fakeExpense({ paperlessDocId: 'sheet-outage' }));
-    if (!ingest.ingested) {
-      throw new Error('precondition');
-    }
-
-    const result = await controller.approveExpense(ingest.row.id, {} as ExpenseApproveDto);
-    expect(result.status).toBe(ExpenseStatus.Approved);
-    expect(sheetWriter.writeExpenseRow).toHaveBeenCalledOnce();
   });
 
   it('reject sets the notes string', async () => {
@@ -260,9 +215,8 @@ function buildRescanController(
     getPaperlessExpenseTags: vi.fn().mockResolvedValue(input.tags),
   } as unknown as SettingsService;
   const webhookSvc = new WebhookService(eventRepo, jobRepo);
-  const sheetWriter = { writeExpenseRow: vi.fn().mockResolvedValue(void 0) } as unknown as SheetWriterService;
   return {
-    controller: new ExpensesController(repo, eventRepo, paperlessSvc, settingsSvc, webhookSvc, sheetWriter),
+    controller: new ExpensesController(repo, eventRepo, paperlessSvc, settingsSvc, webhookSvc),
     jobQueue,
     eventRepo,
   };

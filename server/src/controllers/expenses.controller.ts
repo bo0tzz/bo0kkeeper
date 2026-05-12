@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Logger, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { loadConfig } from 'src/config';
@@ -18,21 +18,17 @@ import {
 import { ExpenseRepository, ExpenseUpdate } from 'src/repositories/expense.repository';
 import { PaperlessService } from 'src/services/paperless.service';
 import { SettingsService } from 'src/services/settings.service';
-import { expenseToSheetRow, SheetWriterService } from 'src/services/sheet-writer.service';
 import { WebhookService } from 'src/services/webhook.service';
 
 @ApiTags('Expenses')
 @Controller('/api/expenses')
 export class ExpensesController {
-  private readonly logger = new Logger(ExpensesController.name);
-
   constructor(
     private readonly expenseRepository: ExpenseRepository,
     private readonly eventRepository: EventRepository,
     private readonly paperlessService: PaperlessService,
     private readonly settingsService: SettingsService,
     private readonly webhookService: WebhookService,
-    private readonly sheetWriter: SheetWriterService,
   ) {}
 
   @Get()
@@ -44,6 +40,7 @@ export class ExpensesController {
       locationClass: query.locationClass,
       from: query.from,
       to: query.to,
+      matched: query.matched,
       limit: query.limit,
       offset: query.offset,
     });
@@ -89,6 +86,13 @@ export class ExpensesController {
   /**
    * Approve a pending expense. Body fields are merged in atomically with the
    * status flip, so the UI can submit "save + approve" in a single request.
+   *
+   * Approval is a pure DB state change — it does NOT write a sheet row.
+   * Under kasstelsel the sheet date must be the bank-movement date, which
+   * we only know once a bank tx is linked to the expense. The sheet row
+   * fires on bank-tx-match (auto if/when we add expense auto-matching, or
+   * manual via /banking link UI). Approved-but-unmatched expenses surface
+   * on the dashboard tile so they don't fall through the cracks.
    */
   @Post(':id/approve')
   @Authenticated()
@@ -110,24 +114,6 @@ export class ExpensesController {
         currency: row.currency,
       },
     });
-    // Sheet append is best-effort: a Sheets outage shouldn't roll back the
-    // approval (the row is in the DB and visible in the admin UI either way).
-    try {
-      const date = row.expenseDate instanceof Date ? row.expenseDate : new Date(row.expenseDate);
-      await this.sheetWriter.writeExpenseRow(expenseToSheetRow(row, date));
-    } catch (error) {
-      const message = (error as Error).message;
-      this.logger.error(`Sheet write failed for expense ${row.id}: ${message}`);
-      try {
-        await this.eventRepository.recordAction({
-          source: EventSource.System,
-          eventType: 'sheet.write_failed',
-          payload: { kind: 'expense', expenseId: row.id, vendor: row.vendor, message },
-        });
-      } catch (eventError) {
-        this.logger.error(`Failed to record sheet.write_failed event: ${(eventError as Error).message}`);
-      }
-    }
     return mapExpense(row);
   }
 
