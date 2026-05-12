@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ClientClass, ExpenseLocationClass } from 'src/enum';
+import { Expense } from 'src/repositories/expense.repository';
 import { ColumnFormat, SheetsService } from 'src/services/sheets.service';
 
 export type IncomeRowInput = {
@@ -130,7 +131,7 @@ export class SheetWriterService {
 
     this.logger.log(`Sheet append: tab=${tab} id=${input.invoiceNumber}`);
     await this.sheets.appendRow(tab, row);
-    await this.sheets.autoResizeColumns(sheetId, QUARTER_TAB_HEADERS.length);
+    await this.sheets.autoResizeColumns(tab, sheetId, QUARTER_TAB_HEADERS.length);
   }
 
   /** Append an Expense row for an approved expense and ensure the quarter tab exists. */
@@ -157,8 +158,33 @@ export class SheetWriterService {
 
     this.logger.log(`Sheet append: tab=${tab} id=${input.paperlessDocId} (expense)`);
     await this.sheets.appendRow(tab, row);
-    await this.sheets.autoResizeColumns(sheetId, QUARTER_TAB_HEADERS.length);
+    await this.sheets.autoResizeColumns(tab, sheetId, QUARTER_TAB_HEADERS.length);
   }
+}
+
+/**
+ * Compose an ExpenseRowInput from a persisted expense + an explicit Date.
+ * Caller chooses the date deliberately:
+ *   - approval-time flow: pass `expense.expenseDate` (the receipt date)
+ *   - manual-match flow: pass `bankTx.txDate` (the canonical kasstelsel
+ *     money-out date — strictly more correct when available)
+ * If/when we converge on the bank-tx date as the sole source of truth, the
+ * approval path goes away (sheet write moves to bank-tx-match time).
+ */
+export function expenseToSheetRow(expense: Expense, date: Date): ExpenseRowInput {
+  const vatPercent = expense.btwRateBps == null ? undefined : `${expense.btwRateBps / 100}%`;
+  const vatMinor = expense.btwMinor == null ? undefined : BigInt(expense.btwMinor as bigint | string);
+  return {
+    date,
+    paperlessDocId: expense.paperlessDocId,
+    vendor: expense.vendor,
+    eurAmountMinor: BigInt(expense.amountMinor as bigint | string),
+    locationClass: expense.locationClass,
+    vatPercent,
+    vatMinor,
+    notes: expense.notes ?? undefined,
+    source: `expense/${expense.id}`,
+  };
 }
 
 /** Calendar-quarter tab name in the existing sheet's convention. */

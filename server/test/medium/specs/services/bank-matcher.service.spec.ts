@@ -4,6 +4,7 @@ import {
   ClientClass,
   EventSource,
   ExpenseLocationClass,
+  ExpenseStatus,
   MatchConfidence,
   TradeName,
   WiseTransferDirection,
@@ -52,7 +53,10 @@ describe('BankMatcherService', () => {
   let transferRepo: WiseTransferRepository;
   let invoiceRepo: InvoiceRepository;
   let clientRepo: ClientRepository;
-  let sheetWriter: SheetWriterService & { writeIncomeRow: ReturnType<typeof vi.fn> };
+  let sheetWriter: SheetWriterService & {
+    writeIncomeRow: ReturnType<typeof vi.fn>;
+    writeExpenseRow: ReturnType<typeof vi.fn>;
+  };
   let matcher: BankMatcherService;
 
   beforeEach(async () => {
@@ -63,7 +67,11 @@ describe('BankMatcherService', () => {
     clientRepo = new ClientRepository(db);
     sheetWriter = {
       writeIncomeRow: vi.fn().mockResolvedValue(void 0),
-    } as unknown as SheetWriterService & { writeIncomeRow: ReturnType<typeof vi.fn> };
+      writeExpenseRow: vi.fn().mockResolvedValue(void 0),
+    } as unknown as SheetWriterService & {
+      writeIncomeRow: ReturnType<typeof vi.fn>;
+      writeExpenseRow: ReturnType<typeof vi.fn>;
+    };
     matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, new EventRepository(db));
   });
 
@@ -309,6 +317,107 @@ describe('BankMatcherService', () => {
     if (!result.matched) {
       expect(result.reason).toContain('already matched');
     }
+  });
+
+  it('manualMatch to a pending_review expense flips it to approved and writes the sheet row', async () => {
+    const expenseRepo = new ExpenseRepository(db);
+    const expense = await expenseRepo.ingest({
+      paperlessDocId: 'manual-doc-1',
+      vendor: 'Acme Cables',
+      expenseDate: new Date('2099-04-05'),
+      amountMinor: 12_100n,
+      currency: 'EUR',
+      btwRateBps: 2100,
+      btwMinor: 2100n,
+      locationClass: ExpenseLocationClass.Domestic,
+      category: '',
+      notes: 'hub',
+      sourceEventId: null,
+    });
+    if (!expense.ingested) {
+      throw new Error('precondition');
+    }
+    const bankIngest = await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'manual-bank-1',
+      txDate: new Date('2099-04-10'),
+      amountMinor: -12_100n,
+      currency: 'EUR',
+      counterpartyName: 'Acme Cables BV',
+      counterpartyIban: null,
+      description: 'card payment',
+      rawPayload: {},
+    });
+    if (!bankIngest.ingested) {
+      throw new Error('precondition');
+    }
+
+    await matcher.manualMatch(bankIngest.row.id, { type: 'expense', targetId: expense.row.id });
+
+    // Expense flipped to approved.
+    const refetched = await db.selectFrom('expense').selectAll().where('id', '=', expense.row.id).executeTakeFirstOrThrow();
+    expect(refetched.status).toBe(ExpenseStatus.Approved);
+    expect(refetched.reviewedAt).not.toBeNull();
+
+    // Sheet row written with the bank-tx date (kasstelsel), not the receipt date.
+    expect(sheetWriter.writeExpenseRow).toHaveBeenCalledOnce();
+    const args = sheetWriter.writeExpenseRow.mock.calls[0][0] as {
+      paperlessDocId: string;
+      vendor: string;
+      eurAmountMinor: bigint;
+      date: Date;
+      vatPercent: string | undefined;
+      vatMinor: bigint | undefined;
+      source: string;
+    };
+    expect(args.paperlessDocId).toBe('manual-doc-1');
+    expect(args.vendor).toBe('Acme Cables');
+    expect(args.eurAmountMinor).toBe(12_100n);
+    expect(args.date.toISOString().slice(0, 10)).toBe('2099-04-10');
+    expect(args.vatPercent).toBe('21%');
+    expect(args.vatMinor).toBe(2100n);
+    expect(args.source).toBe(`expense/${expense.row.id}`);
+  });
+
+  it('manualMatch to an already-approved expense does NOT re-write the sheet row', async () => {
+    const expenseRepo = new ExpenseRepository(db);
+    const expense = await expenseRepo.ingest({
+      paperlessDocId: 'manual-doc-2',
+      vendor: 'Acme Cables',
+      expenseDate: new Date('2099-04-05'),
+      amountMinor: 5000n,
+      currency: 'EUR',
+      btwRateBps: null,
+      btwMinor: null,
+      locationClass: ExpenseLocationClass.Domestic,
+      category: '',
+      notes: null,
+      sourceEventId: null,
+    });
+    if (!expense.ingested) {
+      throw new Error('precondition');
+    }
+    // Pre-flip to approved (simulating a prior approval).
+    await expenseRepo.approve(expense.row.id);
+    const bankIngest = await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'manual-bank-2',
+      txDate: new Date('2099-04-10'),
+      amountMinor: -5000n,
+      currency: 'EUR',
+      counterpartyName: 'Acme Cables',
+      counterpartyIban: null,
+      description: 'card payment',
+      rawPayload: {},
+    });
+    if (!bankIngest.ingested) {
+      throw new Error('precondition');
+    }
+
+    await matcher.manualMatch(bankIngest.row.id, { type: 'expense', targetId: expense.row.id });
+
+    // No sheet write — the row already exists from the original approval.
+    expect(sheetWriter.writeExpenseRow).not.toHaveBeenCalled();
   });
 
   it('matchAllUnmatched processes the queue and reports counts', async () => {

@@ -18,7 +18,7 @@ import {
 import { ExpenseRepository, ExpenseUpdate } from 'src/repositories/expense.repository';
 import { PaperlessService } from 'src/services/paperless.service';
 import { SettingsService } from 'src/services/settings.service';
-import { SheetWriterService } from 'src/services/sheet-writer.service';
+import { expenseToSheetRow, SheetWriterService } from 'src/services/sheet-writer.service';
 import { WebhookService } from 'src/services/webhook.service';
 
 @ApiTags('Expenses')
@@ -113,19 +113,8 @@ export class ExpensesController {
     // Sheet append is best-effort: a Sheets outage shouldn't roll back the
     // approval (the row is in the DB and visible in the admin UI either way).
     try {
-      const vatPercent = row.btwRateBps == null ? undefined : `${row.btwRateBps / 100}%`;
-      const vatMinor = row.btwMinor == null ? undefined : BigInt(row.btwMinor as bigint | string);
-      await this.sheetWriter.writeExpenseRow({
-        date: row.expenseDate instanceof Date ? row.expenseDate : new Date(row.expenseDate),
-        paperlessDocId: row.paperlessDocId,
-        vendor: row.vendor,
-        eurAmountMinor: BigInt(row.amountMinor as bigint | string),
-        locationClass: row.locationClass,
-        vatPercent,
-        vatMinor,
-        notes: row.notes ?? undefined,
-        source: `expense/${row.id}`,
-      });
+      const date = row.expenseDate instanceof Date ? row.expenseDate : new Date(row.expenseDate);
+      await this.sheetWriter.writeExpenseRow(expenseToSheetRow(row, date));
     } catch (error) {
       const message = (error as Error).message;
       this.logger.error(`Sheet write failed for expense ${row.id}: ${message}`);

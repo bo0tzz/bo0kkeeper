@@ -163,11 +163,16 @@ export class SheetsService {
   }
 
   /**
-   * Re-fit all columns of a tab to their widest cell. Sheets has no
-   * "auto-fit always" mode — autoResizeDimensions is an explicit action,
-   * so we fire it after each row write to keep widths honest.
+   * Re-fit all columns of a tab to their widest cell, with a small pixel
+   * pad applied on top. Sheets has no "auto-fit always" mode, and the
+   * `autoResizeDimensions` API consistently produces widths a few pixels
+   * tighter than the UI's "Fit to data" double-click — enough that text
+   * sometimes clips. We work around it by:
+   *   1) auto-resizing (Sheets computes per-column widths)
+   *   2) reading the post-resize widths back
+   *   3) updating each column to width + padPx
    */
-  async autoResizeColumns(sheetId: number, columnCount: number): Promise<void> {
+  async autoResizeColumns(tabTitle: string, sheetId: number, columnCount: number, padPx = 16): Promise<void> {
     const id = this.requireSpreadsheetId();
     await this.request(`/v4/spreadsheets/${id}:batchUpdate`, {
       method: 'POST',
@@ -175,16 +180,36 @@ export class SheetsService {
         requests: [
           {
             autoResizeDimensions: {
-              dimensions: {
-                sheetId,
-                dimension: 'COLUMNS',
-                startIndex: 0,
-                endIndex: columnCount,
-              },
+              dimensions: { sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: columnCount },
             },
           },
         ],
       },
+    });
+    if (padPx <= 0) {
+      return;
+    }
+    const meta = (await this.request(
+      `/v4/spreadsheets/${id}?fields=sheets(properties(sheetId),data(columnMetadata(pixelSize)))&ranges=${encodeURIComponent(tabTitle)}`,
+      { method: 'GET' },
+    )) as {
+      sheets: { properties: { sheetId: number }; data?: { columnMetadata?: { pixelSize?: number }[] }[] }[];
+    };
+    const tab = meta.sheets.find((s) => s.properties.sheetId === sheetId);
+    const widths = tab?.data?.[0]?.columnMetadata ?? [];
+    const padRequests = widths.slice(0, columnCount).map((cm, i) => ({
+      updateDimensionProperties: {
+        range: { sheetId, dimension: 'COLUMNS', startIndex: i, endIndex: i + 1 },
+        properties: { pixelSize: (cm.pixelSize ?? 100) + padPx },
+        fields: 'pixelSize',
+      },
+    }));
+    if (padRequests.length === 0) {
+      return;
+    }
+    await this.request(`/v4/spreadsheets/${id}:batchUpdate`, {
+      method: 'POST',
+      body: { requests: padRequests },
     });
   }
 

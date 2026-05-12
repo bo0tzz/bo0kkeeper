@@ -196,21 +196,75 @@ describe('SheetsService', () => {
     expect(body.values).toEqual([['08/01/2099', '2099/001', 'Income', 'Non-EU', 'OverseasClientCo', 'Wise']]);
   });
 
-  it('autoResizeColumns batchUpdates a COLUMNS autoResizeDimensions request', async () => {
-    const fetchFn = vi.fn().mockResolvedValueOnce(tokenResponse).mockResolvedValueOnce(okResponse({ replies: [] }));
+  it('autoResizeColumns auto-fits then pads each column by the pad amount', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse)
+      // 1) autoResize batchUpdate
+      .mockResolvedValueOnce(okResponse({ replies: [] }))
+      // 2) GET post-resize widths
+      .mockResolvedValueOnce(
+        okResponse({
+          sheets: [
+            {
+              properties: { sheetId: 123 },
+              data: [{ columnMetadata: [{ pixelSize: 76 }, { pixelSize: 104 }, { pixelSize: 50 }] }],
+            },
+          ],
+        }),
+      )
+      // 3) pad batchUpdate
+      .mockResolvedValueOnce(okResponse({ replies: [] }));
+
     const service = new SheetsService(fetchFn);
-    await service.autoResizeColumns(123, 11);
-    const [url, init] = fetchFn.mock.calls[1] as [string, RequestInit];
-    expect(url).toContain(':batchUpdate');
-    expect(JSON.parse(init.body as string)).toEqual({
+    await service.autoResizeColumns('2099 Q1', 123, 3, 16);
+
+    // First batchUpdate is the autoResize.
+    const [autoUrl, autoInit] = fetchFn.mock.calls[1] as [string, RequestInit];
+    expect(autoUrl).toContain(':batchUpdate');
+    expect(JSON.parse(autoInit.body as string)).toEqual({
       requests: [
         {
           autoResizeDimensions: {
-            dimensions: { sheetId: 123, dimension: 'COLUMNS', startIndex: 0, endIndex: 11 },
+            dimensions: { sheetId: 123, dimension: 'COLUMNS', startIndex: 0, endIndex: 3 },
           },
         },
       ],
     });
+    // GET for post-resize widths.
+    const [getUrl] = fetchFn.mock.calls[2] as [string];
+    expect(getUrl).toContain('columnMetadata');
+    expect(getUrl).toContain('ranges=2099%20Q1');
+    // Final batchUpdate pads each column by +16.
+    const [, padInit] = fetchFn.mock.calls[3] as [string, RequestInit];
+    const padBody = JSON.parse(padInit.body as string);
+    expect(padBody.requests).toHaveLength(3);
+    expect(padBody.requests[0]).toMatchObject({
+      updateDimensionProperties: {
+        range: { sheetId: 123, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 },
+        properties: { pixelSize: 92 },
+      },
+    });
+    expect(padBody.requests[1]).toMatchObject({
+      updateDimensionProperties: {
+        range: { sheetId: 123, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 },
+        properties: { pixelSize: 120 },
+      },
+    });
+    expect(padBody.requests[2]).toMatchObject({
+      updateDimensionProperties: {
+        range: { sheetId: 123, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 },
+        properties: { pixelSize: 66 },
+      },
+    });
+  });
+
+  it('autoResizeColumns with padPx=0 skips the pad step', async () => {
+    const fetchFn = vi.fn().mockResolvedValueOnce(tokenResponse).mockResolvedValueOnce(okResponse({ replies: [] }));
+    const service = new SheetsService(fetchFn);
+    await service.autoResizeColumns('2099 Q1', 123, 3, 0);
+    // Just token + autoResize batchUpdate, no GET, no pad batchUpdate.
+    expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
   it('token cache: second request reuses access token', async () => {

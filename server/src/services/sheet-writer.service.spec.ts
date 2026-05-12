@@ -157,7 +157,7 @@ describe('SheetWriterService', () => {
       client: { name: 'X', class: ClientClass.Domestic },
     });
     expect(autoResizeColumns).toHaveBeenCalledOnce();
-    expect(autoResizeColumns).toHaveBeenCalledWith(777, QUARTER_TAB_HEADERS.length);
+    expect(autoResizeColumns).toHaveBeenCalledWith('2099 Q1', 777, QUARTER_TAB_HEADERS.length);
   });
 
   it('expense write fits columns to data after appending', async () => {
@@ -169,7 +169,7 @@ describe('SheetWriterService', () => {
       locationClass: ExpenseLocationClass.Domestic,
     });
     expect(autoResizeColumns).toHaveBeenCalledOnce();
-    expect(autoResizeColumns).toHaveBeenCalledWith(777, QUARTER_TAB_HEADERS.length);
+    expect(autoResizeColumns).toHaveBeenCalledWith('2099 Q1', 777, QUARTER_TAB_HEADERS.length);
   });
 
   it('quarterTabName: month boundaries', () => {

@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { BankTxCategory, ClientClass, EventSource, MatchConfidence } from 'src/enum';
+import { BankTxCategory, ClientClass, EventSource, ExpenseStatus, MatchConfidence } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { DB } from 'src/schema';
-import { SheetWriterService } from 'src/services/sheet-writer.service';
+import { expenseToSheetRow, SheetWriterService } from 'src/services/sheet-writer.service';
 
 const TXN_REF_PATTERN = /\bTXN-\d{4,}\b/;
 const INVOICE_NUMBER_PATTERN = /\b\d{4}\/\d{3}\b/;
@@ -402,7 +402,7 @@ export class BankMatcherService {
    * event write fails, we don't recurse (we'd just have logged the message).
    */
   private async recordSheetWriteFailure(input: {
-    kind: 'invoice' | 'wise_transfer';
+    kind: 'invoice' | 'wise_transfer' | 'expense';
     bankTxId: string;
     identifier: string;
     message: string;
@@ -583,10 +583,33 @@ export class BankMatcherService {
       }
       await this.persistExpenseMatch(bankTxId, expense.id, MatchConfidence.Manual);
       this.logger.log(`bank_tx ${bankTxId} → expense ${expense.id} (manual)`);
-      // No sheet write here — expense rows fire on approval (see
-      // ExpensesController.approveExpense). If the expense is already
-      // approved, the sheet row exists already; if it's still pending_review,
-      // approving it later will write the row.
+      // Manual-match is itself the operator's "this expense really happened"
+      // signal under kasstelsel — the bank tx is the canonical money-out
+      // event. If the expense was still pending_review we promote it to
+      // approved AND write the sheet row (dated by bank_tx.txDate, which is
+      // the kasstelsel date). If it was already approved, the sheet row
+      // already exists from the approval flow; skip to avoid a duplicate.
+      if (expense.status === ExpenseStatus.PendingReview) {
+        const now = new Date();
+        await this.db
+          .updateTable('expense')
+          .set({ status: ExpenseStatus.Approved, reviewedAt: now, updatedAt: now })
+          .where('id', '=', expense.id)
+          .execute();
+        const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
+        try {
+          await this.sheetWriter.writeExpenseRow(expenseToSheetRow(expense, txDate));
+        } catch (error) {
+          const message = (error as Error).message;
+          this.logger.error(`Sheet write failed for expense ${expense.id}: ${message}`);
+          await this.recordSheetWriteFailure({
+            kind: 'expense',
+            bankTxId: bankTx.id,
+            identifier: expense.paperlessDocId,
+            message,
+          });
+        }
+      }
     }
 
     const refreshed = await this.bankTransactionRepository.findById(bankTxId);
