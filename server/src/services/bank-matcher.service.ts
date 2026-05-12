@@ -344,7 +344,14 @@ export class BankMatcherService {
         source: `bank_tx/${bankTx.id}`,
       });
     } catch (error) {
-      this.logger.error(`Sheet write failed for invoice ${invoice.number}: ${(error as Error).message}`);
+      const message = (error as Error).message;
+      this.logger.error(`Sheet write failed for invoice ${invoice.number}: ${message}`);
+      await this.recordSheetWriteFailure({
+        kind: 'invoice',
+        bankTxId: bankTx.id,
+        identifier: invoice.number,
+        message,
+      });
     }
   }
 
@@ -378,7 +385,36 @@ export class BankMatcherService {
         source: `wise_transfer/${transfer.id}`,
       });
     } catch (error) {
-      this.logger.error(`Sheet write failed for wise_transfer ${transfer.id}: ${(error as Error).message}`);
+      const message = (error as Error).message;
+      this.logger.error(`Sheet write failed for wise_transfer ${transfer.id}: ${message}`);
+      await this.recordSheetWriteFailure({
+        kind: 'wise_transfer',
+        bankTxId: bankTx.id,
+        identifier: transfer.ourReference ?? transfer.id,
+        message,
+      });
+    }
+  }
+
+  /**
+   * Append a `sheet.write_failed` audit event so the operator can see and
+   * resolve sheet outages from the Events page. Best-effort itself — if the
+   * event write fails, we don't recurse (we'd just have logged the message).
+   */
+  private async recordSheetWriteFailure(input: {
+    kind: 'invoice' | 'wise_transfer';
+    bankTxId: string;
+    identifier: string;
+    message: string;
+  }): Promise<void> {
+    try {
+      await this.eventRepository.recordAction({
+        source: EventSource.System,
+        eventType: 'sheet.write_failed',
+        payload: input,
+      });
+    } catch (error) {
+      this.logger.error(`Failed to record sheet.write_failed event: ${(error as Error).message}`);
     }
   }
 
@@ -547,6 +583,10 @@ export class BankMatcherService {
       }
       await this.persistExpenseMatch(bankTxId, expense.id, MatchConfidence.Manual);
       this.logger.log(`bank_tx ${bankTxId} → expense ${expense.id} (manual)`);
+      // No sheet write here — expense rows fire on approval (see
+      // ExpensesController.approveExpense). If the expense is already
+      // approved, the sheet row exists already; if it's still pending_review,
+      // approving it later will write the row.
     }
 
     const refreshed = await this.bankTransactionRepository.findById(bankTxId);

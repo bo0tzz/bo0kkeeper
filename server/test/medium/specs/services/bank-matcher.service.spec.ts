@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import {
   BankSource,
   ClientClass,
+  EventSource,
   ExpenseLocationClass,
   MatchConfidence,
   TradeName,
@@ -249,6 +250,20 @@ describe('BankMatcherService', () => {
 
     const refetched = await bankRepo.findById(ingest.row.id);
     expect(refetched?.matchedInvoiceId).toBe(invoice.id);
+
+    // Audit event records the failure so the operator can act on it from /events.
+    const events = await db
+      .selectFrom('event')
+      .selectAll()
+      .where('eventType', '=', 'sheet.write_failed')
+      .where('source', '=', EventSource.System)
+      .execute();
+    expect(events).toHaveLength(1);
+    expect(events[0].payload).toMatchObject({
+      kind: 'invoice',
+      identifier: invoice.number,
+      bankTxId: ingest.row.id,
+    });
   });
 
   it('returns matched:false when no signal is present', async () => {

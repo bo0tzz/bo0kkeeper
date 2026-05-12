@@ -127,7 +127,17 @@ export class ExpensesController {
         source: `expense/${row.id}`,
       });
     } catch (error) {
-      this.logger.error(`Sheet write failed for expense ${row.id}: ${(error as Error).message}`);
+      const message = (error as Error).message;
+      this.logger.error(`Sheet write failed for expense ${row.id}: ${message}`);
+      try {
+        await this.eventRepository.recordAction({
+          source: EventSource.System,
+          eventType: 'sheet.write_failed',
+          payload: { kind: 'expense', expenseId: row.id, vendor: row.vendor, message },
+        });
+      } catch (eventError) {
+        this.logger.error(`Failed to record sheet.write_failed event: ${(eventError as Error).message}`);
+      }
     }
     return mapExpense(row);
   }
