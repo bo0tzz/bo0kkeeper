@@ -4,8 +4,8 @@
 # tsc would have errored — that has bitten us repeatedly. Catching it
 # here keeps the bug class out of git history.
 #
-# Server: tsc --noEmit
-# Web:    svelte-check + tsc --noEmit
+# Server: tsc --noEmit + prettier --check
+# Web:    svelte-check + tsc --noEmit + prettier --check
 #
 # Skip for `git commit --no-verify` (only do this for hot-fixes you'll
 # clean up immediately).
@@ -25,5 +25,11 @@ echo "pre-commit: server tsc --noEmit"
 
 echo "pre-commit: web svelte-check + tsc --noEmit"
 "${PNPM[@]}" --filter web run check
+
+echo "pre-commit: server prettier --check"
+"${PNPM[@]}" --filter bo0kkeeper run format
+
+echo "pre-commit: web prettier --check"
+"${PNPM[@]}" --filter web run format
 
 echo "pre-commit: ok"
