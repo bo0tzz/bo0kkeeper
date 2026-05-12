@@ -12,9 +12,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  # Bumping these centrally avoids drift between jobs. Mirror mise.toml.
+  # Mirror mise.toml. pnpm version comes from `packageManager` in package.json,
+  # read automatically by pnpm/action-setup.
   NODE_VERSION: "24"
-  PNPM_VERSION: "10"
 
 jobs:
   format:
@@ -23,8 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -39,8 +37,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -54,8 +50,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -69,8 +63,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -86,8 +78,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -101,8 +91,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -116,8 +104,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -131,8 +117,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -140,12 +124,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter web build
 
-  # On every PR + push: build the Docker image as a smoke test for the
-  # Dockerfile itself. Pushes only happen on `main` — see the conditional
-  # `docker/build-push-action.push` below. PR builds catch Dockerfile
-  # breakage at review time without spending registry quota.
-  publish:
-    name: image / build${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && ' + push' || '' }}
+  image:
     runs-on: ubuntu-latest
     needs: [format, server-lint, server-check, server-unit, server-medium, web-lint, web-check, web-build]
     permissions:
