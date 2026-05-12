@@ -1,4 +1,4 @@
-import { apiGet } from '$lib/services/api';
+import { apiGet, apiPost } from '$lib/services/api';
 
 export type SystemInfo = {
   cutoverDate: string | null;
@@ -25,3 +25,11 @@ export const getSystemInfo = (fetchFn?: typeof fetch) =>
 
 export const getIntegrations = (fetchFn?: typeof fetch) =>
   apiGet<IntegrationsResponse>('/api/system/integrations', { fetch: fetchFn });
+
+/**
+ * Trigger an immediate sheet-write retry — re-attempts any matched
+ * bank_tx / approved expense whose sheet row failed to land. Same job
+ * that runs hourly on cron; this is the "do it now" path.
+ */
+export const retrySheetWrites = (fetchFn?: typeof fetch) =>
+  apiPost<{ enqueued: true }>('/api/system/retry-sheet-writes', {}, { fetch: fetchFn });

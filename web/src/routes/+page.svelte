@@ -9,7 +9,7 @@
   } from '$lib/services/banking.service';
   import { listEvents, type ListEventsResponse } from '$lib/services/events.service';
   import { listExpenses, type ListExpensesResponse } from '$lib/services/expenses.service';
-  import { getSystemInfo, type SystemInfo } from '$lib/services/system.service';
+  import { getSystemInfo, retrySheetWrites, type SystemInfo } from '$lib/services/system.service';
   import {
     Alert,
     Badge,
@@ -69,6 +69,22 @@
   let counts = $state<Counts | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
+
+  let retryingSheetWrites = $state(false);
+  let retryFlash = $state<string | null>(null);
+
+  async function triggerSheetWriteRetry() {
+    retryingSheetWrites = true;
+    retryFlash = null;
+    try {
+      await retrySheetWrites();
+      retryFlash = 'Retry enqueued — refresh in a few seconds to see the count drop.';
+    } catch (error_) {
+      retryFlash = `Retry failed to enqueue: ${(error_ as Error).message}`;
+    } finally {
+      retryingSheetWrites = false;
+    }
+  }
 
   async function load() {
     loading = true;
@@ -432,12 +448,26 @@
                   </Badge>
                 </HStack>
                 {#if counts.sheetWriteFailures30d > 0}
-                  <Button
-                    href={`${resolve('/events')}?source=system&eventType=sheet.write_failed`}
-                    variant="outline"
-                  >
-                    Investigate →
-                  </Button>
+                  <HStack gap={2}>
+                    <Button
+                      href={`${resolve('/events')}?source=system&eventType=sheet.write_failed`}
+                      variant="outline"
+                      size="small"
+                    >
+                      Investigate →
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="small"
+                      disabled={retryingSheetWrites}
+                      onclick={triggerSheetWriteRetry}
+                    >
+                      {retryingSheetWrites ? 'Retrying…' : 'Retry now'}
+                    </Button>
+                  </HStack>
+                {/if}
+                {#if retryFlash}
+                  <Text size="small" color="muted">{retryFlash}</Text>
                 {/if}
               </Stack>
             </CardBody>
