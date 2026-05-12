@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, Selectable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { BankSource, BankTxCategory } from 'src/enum';
+import { BankSource, BankTxCategory, MatchConfidence } from 'src/enum';
 import { DB } from 'src/schema';
 import { BankTransactionTable } from 'src/schema/tables/bank-transaction.table';
 
@@ -94,6 +94,28 @@ export class BankTransactionRepository {
       .where('txDate', '>=', new Date(since))
       .executeTakeFirst()) as { total: string | null } | undefined;
     return result?.total ? BigInt(result.total) : 0n;
+  }
+
+  /**
+   * Count matched bank_txs (auto_high or manual to an invoice / wise_transfer)
+   * whose sheet income row never landed AND whose match has been sitting for
+   * longer than `staleAfterMs`. Distinct from the "Sheet write failures 30d"
+   * audit count which is historical noise; this is current state.
+   */
+  async countStaleSheetWrites(staleAfterMs: number): Promise<number> {
+    const threshold = new Date(Date.now() - staleAfterMs);
+    const result = (await this.db
+      .selectFrom('bank_transaction')
+      .select((eb) => eb.fn.countAll().as('total'))
+      .where('matchedAt', 'is not', null)
+      .where('matchedAt', '<', threshold)
+      .where('matchConfidence', 'in', [MatchConfidence.AutoHigh, MatchConfidence.Manual])
+      .where('sheetRowAt', 'is', null)
+      .where((eb) =>
+        eb.or([eb('matchedInvoiceId', 'is not', null), eb('matchedTransferId', 'is not', null)]),
+      )
+      .executeTakeFirstOrThrow()) as { total: string | number };
+    return Number(result.total);
   }
 
   /** Recent rows, newest first. Used by the /transactions all-flows view. */

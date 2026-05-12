@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Insertable, Kysely, Selectable, sql, Updateable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { ExpenseLocationClass, ExpenseStatus } from 'src/enum';
+import { ExpenseLocationClass, ExpenseStatus, MatchConfidence } from 'src/enum';
 import { DB } from 'src/schema';
 import { ExpenseTable } from 'src/schema/tables/expense.table';
 
@@ -128,6 +128,26 @@ export class ExpenseRepository {
       reviewedAt: new Date(),
       ...(notes ? { notes } : {}),
     });
+  }
+
+  /**
+   * Count approved expenses with a manual-match linked bank_tx whose sheet
+   * row never landed AND where the bank-tx-match has been sitting for longer
+   * than `staleAfterMs`. Parallel to
+   * BankTransactionRepository.countStaleSheetWrites for the expense side.
+   */
+  async countStaleSheetWrites(staleAfterMs: number): Promise<number> {
+    const threshold = new Date(Date.now() - staleAfterMs);
+    const result = (await this.db
+      .selectFrom('expense')
+      .innerJoin('bank_transaction', 'bank_transaction.matchedExpenseId', 'expense.id')
+      .select((eb) => eb.fn.countAll().as('total'))
+      .where('expense.status', '=', ExpenseStatus.Approved)
+      .where('expense.sheetRowAt', 'is', null)
+      .where('bank_transaction.matchConfidence', '=', MatchConfidence.Manual)
+      .where('bank_transaction.matchedAt', '<', threshold)
+      .executeTakeFirstOrThrow()) as { total: string | number };
+    return Number(result.total);
   }
 }
 
