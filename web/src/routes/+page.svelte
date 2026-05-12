@@ -30,6 +30,9 @@
     /** Approved expenses with no matched bank_transaction — the new failure
      * mode under bank-tx-match-only sheet writes. */
     approvedUnmatchedExpenses: number;
+    /** Issued invoices with no bank tx linked (any quarter). Sourced from
+     * the quarterly aggregator's `invoice_unmatched` warning. */
+    unmatchedInvoices: number;
     unmatchedBankTx: number;
     failedEvents: number;
     /** Count of sheet.write_failed system events in the last 30 days. */
@@ -117,10 +120,12 @@
         }) as Promise<ListEventsResponse>,
         getSystemInfo(),
       ]);
+      const invoiceUnmatched = agg?.warnings.find((w) => w.kind === 'invoice_unmatched');
       counts = {
         pendingWiseCredits: wise.total,
         pendingExpenseReviews: expenses.total,
         approvedUnmatchedExpenses: approvedUnmatched.total,
+        unmatchedInvoices: invoiceUnmatched?.count ?? 0,
         unmatchedBankTx: bankTx.total,
         failedEvents: failed.total,
         sheetWriteFailures30d: sheetFails.total,
@@ -282,7 +287,26 @@
 
           <Card>
             <CardHeader>
-              <CardTitle>Approved, no bank match</CardTitle>
+              <CardTitle>Invoices awaiting payment</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <Stack gap={3}>
+                <HStack class="items-center justify-between">
+                  <Heading size="medium" tag="h3">{counts.unmatchedInvoices}</Heading>
+                  <Badge color={counts.unmatchedInvoices === 0 ? 'secondary' : 'warning'}>
+                    {counts.unmatchedInvoices === 0 ? 'all paid' : 'waiting for bank'}
+                  </Badge>
+                </HStack>
+                {#if counts.unmatchedInvoices > 0}
+                  <Button href={resolve('/banking')} variant="outline">Link →</Button>
+                {/if}
+              </Stack>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Expenses awaiting bank match</CardTitle>
             </CardHeader>
             <CardBody>
               <Stack gap={3}>
@@ -467,28 +491,10 @@
               </CardBody>
             </Card>
           </div>
-          {#if agg.warnings.length > 0}
-            <Stack gap={2}>
-              {#each agg.warnings as warning (warning.kind)}
-                {@const target =
-                  warning.kind === 'invoice_unmatched'
-                    ? resolve('/banking')
-                    : warning.kind === 'expense_pending_review'
-                      ? resolve('/expenses')
-                      : resolve('/banking')}
-                <Alert color="warning">
-                  {#if warning.kind === 'invoice_unmatched'}
-                    {warning.count} invoice{warning.count === 1 ? '' : 's'} not yet matched to a bank tx
-                  {:else if warning.kind === 'expense_pending_review'}
-                    {warning.count} expense{warning.count === 1 ? '' : 's'} still pending review
-                  {:else}
-                    {warning.count} bank tx match{warning.count === 1 ? '' : 'es'} need manual confirmation
-                  {/if}
-                  <a class="ml-1 underline" href={target}>Open →</a>
-                </Alert>
-              {/each}
-            </Stack>
-          {/if}
+          <!-- agg.warnings are surfaced as inbox tiles above (invoices →
+               "Invoices awaiting payment"; pending review → "Expenses to
+               review"). Full warnings list with sample numbers/vendors
+               lives on /aggregator. -->
         </Stack>
       {/if}
     {/if}
