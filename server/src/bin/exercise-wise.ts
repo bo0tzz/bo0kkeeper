@@ -24,6 +24,11 @@ import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { SheetsService } from 'src/services/sheets.service';
 import { getKyselyConfig } from 'src/utils/database';
 
+if (process.env.NODE_ENV === 'production') {
+  console.error('exercise-wise synthesizes fake bank txs; refusing to run with NODE_ENV=production.');
+  process.exit(1);
+}
+
 function parseDateArg(): Date {
   const idx = process.argv.indexOf('--date');
   if (idx === -1) {
