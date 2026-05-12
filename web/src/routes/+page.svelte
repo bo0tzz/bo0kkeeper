@@ -363,14 +363,6 @@
             </CardBody>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Compose invoice</CardTitle>
-            </CardHeader>
-            <CardBody>
-              <Button href={resolve('/invoices/compose')} color="primary">New invoice →</Button>
-            </CardBody>
-          </Card>
         </div>
       </Stack>
 
