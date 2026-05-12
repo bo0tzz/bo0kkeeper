@@ -3,7 +3,7 @@ import { OnJob } from 'src/decorators';
 import { EventSource, ExpenseLocationClass, JobName, QueueName } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository, NewExpense } from 'src/repositories/expense.repository';
-import { PaperlessService } from 'src/services/paperless.service';
+import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { JobOf } from 'src/types';
 
@@ -21,7 +21,7 @@ export class ExpensePipelineService {
   constructor(
     private readonly eventRepository: EventRepository,
     private readonly expenseRepository: ExpenseRepository,
-    private readonly paperlessService: PaperlessService,
+    private readonly paperlessService: PaperlessRepository,
     private readonly settingsService: SettingsService,
   ) {}
 

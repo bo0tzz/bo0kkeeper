@@ -10,7 +10,7 @@ import {
 import { EventSource } from 'src/enum';
 import { AppSettings } from 'src/repositories/app-settings.repository';
 import { EventRepository } from 'src/repositories/event.repository';
-import { PaperlessService } from 'src/services/paperless.service';
+import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 
 /**
@@ -24,7 +24,7 @@ export class SettingsController {
   constructor(
     private readonly settingsService: SettingsService,
     private readonly eventRepository: EventRepository,
-    private readonly paperlessService: PaperlessService,
+    private readonly paperlessService: PaperlessRepository,
   ) {}
 
   @Get()

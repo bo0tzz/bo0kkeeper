@@ -1,5 +1,5 @@
 import { createPublicKey, createVerify, generateKeyPairSync } from 'node:crypto';
-import { EnableBankingApiService } from 'src/services/enable-banking-api.service';
+import { EnableBankingRepository } from 'src/repositories/enable-banking.repository';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const APP_ID = '11111111-2222-4333-8444-555555555555';
@@ -38,9 +38,9 @@ function decodeJwt(jwt: string): { header: Record<string, unknown>; claims: Reco
   return { header, claims, signingInput: `${headerB64}.${claimsB64}`, signatureB64Url: sigB64 };
 }
 
-describe('EnableBankingApiService — JWT', () => {
+describe('EnableBankingRepository — JWT', () => {
   it('signs an RS256 JWT that verifies against the matching public key', () => {
-    const service = new EnableBankingApiService();
+    const service = new EnableBankingRepository();
     const now = new Date('2026-05-08T12:00:00Z');
     const jwt = service.signJwt(now);
     const { header, claims, signingInput, signatureB64Url } = decodeJwt(jwt);
@@ -63,11 +63,11 @@ describe('EnableBankingApiService — JWT', () => {
 
   it('throws when no app id or key is configured', () => {
     delete process.env.ENABLE_BANKING_APP_ID;
-    expect(() => new EnableBankingApiService().signJwt()).toThrow(/ENABLE_BANKING_APP_ID/);
+    expect(() => new EnableBankingRepository().signJwt()).toThrow(/ENABLE_BANKING_APP_ID/);
 
     process.env.ENABLE_BANKING_APP_ID = APP_ID;
     delete process.env.ENABLE_BANKING_PRIVATE_KEY;
-    expect(() => new EnableBankingApiService().signJwt()).toThrow(/ENABLE_BANKING_PRIVATE_KEY/);
+    expect(() => new EnableBankingRepository().signJwt()).toThrow(/ENABLE_BANKING_PRIVATE_KEY/);
   });
 });
 
@@ -75,7 +75,7 @@ function fakeFetch(handler: (url: string, init: RequestInit) => Response | Promi
   return vi.fn().mockImplementation((url: string, init: RequestInit) => Promise.resolve(handler(url, init)));
 }
 
-describe('EnableBankingApiService — wire shapes', () => {
+describe('EnableBankingRepository — wire shapes', () => {
   it('startAuth posts the documented body and returns the redirect url', async () => {
     const fetchSpy = fakeFetch((url, init) => {
       expect(url).toBe('https://api.enablebanking.test/auth');
@@ -93,7 +93,7 @@ describe('EnableBankingApiService — wire shapes', () => {
       });
       return Response.json({ url: 'https://bank.test/sca?x=1', authorization_id: 'auth-1' });
     });
-    const service = new EnableBankingApiService(fetchSpy);
+    const service = new EnableBankingRepository(fetchSpy);
     const result = await service.startAuth({
       aspspName: 'Mock ASPSP',
       aspspCountry: 'NL',
@@ -114,7 +114,7 @@ describe('EnableBankingApiService — wire shapes', () => {
         accounts: [{ uid: 'acct-1', currency: 'EUR', name: 'Business' }],
       });
     });
-    const service = new EnableBankingApiService(fetchSpy);
+    const service = new EnableBankingRepository(fetchSpy);
     const result = await service.createSession('code-xyz');
     expect(result.sessionId).toBe('sess-42');
     expect(result.accounts).toHaveLength(1);
@@ -140,7 +140,7 @@ describe('EnableBankingApiService — wire shapes', () => {
         continuation_key: null,
       });
     });
-    const service = new EnableBankingApiService(fetchSpy);
+    const service = new EnableBankingRepository(fetchSpy);
     const result = await service.listTransactions({
       accountUid: 'acct-1',
       dateFrom: '2026-05-01',
@@ -155,7 +155,7 @@ describe('EnableBankingApiService — wire shapes', () => {
     const fetchSpy = fakeFetch(
       () => Response.json({ error: 'AUTHORIZATION_FAILED', description: 'expired session' }, { status: 401 }),
     );
-    const service = new EnableBankingApiService(fetchSpy);
+    const service = new EnableBankingRepository(fetchSpy);
     await expect(service.createSession('bad')).rejects.toMatchObject({
       status: 401,
       body: { error: 'AUTHORIZATION_FAILED' },

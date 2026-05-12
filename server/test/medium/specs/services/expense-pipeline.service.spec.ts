@@ -4,7 +4,7 @@ import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { DB } from 'src/schema';
 import { ExpensePipelineService } from 'src/services/expense-pipeline.service';
-import { PaperlessService } from 'src/services/paperless.service';
+import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,7 +27,7 @@ function fakeSettings(expenseTags: string[] = []): SettingsService {
   } as unknown as SettingsService;
 }
 
-function fakePaperless(opts: { docTags?: number[]; tagIds?: Map<string, number> } = {}): PaperlessService {
+function fakePaperless(opts: { docTags?: number[]; tagIds?: Map<string, number> } = {}): PaperlessRepository {
   return {
     getDocument: vi.fn().mockResolvedValue({
       id: 0,
@@ -42,14 +42,14 @@ function fakePaperless(opts: { docTags?: number[]; tagIds?: Map<string, number> 
       const map = opts.tagIds ?? new Map<string, number>();
       return Promise.resolve(names.map((n) => map.get(n) ?? 0));
     }),
-  } as unknown as PaperlessService;
+  } as unknown as PaperlessRepository;
 }
 
 describe('ExpensePipelineService', () => {
   let db: Kysely<DB>;
   let eventRepo: EventRepository;
   let expenseRepo: ExpenseRepository;
-  let paperless: PaperlessService;
+  let paperless: PaperlessRepository;
   let service: ExpensePipelineService;
 
   beforeEach(async () => {
@@ -210,7 +210,7 @@ describe('ExpensePipelineService', () => {
       paperless = {
         getDocument: vi.fn().mockRejectedValue(new Error('paperless down')),
         resolveTagIds: vi.fn().mockRejectedValue(new Error('paperless down')),
-      } as unknown as PaperlessService;
+      } as unknown as PaperlessRepository;
       service = new ExpensePipelineService(eventRepo, expenseRepo, paperless, fakeSettings(['Business', 'Bills']));
       const ingest = await eventRepo.ingest({
         source: EventSource.Paperless,

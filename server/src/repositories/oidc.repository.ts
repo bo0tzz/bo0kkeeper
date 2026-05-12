@@ -19,8 +19,8 @@ import { AuthUser } from 'src/types';
 type DiscoveredClient = Configuration;
 
 @Injectable()
-export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
+export class OidcRepository {
+  private readonly logger = new Logger(OidcRepository.name);
   private readonly oidcConfig: Config['oidc'];
   private clientPromise?: Promise<DiscoveredClient>;
   private jwks?: ReturnType<typeof createRemoteJWKSet>;

@@ -3,7 +3,7 @@ import { OnJob } from 'src/decorators';
 import { EventSource, JobName, QueueName, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
 import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
-import { WiseApiError, WiseApiService } from 'src/services/wise-api.service';
+import { WiseApiError, WiseApiRepository } from 'src/repositories/wise-api.repository';
 
 /**
  * Belt-and-braces for missed `transfers#state-change` webhooks.
@@ -25,7 +25,7 @@ export class WiseReconcileService {
 
   constructor(
     private readonly wiseTransferRepository: WiseTransferRepository,
-    private readonly wiseApi: WiseApiService,
+    private readonly wiseApi: WiseApiRepository,
     private readonly eventRepository: EventRepository,
   ) {}
 

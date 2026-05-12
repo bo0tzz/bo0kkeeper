@@ -3,7 +3,7 @@ import { EventSource, WiseTransferDirection } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
-import { WiseApiService } from 'src/services/wise-api.service';
+import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { WiseDraftService } from 'src/services/wise-draft.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -32,7 +32,7 @@ describe('WiseDraftService', () => {
   let db: Kysely<DB>;
   let eventRepo: EventRepository;
   let transferRepo: WiseTransferRepository;
-  let wiseApi: WiseApiService;
+  let wiseApi: WiseApiRepository;
   let createQuoteMock: ReturnType<typeof vi.fn>;
   let createTransferMock: ReturnType<typeof vi.fn>;
   let service: WiseDraftService;
@@ -63,7 +63,7 @@ describe('WiseDraftService', () => {
       targetValue: 4045.72,
     });
 
-    wiseApi = new WiseApiService();
+    wiseApi = new WiseApiRepository();
     wiseApi.createQuote = createQuoteMock;
     wiseApi.createTransfer = createTransferMock;
 
@@ -151,7 +151,7 @@ describe('WiseDraftService', () => {
 
     const row = await service.draftFromEvent({ eventId: ingest.event.id });
 
-    // Sequence starts at 44 (the user's existing manual chain ends at TXN-0001).
+    // Sequence starts at 44 in the seeded test DB.
     expect(row.ourReference).toBe('TXN-0044');
     expect(createTransferMock).toHaveBeenCalledWith(expect.objectContaining({ reference: 'TXN-0044' }));
   });

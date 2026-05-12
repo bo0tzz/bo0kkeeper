@@ -355,7 +355,11 @@ describe('BankMatcherService', () => {
     await matcher.manualMatch(bankIngest.row.id, { type: 'expense', targetId: expense.row.id });
 
     // Expense flipped to approved.
-    const refetched = await db.selectFrom('expense').selectAll().where('id', '=', expense.row.id).executeTakeFirstOrThrow();
+    const refetched = await db
+      .selectFrom('expense')
+      .selectAll()
+      .where('id', '=', expense.row.id)
+      .executeTakeFirstOrThrow();
     expect(refetched.status).toBe(ExpenseStatus.Approved);
     expect(refetched.reviewedAt).not.toBeNull();
 

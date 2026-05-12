@@ -1,9 +1,9 @@
 import { Kysely, sql } from 'kysely';
 
 /**
- * Sequence for `TXN-NNNN` references on outbound Wise transfers. The user's
- * existing manual sheet is at TXN-0001 at go-live, so we start at 44 — the
- * first auto-allocated reference will be TXN-0044, continuing the chain.
+ * Sequence for `TXN-NNNN` references on outbound Wise transfers. Starts at
+ * an offset so that auto-allocated references can continue an existing
+ * manual numbering chain rather than colliding with it.
  *
  * sql-tools doesn't model Postgres sequences, hence this hand-written migration.
  */

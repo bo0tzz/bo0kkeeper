@@ -39,8 +39,8 @@ const ConfigSchema = z.object({
   /** Recipient id of the user's Dutch bank account in Wise. */
   WISE_TARGET_RECIPIENT_ID: z.coerce.number().int().positive().optional(),
   /**
-   * Starting offset for the `TXN-NNNN` reference sequence. The user's existing
-   * sheet is at TXN-0001 at go-live; the system continues from this number.
+   * Starting offset for the `TXN-NNNN` reference sequence. Set to the highest
+   * existing reference number at go-live; the system continues from there.
    */
   WISE_TXN_REFERENCE_START: z.coerce.number().int().nonnegative().default(0),
 

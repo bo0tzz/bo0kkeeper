@@ -20,7 +20,7 @@ import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
-import { PaperlessService } from 'src/services/paperless.service';
+import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { SheetsRepository } from 'src/repositories/sheets.repository';
@@ -60,7 +60,7 @@ async function main(): Promise<void> {
     const eventRepo = new EventRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
     const matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, eventRepo);
-    const stubPaperless = {} as unknown as PaperlessService;
+    const stubPaperless = {} as unknown as PaperlessRepository;
     const stubSettings = {} as unknown as SettingsService;
     const stubWebhook = {} as unknown as WebhookService;
     const controller = new ExpensesController(expenseRepo, eventRepo, stubPaperless, stubSettings, stubWebhook);

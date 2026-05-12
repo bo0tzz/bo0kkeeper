@@ -7,8 +7,8 @@ import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
 import { InvoiceComposerService } from 'src/services/invoice-composer.service';
-import { PaperlessService } from 'src/services/paperless.service';
-import { RenderService } from 'src/services/render.service';
+import { PaperlessRepository } from 'src/repositories/paperless.repository';
+import { TypstRepository } from 'src/repositories/typst.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,8 +29,8 @@ describe('InvoiceComposerService', () => {
   let db: Kysely<DB>;
   let clientRepo: ClientRepository;
   let invoiceRepo: InvoiceRepository;
-  let render: RenderService;
-  let paperless: PaperlessService;
+  let render: TypstRepository;
+  let paperless: PaperlessRepository;
   let jobs: JobRepository & { queue: ReturnType<typeof vi.fn> };
   let composer: InvoiceComposerService;
   let clientId: string;
@@ -39,9 +39,9 @@ describe('InvoiceComposerService', () => {
     db = await getKyselyDB();
     clientRepo = new ClientRepository(db);
     invoiceRepo = new InvoiceRepository(db);
-    render = new RenderService();
+    render = new TypstRepository();
 
-    paperless = new PaperlessService();
+    paperless = new PaperlessRepository();
     paperless.uploadDocument = vi.fn().mockResolvedValue({ taskId: 'task-uuid-1' });
     paperless.waitForDocumentId = vi.fn().mockResolvedValue('paperless-doc-42');
 

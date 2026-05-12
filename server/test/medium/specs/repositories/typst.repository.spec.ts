@@ -1,12 +1,12 @@
-import { RenderService } from 'src/services/render.service';
+import { TypstRepository } from 'src/repositories/typst.repository';
 import { afterAll, describe, expect, it } from 'vitest';
 
-describe('RenderService — typst integration', () => {
+describe('TypstRepository — typst integration', () => {
   // No TEMPLATES_DIR override — exercises the same resolution the runtime
   // uses, so a missing/renamed template here would also fail in prod.
-  const service = new RenderService();
+  const service = new TypstRepository();
 
-  it('renders a non-EU OverseasClientCo invoice as a non-empty PDF', async () => {
+  it('renders a non-EU invoice as a non-empty PDF', async () => {
     const pdf = await service.render({
       template: 'invoice',
       data: {

@@ -4,7 +4,7 @@ import { Request, Response } from 'express';
 import { loadConfig } from 'src/config';
 import { Auth, Authenticated } from 'src/decorators';
 import { AuthCallbackDto, AuthLoginDto, AuthMeDto } from 'src/dtos/auth.dto';
-import { AuthService } from 'src/services/auth.service';
+import { OidcRepository } from 'src/repositories/oidc.repository';
 import { AuthUser } from 'src/types';
 
 const ID_TOKEN_COOKIE = 'bo0kkeeper.id_token';
@@ -26,7 +26,7 @@ export class AuthController {
   private readonly cookieSecure = loadConfig().cookie.secure;
   private readonly postLoginPath = loadConfig().oidc.postLoginPath;
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: OidcRepository) {}
 
   @Get('login')
   async login(@Query() dto: AuthLoginDto, @Res({ passthrough: false }) res: Response) {

@@ -14,9 +14,9 @@ import { BankMatcherService } from 'src/services/bank-matcher.service';
 import {
   EnableBankingAccount,
   EnableBankingApiError,
-  EnableBankingApiService,
+  EnableBankingRepository,
   EnableBankingTransaction,
-} from 'src/services/enable-banking-api.service';
+} from 'src/repositories/enable-banking.repository';
 
 /**
  * Account row as we stash it in `banking_session.accountsJson` — the API
@@ -67,7 +67,7 @@ export class BankingSyncService {
   constructor(
     private readonly sessionRepository: BankingSessionRepository,
     private readonly bankTransactionRepository: BankTransactionRepository,
-    private readonly apiService: EnableBankingApiService,
+    private readonly apiService: EnableBankingRepository,
     private readonly matcher: BankMatcherService,
     private readonly eventRepository: EventRepository,
   ) {}

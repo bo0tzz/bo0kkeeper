@@ -3,7 +3,7 @@ import { loadConfig } from 'src/config';
 import { EventSource, WiseTransferDirection, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
 import { NewWiseTransfer, WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
-import { WiseApiService } from 'src/services/wise-api.service';
+import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 
 const TARGET_CURRENCY = 'EUR';
 
@@ -23,7 +23,7 @@ export type DraftFromEventInput = {
  *
  * Steps:
  *   1. Resolve the source event (must be `wise.balances.credit`).
- *   2. Quote USD→EUR for the credited amount via WiseApiService.
+ *   2. Quote USD→EUR for the credited amount via WiseApiRepository.
  *   3. Create a transfer to the configured target recipient with `ourReference`.
  *   4. Persist a `wise_transfer` row keyed on Wise's transfer id.
  *
@@ -38,7 +38,7 @@ export class WiseDraftService {
   constructor(
     private readonly eventRepository: EventRepository,
     private readonly wiseTransferRepository: WiseTransferRepository,
-    private readonly wiseApiService: WiseApiService,
+    private readonly wiseApiService: WiseApiRepository,
   ) {}
 
   async draftFromEvent(input: DraftFromEventInput): Promise<WiseTransferRow> {

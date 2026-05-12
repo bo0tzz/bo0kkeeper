@@ -1,8 +1,8 @@
-import { RenderService } from 'src/services/render.service';
+import { TypstRepository } from 'src/repositories/typst.repository';
 import { describe, expect, it } from 'vitest';
 
-describe('RenderService — domestic variant', () => {
-  const service = new RenderService();
+describe('TypstRepository — domestic variant', () => {
+  const service = new TypstRepository();
 
   it('renders a domestic invoice with subtotal/BTW/total + payment block', async () => {
     const pdf = await service.render({

@@ -30,8 +30,8 @@ export type RenderInput = {
  * `runTypst` is protected so unit tests can substitute a fake spawner.
  */
 @Injectable()
-export class RenderService implements OnModuleInit {
-  private readonly logger = new Logger(RenderService.name);
+export class TypstRepository implements OnModuleInit {
+  private readonly logger = new Logger(TypstRepository.name);
 
   constructor(
     @Optional() private readonly templatesDir: string = TEMPLATES_DIR,
@@ -47,7 +47,7 @@ export class RenderService implements OnModuleInit {
     const missing = KNOWN_TEMPLATES.filter((name) => !existsSync(join(this.templatesDir, `${name}.typ`)));
     if (missing.length > 0) {
       throw new Error(
-        `RenderService: templates missing from ${this.templatesDir}: ${missing.join(', ')}. ` +
+        `TypstRepository: templates missing from ${this.templatesDir}: ${missing.join(', ')}. ` +
           `Did you delete a template without updating KNOWN_TEMPLATES, or is TEMPLATES_DIR wrong for this env?`,
       );
     }

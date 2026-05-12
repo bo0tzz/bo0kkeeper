@@ -27,9 +27,9 @@ describe('ClientRepository', () => {
   });
 
   it('creates and retrieves a client', async () => {
-    const created = await repo.create(fakeClient({ name: 'OverseasClientCo-ish' }));
+    const created = await repo.create(fakeClient({ name: 'OverseasCo-ish' }));
     expect(created.id).toBeTruthy();
-    expect(created.name).toBe('OverseasClientCo-ish');
+    expect(created.name).toBe('OverseasCo-ish');
     expect(created.class).toBe(ClientClass.NonEu);
 
     const fetched = await repo.findById(created.id);

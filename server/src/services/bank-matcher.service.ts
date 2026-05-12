@@ -266,7 +266,7 @@ export class BankMatcherService {
 
     // For non-EUR invoices we'd need a currency conversion to compare against
     // the EUR-denominated bank row; that's a meaningful slice of false-negatives
-    // for the OverseasClientCo/USD flow, but those are already TXN-NNNN-matched (auto_high)
+    // for the non-EU/USD flow, but those are already TXN-NNNN-matched (auto_high)
     // so the heuristic skipping them is fine.
     const candidates = await this.db
       .selectFrom('invoice')
@@ -343,6 +343,7 @@ export class BankMatcherService {
         vatMinor,
         source: `bank_tx/${bankTx.id}`,
       });
+      await this.markBankTxSheetRowAt(bankTx.id);
     } catch (error) {
       const message = (error as Error).message;
       this.logger.error(`Sheet write failed for invoice ${invoice.number}: ${message}`);
@@ -379,11 +380,12 @@ export class BankMatcherService {
         eurAmountMinor,
         client: { name: nonEuClient?.name ?? 'Wise', class: ClientClass.NonEu },
         // Omit `from` — writeIncomeRow falls back to client.name, which is the
-        // originating Non-EU client (e.g. "OverseasClientCo"). The bank-tx
-        // counterparty on the SNS side is always "Wise" (the routing service),
-        // which is the wrong bookkeeping party.
+        // originating Non-EU client. The bank-tx counterparty on the SNS side
+        // is always "Wise" (the routing service), which is the wrong
+        // bookkeeping party.
         source: `wise_transfer/${transfer.id}`,
       });
+      await this.markBankTxSheetRowAt(bankTx.id);
     } catch (error) {
       const message = (error as Error).message;
       this.logger.error(`Sheet write failed for wise_transfer ${transfer.id}: ${message}`);
@@ -394,6 +396,28 @@ export class BankMatcherService {
         message,
       });
     }
+  }
+
+  /**
+   * Mark a bank_tx as having its sheet income row successfully written.
+   * The retry job uses `sheetRowAt IS NULL` to find writes to retry; setting
+   * it here closes the loop.
+   */
+  private async markBankTxSheetRowAt(bankTxId: string): Promise<void> {
+    await this.db
+      .updateTable('bank_transaction')
+      .set({ sheetRowAt: new Date(), updatedAt: new Date() })
+      .where('id', '=', bankTxId)
+      .execute();
+  }
+
+  /** Same as markBankTxSheetRowAt but for the expense row. */
+  private async markExpenseSheetRowAt(expenseId: string): Promise<void> {
+    await this.db
+      .updateTable('expense')
+      .set({ sheetRowAt: new Date(), updatedAt: new Date() })
+      .where('id', '=', expenseId)
+      .execute();
   }
 
   /**
@@ -601,6 +625,7 @@ export class BankMatcherService {
         const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
         try {
           await this.sheetWriter.writeExpenseRow(expenseToSheetRow(expense, txDate));
+          await this.markExpenseSheetRowAt(expense.id);
         } catch (error) {
           const message = (error as Error).message;
           this.logger.error(`Sheet write failed for expense ${expense.id}: ${message}`);
@@ -726,10 +751,11 @@ export class BankMatcherService {
 void sql;
 
 /**
- * "Either name contains the other" — handles "Online Cable Shop BV" vs the
- * paperless-ingested "Online Cable Shop", or "Acme Cables via Stichting Mollie
- * Payments" vs "Acme Cables". Case-insensitive, with a length floor enforced by
- * the caller so generic names like "Wise" don't match overly-broadly.
+ * "Either name contains the other" — handles the common case where the bank
+ * statement and the paperless-ingested receipt list a vendor under slightly
+ * different forms (corporate suffix, PSP-routing prefix, etc.).
+ * Case-insensitive, with a length floor enforced by the caller so generic
+ * names like "Wise" don't match overly-broadly.
  */
 function fuzzyContains(a: string, b: string): boolean {
   const al = a.trim().toLowerCase();

@@ -112,8 +112,8 @@ export class EnableBankingApiError extends Error {
 type FetchLike = typeof fetch;
 
 @Injectable()
-export class EnableBankingApiService {
-  private readonly logger = new Logger(EnableBankingApiService.name);
+export class EnableBankingRepository {
+  private readonly logger = new Logger(EnableBankingRepository.name);
   private readonly config: Config['enableBanking'];
   private readonly fetchFn: FetchLike;
 

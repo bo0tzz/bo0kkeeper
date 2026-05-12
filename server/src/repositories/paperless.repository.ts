@@ -55,8 +55,8 @@ export type PaperlessDocument = {
 };
 
 @Injectable()
-export class PaperlessService {
-  private readonly logger = new Logger(PaperlessService.name);
+export class PaperlessRepository {
+  private readonly logger = new Logger(PaperlessRepository.name);
   /** name → id map, populated lazily; cleared on tag creation. */
   private tagCache: Map<string, number> | null = null;
   private readonly config: Config['paperless'];

@@ -6,7 +6,7 @@ import { BankingSessionStatus, EventSource, JobName, QueueName } from 'src/enum'
 import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
-import { EnableBankingAccount, EnableBankingApiService } from 'src/services/enable-banking-api.service';
+import { EnableBankingAccount, EnableBankingRepository } from 'src/repositories/enable-banking.repository';
 
 /**
  * Drives the PSD2 consent flow against Enable Banking. Two entry points:
@@ -46,7 +46,7 @@ export class BankingSessionService {
 
   constructor(
     private readonly sessionRepository: BankingSessionRepository,
-    private readonly apiService: EnableBankingApiService,
+    private readonly apiService: EnableBankingRepository,
     private readonly jobRepository: JobRepository,
     private readonly eventRepository: EventRepository,
   ) {

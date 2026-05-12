@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { MetadataKey } from 'src/constants';
 import { AuthRouteOptions } from 'src/decorators';
-import { AuthService } from 'src/services/auth.service';
+import { OidcRepository } from 'src/repositories/oidc.repository';
 
 const ID_TOKEN_COOKIE = 'bo0kkeeper.id_token';
 
@@ -16,7 +16,7 @@ const ID_TOKEN_COOKIE = 'bo0kkeeper.id_token';
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly authService: AuthService,
+    private readonly authService: OidcRepository,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

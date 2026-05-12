@@ -1,4 +1,4 @@
-import { PaperlessApiError, PaperlessService } from 'src/services/paperless.service';
+import { PaperlessApiError, PaperlessRepository } from 'src/repositories/paperless.repository';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const okResponse = (body: unknown): Response =>
@@ -23,12 +23,12 @@ beforeEach(() => {
   process.env.PAPERLESS_TOKEN = 'fake-token';
 });
 
-describe('PaperlessService', () => {
+describe('PaperlessRepository', () => {
   it('uploads a document and returns the consume task id (string-quoted body)', async () => {
     // paperless's post_document returns the task UUID as a JSON string.
     const fetchFn = vi.fn().mockResolvedValue(okResponse('"abc-123-task"'));
 
-    const service = new PaperlessService(fetchFn);
+    const service = new PaperlessRepository(fetchFn);
     const result = await service.uploadDocument({
       file: Buffer.from('%PDF-1.7 fake'),
       filename: '2099-001.pdf',
@@ -45,7 +45,7 @@ describe('PaperlessService', () => {
 
   it('uploads a document when paperless returns an object body', async () => {
     const fetchFn = vi.fn().mockResolvedValue(okResponse({ task_id: 'def-456' }));
-    const service = new PaperlessService(fetchFn);
+    const service = new PaperlessRepository(fetchFn);
     const result = await service.uploadDocument({
       file: Buffer.from('pdf'),
       filename: 'x.pdf',
@@ -56,7 +56,7 @@ describe('PaperlessService', () => {
 
   it('throws PaperlessApiError on non-2xx upload', async () => {
     const fetchFn = vi.fn().mockResolvedValue(errorResponse(401, { detail: 'unauthenticated' }));
-    const service = new PaperlessService(fetchFn);
+    const service = new PaperlessRepository(fetchFn);
     await expect(
       service.uploadDocument({ file: Buffer.from('pdf'), filename: 'x.pdf', title: 'x' }),
     ).rejects.toBeInstanceOf(PaperlessApiError);
@@ -69,7 +69,7 @@ describe('PaperlessService', () => {
       .mockResolvedValueOnce(okResponse([{ status: 'STARTED' }]))
       .mockResolvedValueOnce(okResponse([{ status: 'SUCCESS', related_document: 4242 }]));
 
-    const service = new PaperlessService(fetchFn);
+    const service = new PaperlessRepository(fetchFn);
     const docId = await service.waitForDocumentId('abc-123-task', { attempts: 5, intervalMs: 1 });
     expect(docId).toBe('4242');
     expect(fetchFn).toHaveBeenCalledTimes(3);
@@ -78,7 +78,7 @@ describe('PaperlessService', () => {
   it('waitForDocumentId throws when the consume task fails', async () => {
     const fetchFn = vi.fn().mockResolvedValueOnce(okResponse([{ status: 'FAILURE', result: 'corrupted PDF' }]));
 
-    const service = new PaperlessService(fetchFn);
+    const service = new PaperlessRepository(fetchFn);
     await expect(service.waitForDocumentId('bad-task', { attempts: 5, intervalMs: 1 })).rejects.toThrow(
       /corrupted PDF/,
     );
@@ -87,7 +87,7 @@ describe('PaperlessService', () => {
   it('throws if PAPERLESS_BASE_URL is missing', async () => {
     delete process.env.PAPERLESS_BASE_URL;
     const fetchFn = vi.fn();
-    const service = new PaperlessService(fetchFn);
+    const service = new PaperlessRepository(fetchFn);
     await expect(service.uploadDocument({ file: Buffer.from('pdf'), filename: 'x.pdf', title: 'x' })).rejects.toThrow(
       /PAPERLESS_BASE_URL/,
     );
@@ -99,7 +99,7 @@ describe('PaperlessService', () => {
       const fetchFn = vi
         .fn()
         .mockResolvedValueOnce(okResponse({ results: [{ id: 1, name: 'Business' }, { id: 2, name: 'Bills' }], next: null }));
-      const service = new PaperlessService(fetchFn);
+      const service = new PaperlessRepository(fetchFn);
       const result = await service.checkTagsExist(['Business', 'Buisness', 'Bills']);
       expect(result).toEqual([
         { name: 'Business', exists: true, id: 1 },
@@ -112,14 +112,14 @@ describe('PaperlessService', () => {
       const fetchFn = vi
         .fn()
         .mockResolvedValueOnce(okResponse({ results: [{ id: 1, name: 'Business' }], next: null }));
-      const service = new PaperlessService(fetchFn);
+      const service = new PaperlessRepository(fetchFn);
       const result = await service.checkTagsExist(['business']);
       expect(result[0].exists).toBe(false);
     });
 
     it('does not call paperless for an empty input', async () => {
       const fetchFn = vi.fn();
-      const service = new PaperlessService(fetchFn);
+      const service = new PaperlessRepository(fetchFn);
       const result = await service.checkTagsExist([]);
       expect(result).toEqual([]);
       expect(fetchFn).not.toHaveBeenCalled();

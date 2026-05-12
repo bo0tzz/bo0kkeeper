@@ -99,10 +99,10 @@ async function main(): Promise<void> {
       paperlessDocId: 'demo-acme-cables-001',
       vendor: 'Acme Cables',
       expenseDate: new Date('2026-04-22'),
-      amountMinor: 8500n,
+      amountMinor: 12_100n,
       currency: 'EUR',
       btwRateBps: 2100,
-      btwMinor: 1475n,
+      btwMinor: 2100n,
       locationClass: ExpenseLocationClass.Domestic,
       category: '',
       notes: 'Demo HDMI cable purchase',
@@ -110,10 +110,10 @@ async function main(): Promise<void> {
     });
     // Auto-approve so it's not stuck in pending_review.
     const pendingExpenses = await expenseRepo.findPendingReview();
-    const acme-cables = pendingExpenses.find((e) => e.vendor === 'Acme Cables');
-    if (acme-cables) {
-      await expenseRepo.approve(acme-cables.id);
-      console.log(`  approved expense ${acme-cables.id} (Acme Cables, €85)`);
+    const demoExpense = pendingExpenses.find((e) => e.vendor === 'Acme Cables');
+    if (demoExpense) {
+      await expenseRepo.approve(demoExpense.id);
+      console.log(`  approved expense ${demoExpense.id} (Acme Cables, €121)`);
     }
 
     console.log('=== Bank transactions, run through matcher ===');
@@ -154,22 +154,22 @@ async function main(): Promise<void> {
     await ingestAndMatch(bankRepo, matcher, {
       externalId: 'demo-bank-3',
       txDate: new Date('2026-04-22'),
-      amountMinor: -8500n,
+      amountMinor: -12_100n,
       currency: 'EUR',
       counterpartyName: 'Acme Cables via PSP',
       counterpartyIban: null,
-      description: 'opaque-mollie-id 1234567 ORD-987654 no-TXN-ref',
+      description: 'opaque-psp-id 1234567 ORD-987654 no-TXN-ref',
     });
 
     // 4. Unmatched — to exercise the manual Link UI.
     await ingestAndMatch(bankRepo, matcher, {
       externalId: 'demo-bank-4',
       txDate: new Date('2026-04-25'),
-      amountMinor: -19_995n,
+      amountMinor: -25_000n,
       currency: 'EUR',
       counterpartyName: 'BELASTINGDIENST',
       counterpartyIban: 'NL86INGB0002445588',
-      description: 'BTW-aangifte Q1 2026',
+      description: 'BTW-aangifte',
     });
 
     // 5. Self-transfer (should remain unmatched too).

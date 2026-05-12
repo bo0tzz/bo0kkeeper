@@ -70,6 +70,15 @@ export class ExpenseTable {
   @ForeignKeyColumn(() => EventTable, { nullable: true, onDelete: 'SET NULL' })
   sourceEventId!: string | null;
 
+  /**
+   * When a sheet expense row was successfully written for this expense.
+   * Null = no row yet (either no bank-tx is matched yet, or the write
+   * failed and is awaiting retry). The retry job re-attempts any approved
+   * + bank-tx-matched expense with this still null.
+   */
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  sheetRowAt!: Timestamp | null;
+
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;
 

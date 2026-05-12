@@ -13,7 +13,7 @@ import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository, NewExpense } from 'src/repositories/expense.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
-import { PaperlessDocument, PaperlessService } from 'src/services/paperless.service';
+import { PaperlessDocument, PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { WebhookService } from 'src/services/webhook.service';
 import { getKyselyDB } from 'test/utils';
@@ -44,7 +44,7 @@ describe('ExpensesController', () => {
     repo = new ExpenseRepository(db);
     // The existing tests don't exercise the paperless-rescan path; pass typed
     // nulls cast to the service shape so the controller wires up.
-    const stubPaperless = {} as unknown as PaperlessService;
+    const stubPaperless = {} as unknown as PaperlessRepository;
     const stubSettings = {} as unknown as SettingsService;
     const stubWebhook = {} as unknown as WebhookService;
     controller = new ExpensesController(
@@ -210,7 +210,7 @@ function buildRescanController(
   const jobRepo = { queue: jobQueue, queueAll: vi.fn(), setup: vi.fn() } as unknown as JobRepository;
   const paperlessSvc = {
     listDocumentsTaggedAllOf: vi.fn().mockResolvedValue(input.docs),
-  } as unknown as PaperlessService;
+  } as unknown as PaperlessRepository;
   const settingsSvc = {
     getPaperlessExpenseTags: vi.fn().mockResolvedValue(input.tags),
   } as unknown as SettingsService;

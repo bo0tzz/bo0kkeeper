@@ -16,7 +16,7 @@ import {
   RescanPaperlessResponseDto,
 } from 'src/dtos/expense.dto';
 import { ExpenseRepository, ExpenseUpdate } from 'src/repositories/expense.repository';
-import { PaperlessService } from 'src/services/paperless.service';
+import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { WebhookService } from 'src/services/webhook.service';
 
@@ -26,7 +26,7 @@ export class ExpensesController {
   constructor(
     private readonly expenseRepository: ExpenseRepository,
     private readonly eventRepository: EventRepository,
-    private readonly paperlessService: PaperlessService,
+    private readonly paperlessService: PaperlessRepository,
     private readonly settingsService: SettingsService,
     private readonly webhookService: WebhookService,
   ) {}

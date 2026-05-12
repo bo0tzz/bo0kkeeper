@@ -3,10 +3,10 @@ import { BankingSessionStatus } from 'src/enum';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { DB } from 'src/schema';
-import { PaperlessService } from 'src/services/paperless.service';
+import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { SystemHealthService } from 'src/services/system-health.service';
-import { WiseApiService } from 'src/services/wise-api.service';
+import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -46,7 +46,7 @@ describe('SystemHealthService', () => {
   } = {}): SystemHealthService {
     const paperless = {
       checkTagsExist: vi.fn().mockResolvedValue(overrides.paperlessTagsExist ?? []),
-    } as unknown as PaperlessService;
+    } as unknown as PaperlessRepository;
     const settings = {
       getPaperlessExpenseTags: vi.fn().mockResolvedValue(overrides.paperlessTags ?? []),
     } as unknown as SettingsService;
@@ -57,7 +57,7 @@ describe('SystemHealthService', () => {
         }
         return Promise.resolve();
       }),
-    } as unknown as WiseApiService;
+    } as unknown as WiseApiRepository;
     return new SystemHealthService(eventRepo, sessionRepo, paperless, settings, wise);
   }
 

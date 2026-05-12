@@ -42,11 +42,11 @@ async function main() {
     const eventRepo = new EventRepository(db);
 
     console.log('Seeding clients…');
-    const acmeStudio = await clientRepo.create({
-      name: 'F. Acme Studio (Otherville)',
+    const domestic = await clientRepo.create({
+      name: 'Acme Studio NL',
       class: ClientClass.Domestic,
       tradeName: TradeName.ItServices,
-      address: { line1: 'Example Street 99', city: '5678CD Otherville', countryCode: 'NL' },
+      address: { line1: 'Example Street 1', city: '1234AB Exampletown', countryCode: 'NL' },
       vatId: null,
       defaultDescription: 'Maatwerk',
     });
@@ -56,7 +56,7 @@ async function main() {
       tradeName: TradeName.ItServices,
       address: { line1: '1 Park Plaza', city: 'Anytown', countryCode: 'US' },
       vatId: null,
-      wiseSenderPattern: 'OverseasClientCo',
+      wiseSenderPattern: 'OVERSEAS',
       defaultDescription: 'Provided services',
     });
     const euClient = await clientRepo.create({
@@ -72,7 +72,7 @@ async function main() {
     const inv2026001 = await invoiceRepo.issue({
       year: 2026,
       invoice: {
-        clientId: acmeStudio.id,
+        clientId: domestic.id,
         issuedAt: new Date('2026-01-15'),
         currency: 'EUR',
         totalMinor: 18_150n,
@@ -93,7 +93,7 @@ async function main() {
     const inv2026002 = await invoiceRepo.issue({
       year: 2026,
       invoice: {
-        clientId: acmeStudio.id,
+        clientId: domestic.id,
         issuedAt: new Date('2026-02-15'),
         currency: 'EUR',
         totalMinor: 24_200n,
@@ -336,7 +336,7 @@ async function main() {
     }
 
     console.log('Done seeding.');
-    console.log(`  clients:       ${[acmeStudio, overseas, euClient].length}`);
+    console.log(`  clients:       ${[domestic, overseas, euClient].length}`);
     console.log('  invoices:      4 (1 unpaid, 3 paid via bank match)');
     console.log('  bank tx:       4 (3 matched, 1 noise)');
     console.log('  wise transfer: 1 (matched to bank tx)');

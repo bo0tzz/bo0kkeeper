@@ -92,7 +92,7 @@ describe('QuarterlyAggregatorService', () => {
     });
 
     // Non-EU income: USD invoice was issued but hasn't been paid yet, AND a
-    // separate Wise transfer landed €4500 in the quarter — that's the income.
+    // separate Wise transfer landed in the quarter — that's the income.
     const nonEu = await clientRepo.create({
       name: 'OverseasClientCo',
       class: ClientClass.NonEu,

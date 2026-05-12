@@ -64,8 +64,8 @@ export class WiseApiError extends Error {
 type FetchLike = typeof fetch;
 
 @Injectable()
-export class WiseApiService {
-  private readonly logger = new Logger(WiseApiService.name);
+export class WiseApiRepository {
+  private readonly logger = new Logger(WiseApiRepository.name);
   private readonly config: Config['wise'];
   private readonly fetchFn: FetchLike;
 

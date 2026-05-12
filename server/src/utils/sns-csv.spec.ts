@@ -9,7 +9,7 @@ describe('parseSnsCsv', () => {
   it('parses a basic row with the existing SNS column layout', () => {
     const csv = [
       HEADER,
-      `01-08-2099,NL00BANK0000000000,BE03967415006984,Test Account Holder,,,,EUR,0.00,EUR,13493.97,01-08-2099,01-08-2099,8949,IOS,5710841,,'996460097-BE03967415006984-Test Account Holder-TXN-0002',32`,
+      `01-08-2099,NL00BANK0000000000,BE03967415006984,Test Account Holder,,,,EUR,0.00,EUR,50000.00,01-08-2099,01-08-2099,8949,IOS,5710841,,'996460097-BE03967415006984-Test Account Holder-TXN-0002',32`,
     ].join('\n');
 
     const rows = parseSnsCsv(csv, 'NL00BANK0000000000');
@@ -17,7 +17,7 @@ describe('parseSnsCsv', () => {
     const row = rows[0];
     expect(row.source).toBe(BankSource.SnsCsv);
     expect(row.externalId).toBe('32:5710841');
-    expect(row.amountMinor).toBe(1_349_397n);
+    expect(row.amountMinor).toBe(5_000_000n);
     expect(row.currency).toBe('EUR');
     expect(row.counterpartyName).toBe('Test Account Holder');
     expect(row.counterpartyIban).toBe('BE03967415006984');
@@ -28,18 +28,18 @@ describe('parseSnsCsv', () => {
   it('handles negative amounts (debits)', () => {
     const csv = [
       HEADER,
-      `02-08-2099,NL00BANK0000000000,NL35RABO0117713678,Online Cable Shop BV,,,,EUR,13413.87,EUR,-90.95,02-08-2099,02-08-2099,9806,IDE,1792387,,'2551468554X6fa2e ORD125568',32`,
+      `02-08-2099,NL00BANK0000000000,NL35RABO0117713678,Online Cable Shop BV,,,,EUR,49999.00,EUR,-100.00,02-08-2099,02-08-2099,9806,IDE,1792387,,'2551468554X6fa2e ORD125568',32`,
     ].join('\n');
 
     const rows = parseSnsCsv(csv, 'NL00BANK0000000000');
-    expect(rows[0].amountMinor).toBe(-9095n);
+    expect(rows[0].amountMinor).toBe(-10_000n);
     expect(rows[0].counterpartyName).toBe('Online Cable Shop BV');
   });
 
   it('preserves the full raw row in rawPayload', () => {
     const csv = [
       HEADER,
-      `11-09-2099,NL00BANK0000000000,NL87ASNB8843857517,Test Counterparty,,,,EUR,14959.32,EUR,15.00,11-09-2099,11-09-2099,6853,BVZ,741611,,'3D print services (2099/005)',38`,
+      `11-09-2099,NL00BANK0000000000,NL87ASNB8843857517,Test Counterparty,,,,EUR,50000.00,EUR,25.00,11-09-2099,11-09-2099,6853,BVZ,741611,,'3D print services (2099/005)',38`,
     ].join('\n');
 
     const rows = parseSnsCsv(csv, 'NL00BANK0000000000');

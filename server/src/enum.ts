@@ -53,6 +53,14 @@ export enum JobName {
    * showing the wrong state forever.
    */
   WiseReconcile = 'wise.reconcile',
+  /**
+   * Retry any sheet writes that previously failed. Identifies them by
+   * scanning entities that should have a sheet row (matched bank_tx,
+   * approved+matched expense) but where `sheetRowAt` is still null.
+   * Cron-scheduled hourly; idempotent — concurrent retries no-op once
+   * one succeeds.
+   */
+  SheetWriteRetry = 'sheet.write_retry',
 }
 
 /** Tax/billing classification of a client; drives BTW treatment + invoice template selection. */

@@ -90,6 +90,15 @@ export class BankTransactionTable {
   @Column({ type: 'character varying', nullable: true })
   category!: BankTxCategory | null;
 
+  /**
+   * When a sheet income row was successfully written for this bank tx.
+   * Null = no row yet (either the match doesn't warrant one, or the write
+   * failed and is awaiting retry). The retry job re-attempts any matched
+   * bank_tx with this still null.
+   */
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  sheetRowAt!: Timestamp | null;
+
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;
 

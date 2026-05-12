@@ -3,7 +3,7 @@ import { loadConfig } from 'src/config';
 import { EventRepository } from 'src/repositories/event.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
-import { WiseApiService } from 'src/services/wise-api.service';
+import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { WiseDraftService } from 'src/services/wise-draft.service';
 import { getKyselyConfig } from 'src/utils/database';
 
@@ -13,7 +13,7 @@ async function main() {
   try {
     const eventRepo = new EventRepository(db);
     const transferRepo = new WiseTransferRepository(db);
-    const wiseApi = new WiseApiService();
+    const wiseApi = new WiseApiRepository();
     const draft = new WiseDraftService(eventRepo, transferRepo, wiseApi);
     const eventId = process.argv[2];
     if (!eventId) {

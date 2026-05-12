@@ -29,7 +29,7 @@ const TransactionRowSchema = z.object({
   counterparty: z.string().nullable(),
   /**
    * Human label of what this row represents:
-   *   bank rows: 'Income (invoice 2026/001)' / 'Expense (Acme Cables)' / 'Tax' /
+   *   bank rows: 'Income (invoice 2026/001)' / 'Expense (vendor)' / 'Tax' /
    *              'Drawings' / 'Self-transfer' / 'Fee' / 'Unmatched'
    *   wise rows: 'Wise USD→EUR' (or whichever direction)
    */

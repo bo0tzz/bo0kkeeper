@@ -3,8 +3,8 @@ import { ColumnType } from 'kysely';
 import { InvoiceTable } from 'src/schema/tables/invoice.table';
 
 /**
- * Per-line breakdown of an invoice. For single-item invoices (e.g. OverseasClientCo
- * regular paychecks) a single row carries the whole amount. For multi-line
+ * Per-line breakdown of an invoice. For single-item invoices (e.g. regular
+ * non-EU paychecks) a single row carries the whole amount. For multi-line
  * invoices (paycheck + bonus + reimbursement; design + 3D printing) each
  * line gets its own row.
  *

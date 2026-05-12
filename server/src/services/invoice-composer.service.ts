@@ -5,8 +5,8 @@ import { Client, ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { InvoiceRepository, InvoiceWithLines } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
-import { PaperlessService } from 'src/services/paperless.service';
-import { RenderService } from 'src/services/render.service';
+import { PaperlessRepository } from 'src/repositories/paperless.repository';
+import { TypstRepository } from 'src/repositories/typst.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { JobOf } from 'src/types';
 
@@ -20,11 +20,11 @@ export type InvoiceLineInput = {
 
 export type InvoiceCompositionInput = {
   clientId: string;
-  /** Defaults to today; usually the period end (e.g. 15th / end-of-month for OverseasClientCo). */
+  /** Defaults to today; usually the period end (e.g. 15th / end-of-month for non-EU clients). */
   issuedAt: Date;
   periodStart?: Date;
   periodEnd?: Date;
-  /** Primary currency. USD for OverseasClientCo non-EU; EUR for domestic. */
+  /** Primary currency. USD for non-EU; EUR for domestic. */
   currency: string;
   /**
    * For Non-EU bilingual invoices: the EUR equivalent of the total at the FX
@@ -68,8 +68,8 @@ export class InvoiceComposerService {
   constructor(
     private readonly clientRepository: ClientRepository,
     private readonly invoiceRepository: InvoiceRepository,
-    private readonly renderService: RenderService,
-    private readonly paperlessService: PaperlessService,
+    private readonly renderService: TypstRepository,
+    private readonly paperlessService: PaperlessRepository,
     private readonly jobRepository: JobRepository,
     private readonly eventRepository: EventRepository,
     private readonly settingsService: SettingsService,
@@ -203,7 +203,7 @@ export class InvoiceComposerService {
   }
 }
 
-/** Period decimals, e.g. 4155.12 — used for OverseasClientCo non-EU invoices. */
+/** Period decimals, e.g. 4155.12 — used for non-EU invoices. */
 function formatMinor(minor: bigint): string {
   const negative = minor < 0n;
   const abs = negative ? -minor : minor;
@@ -224,7 +224,7 @@ function formatMinorWhole(minor: bigint): string {
 
 /**
  * Dutch number format used on domestic invoices: "165,-" for whole amounts,
- * "32,50" for fractional. Matches the user's existing Acme Studio invoices.
+ * "32,50" for fractional.
  */
 function formatMinorDutch(minor: bigint): string {
   const negative = minor < 0n;
@@ -280,7 +280,6 @@ function buildClientBlock(client: Client): Record<string, string> {
 
 /**
  * Format a date as "March 15, 2026" — month name in English, US convention.
- * Matches the existing OverseasClientCo invoice layout.
  */
 function formatDateLong(date: Date | string): string {
   const d = date instanceof Date ? date : new Date(date);
@@ -288,8 +287,7 @@ function formatDateLong(date: Date | string): string {
 }
 
 /**
- * Format a date as "5 March 2026" — day-month-year, no comma. Matches the
- * existing Acme Studio (domestic) invoice layout.
+ * Format a date as "5 March 2026" — day-month-year, no comma.
  */
 function formatDateDutch(date: Date | string): string {
   const d = date instanceof Date ? date : new Date(date);
@@ -409,7 +407,7 @@ function nonEuSummary(invoice: InvoiceWithLines, totalMinor: bigint): SummaryRow
 
 /**
  * Currency-aware amount string for non-EU invoices. USD shows "$ X (€ Y)";
- * EUR-only (e.g. OverseasClientCo reimbursements) just shows "€ Y".
+ * EUR-only (e.g. reimbursements) just shows "€ Y".
  */
 function formatLineAmount(invoice: InvoiceWithLines, primary: string, eur: string): string {
   if (invoice.currency === 'USD') {

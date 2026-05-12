@@ -7,10 +7,10 @@ import { DB } from 'src/schema';
 import { BankingSessionService } from 'src/services/banking-session.service';
 import {
   CreateSessionResult,
-  EnableBankingApiService,
+  EnableBankingRepository,
   StartAuthInput,
   StartAuthResult,
-} from 'src/services/enable-banking-api.service';
+} from 'src/repositories/enable-banking.repository';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -23,14 +23,14 @@ beforeEach(() => {
   process.env.ENABLE_BANKING_CONSENT_DAYS = '90';
 });
 
-function fakeApi(): EnableBankingApiService & {
+function fakeApi(): EnableBankingRepository & {
   startAuth: ReturnType<typeof vi.fn>;
   createSession: ReturnType<typeof vi.fn>;
 } {
   return {
     startAuth: vi.fn(),
     createSession: vi.fn(),
-  } as unknown as EnableBankingApiService & {
+  } as unknown as EnableBankingRepository & {
     startAuth: ReturnType<typeof vi.fn>;
     createSession: ReturnType<typeof vi.fn>;
   };

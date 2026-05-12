@@ -11,10 +11,10 @@ import { BankingSyncService, mapTransaction } from 'src/services/banking-sync.se
 import {
   EnableBankingAccount,
   EnableBankingApiError,
-  EnableBankingApiService,
+  EnableBankingRepository,
   EnableBankingTransaction,
   ListTransactionsResult,
-} from 'src/services/enable-banking-api.service';
+} from 'src/repositories/enable-banking.repository';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -40,7 +40,7 @@ function tx(overrides: Partial<EnableBankingTransaction> = {}): EnableBankingTra
   };
 }
 
-function fakeApi(pages: ListTransactionsResult[]): EnableBankingApiService & {
+function fakeApi(pages: ListTransactionsResult[]): EnableBankingRepository & {
   listTransactions: ReturnType<typeof vi.fn>;
 } {
   let i = 0;
@@ -49,7 +49,7 @@ function fakeApi(pages: ListTransactionsResult[]): EnableBankingApiService & {
     i += 1;
     return Promise.resolve(page);
   });
-  return { listTransactions } as unknown as EnableBankingApiService & {
+  return { listTransactions } as unknown as EnableBankingRepository & {
     listTransactions: ReturnType<typeof vi.fn>;
   };
 }

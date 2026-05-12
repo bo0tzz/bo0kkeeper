@@ -3,9 +3,9 @@ import { loadConfig } from 'src/config';
 import { EventSource } from 'src/enum';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { EventRepository } from 'src/repositories/event.repository';
-import { PaperlessService } from 'src/services/paperless.service';
+import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
-import { WiseApiService } from 'src/services/wise-api.service';
+import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 
 export type IntegrationStatus = 'healthy' | 'degraded' | 'broken' | 'not_configured';
 
@@ -37,9 +37,9 @@ export class SystemHealthService {
   constructor(
     private readonly eventRepository: EventRepository,
     private readonly bankingSessionRepository: BankingSessionRepository,
-    private readonly paperlessService: PaperlessService,
+    private readonly paperlessService: PaperlessRepository,
     private readonly settingsService: SettingsService,
-    private readonly wiseApiService: WiseApiService,
+    private readonly wiseApiService: WiseApiRepository,
   ) {}
 
   async checkAll(): Promise<IntegrationCheck[]> {

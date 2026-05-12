@@ -1,4 +1,4 @@
-import { WiseApiError, WiseApiService } from 'src/services/wise-api.service';
+import { WiseApiError, WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 beforeEach(() => {
@@ -25,7 +25,7 @@ const errorResponse = (status: number, body: unknown): Response =>
     text: () => Promise.resolve(JSON.stringify(body)),
   }) as Response;
 
-describe('WiseApiService', () => {
+describe('WiseApiRepository', () => {
   it('createQuote posts the right body shape and maps the response', async () => {
     const fetchFn = vi.fn().mockResolvedValue(
       okResponse({
@@ -61,7 +61,7 @@ describe('WiseApiService', () => {
       }),
     );
 
-    const service = new WiseApiService(fetchFn);
+    const service = new WiseApiRepository(fetchFn);
     const quote = await service.createQuote({
       sourceCurrency: 'USD',
       targetCurrency: 'EUR',
@@ -102,7 +102,7 @@ describe('WiseApiService', () => {
       }),
     );
 
-    const service = new WiseApiService(fetchFn);
+    const service = new WiseApiRepository(fetchFn);
     const transfer = await service.createTransfer({
       quoteId: 'quote-uuid-1',
       recipientId: 67_890,
@@ -139,7 +139,7 @@ describe('WiseApiService', () => {
       }),
     );
 
-    const service = new WiseApiService(fetchFn);
+    const service = new WiseApiRepository(fetchFn);
     const transfer = await service.getTransfer(9_999_999);
 
     const [url, init] = fetchFn.mock.calls[0] as [string, RequestInit];
@@ -151,7 +151,7 @@ describe('WiseApiService', () => {
   it('throws WiseApiError on non-2xx', async () => {
     const fetchFn = vi.fn().mockResolvedValue(errorResponse(401, { errors: [{ code: 'unauthorized' }] }));
 
-    const service = new WiseApiService(fetchFn);
+    const service = new WiseApiRepository(fetchFn);
 
     await expect(
       service.createQuote({ sourceCurrency: 'USD', targetCurrency: 'EUR', sourceAmountMinor: 1n }),
@@ -162,7 +162,7 @@ describe('WiseApiService', () => {
     delete process.env.WISE_API_TOKEN;
     const fetchFn = vi.fn();
 
-    const service = new WiseApiService(fetchFn);
+    const service = new WiseApiRepository(fetchFn);
 
     await expect(
       service.createQuote({ sourceCurrency: 'USD', targetCurrency: 'EUR', sourceAmountMinor: 1n }),

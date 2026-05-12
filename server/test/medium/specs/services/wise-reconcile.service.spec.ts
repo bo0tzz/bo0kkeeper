@@ -3,7 +3,7 @@ import { WiseTransferDirection, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
-import { WiseApiError, WiseApiService, WiseTransfer } from 'src/services/wise-api.service';
+import { WiseApiError, WiseApiRepository, WiseTransfer } from 'src/repositories/wise-api.repository';
 import { WiseReconcileService } from 'src/services/wise-reconcile.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -35,13 +35,13 @@ function makeWiseTransfer(
 describe('WiseReconcileService', () => {
   let db: Kysely<DB>;
   let repo: WiseTransferRepository;
-  let api: WiseApiService & { getTransfer: ReturnType<typeof vi.fn> };
+  let api: WiseApiRepository & { getTransfer: ReturnType<typeof vi.fn> };
   let service: WiseReconcileService;
 
   beforeEach(async () => {
     db = await getKyselyDB();
     repo = new WiseTransferRepository(db);
-    api = { getTransfer: vi.fn() } as unknown as WiseApiService & {
+    api = { getTransfer: vi.fn() } as unknown as WiseApiRepository & {
       getTransfer: ReturnType<typeof vi.fn>;
     };
     service = new WiseReconcileService(repo, api, new EventRepository(db));

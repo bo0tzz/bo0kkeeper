@@ -25,6 +25,7 @@ type JobItemMap = {
   [JobName.BankingSyncAll]: { psuIpAddress?: string };
   [JobName.BankingSweepStalePending]: Record<string, never>;
   [JobName.WiseReconcile]: Record<string, never>;
+  [JobName.SheetWriteRetry]: Record<string, never>;
 };
 
 /** Producer-side: `data` shape for a given job name. */
