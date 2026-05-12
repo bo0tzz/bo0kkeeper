@@ -114,7 +114,11 @@ export class BookkeepingExportService {
     return rows.map((r) => {
       const totalIncMinor = r.eurTotalMinor === null ? BigInt(r.totalMinor) : BigInt(r.eurTotalMinor);
       const vatMinor = r.btwMinor === null ? 0n : BigInt(r.btwMinor);
-      const exclVatMinor = vatMinor === 0n ? null : totalIncMinor - vatMinor;
+      // For Non-EU / out-of-scope rows the entire amount IS the excl-VAT
+      // base (no VAT was charged), so we fill the column with the full
+      // total rather than leaving it blank — the accountant expects every
+      // populated row to have a base amount.
+      const exclVatMinor = vatMinor === 0n ? totalIncMinor : totalIncMinor - vatMinor;
       return {
         date: new Date(r.issuedAt),
         counterparty: r.clientName,
@@ -141,7 +145,7 @@ export class BookkeepingExportService {
     return rows.map((r) => {
       const totalIncMinor = BigInt(r.amountMinor);
       const vatMinor = r.btwMinor === null ? 0n : BigInt(r.btwMinor);
-      const exclVatMinor = vatMinor === 0n ? null : totalIncMinor - vatMinor;
+      const exclVatMinor = vatMinor === 0n ? totalIncMinor : totalIncMinor - vatMinor;
       return {
         date: new Date(r.expenseDate),
         counterparty: r.vendor,
@@ -162,7 +166,7 @@ type ExportRow = {
   description: string;
   vatId: string | null;
   totalIncMinor: bigint;
-  exclVatMinor: bigint | null;
+  exclVatMinor: bigint;
   vatMinor: bigint;
 };
 type InvoiceExportRow = ExportRow & { classification: ClientClass };
@@ -231,10 +235,36 @@ function findContains(sheet: ExcelJS.Worksheet, fragment: string): number {
 }
 
 /**
+ * Standardized data-row styling. Override the template's per-cell styles
+ * (which vary: some cells are bold-italic-underline label-style, others
+ * plain) with a uniform plain Arial 10. Number/date formats explicit so
+ * dates render as `dd/mm/yyyy` and money columns format properly — the
+ * template defaults to "General" which renders dates as serial numbers.
+ */
+const DATA_ROW_FONT = { name: 'Arial', size: 10, family: 2 };
+const DATA_ROW_ALIGNMENT = { vertical: 'bottom' as const };
+const DATE_FMT = 'dd/mm/yyyy';
+const MONEY_FMT = '#,##0.00';
+
+function applyDataRowStyle(cell: ExcelJS.Cell, numFmt?: string): void {
+  cell.font = DATA_ROW_FONT;
+  cell.alignment = DATA_ROW_ALIGNMENT;
+  if (numFmt) {
+    cell.numFmt = numFmt;
+  }
+}
+
+/** Width of a data row in the template, in columns. */
+const DATA_COL_START = 2;
+const DATA_COL_END = 8;
+
+/**
  * Write `data` into the section starting at `sectionStart` and bounded by
  * the next section's start (`sectionEnd`, exclusive). The section's first
  * row already carries its label in column A — we leave that intact and
- * write data starting from column B onwards.
+ * write data starting from column B onwards. Reserved rows past the data
+ * count are cleared so they become natural blank padding rather than the
+ * template's "Not applicable" boilerplate.
  *
  * If we have more rows than the template reserved, duplicate the last
  * reserved row (using ExcelJS's row duplication, which copies styles and
@@ -263,16 +293,36 @@ function fillSection(
   for (let i = 0; i < data.length; i += 1) {
     const row = sectionStart + i;
     const item = data[i];
+
     sheet.getCell(row, 2).value = item.date;
-    sheet.getCell(row, 2).numFmt = sheet.getCell(row, 2).numFmt || 'mm/dd/yyyy';
+    applyDataRowStyle(sheet.getCell(row, 2), DATE_FMT);
+
     sheet.getCell(row, 3).value = item.counterparty;
+    applyDataRowStyle(sheet.getCell(row, 3));
+
     sheet.getCell(row, 4).value = item.description;
+    applyDataRowStyle(sheet.getCell(row, 4));
+
     sheet.getCell(row, 5).value = item.vatId ?? 'N/a';
+    applyDataRowStyle(sheet.getCell(row, 5));
+
     sheet.getCell(row, 6).value = minorToMajor(item.totalIncMinor);
-    if (item.exclVatMinor !== null) {
-      sheet.getCell(row, 7).value = minorToMajor(item.exclVatMinor);
-    }
+    applyDataRowStyle(sheet.getCell(row, 6), MONEY_FMT);
+
+    sheet.getCell(row, 7).value = minorToMajor(item.exclVatMinor);
+    applyDataRowStyle(sheet.getCell(row, 7), MONEY_FMT);
+
     sheet.getCell(row, 8).value = minorToMajor(item.vatMinor);
+    applyDataRowStyle(sheet.getCell(row, 8), MONEY_FMT);
+  }
+
+  // Clear template defaults ("Not applicable" etc.) from unused reserved
+  // rows so they read as blank padding rather than visual noise.
+  const sectionEndAfter = sectionEnd + Math.max(0, overflow);
+  for (let r = sectionStart + data.length; r < sectionEndAfter; r += 1) {
+    for (let c = DATA_COL_START; c <= DATA_COL_END; c += 1) {
+      sheet.getCell(r, c).value = null;
+    }
   }
 }
 
