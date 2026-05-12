@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ClientClass } from 'src/enum';
+import { ClientClass, ExpenseLocationClass } from 'src/enum';
 import { ColumnFormat, SheetsService } from 'src/services/sheets.service';
 
 export type IncomeRowInput = {
@@ -25,11 +25,37 @@ export type IncomeRowInput = {
   source?: string;
 };
 
+export type ExpenseRowInput = {
+  /** Payment-out date (kasstelsel). Drives the quarter tab + Date cell. */
+  date: Date;
+  /** Identifier in the Id column. Paperless doc id is the canonical reference. */
+  paperlessDocId: string;
+  vendor: string;
+  /** Always recorded in EUR on the sheet. */
+  eurAmountMinor: bigint;
+  locationClass: ExpenseLocationClass;
+  /** "From" column — the paying account. Defaults to "SNS Account". */
+  from?: string;
+  /** BTW percent label (e.g. "21%"). Empty when no BTW applies. */
+  vatPercent?: string;
+  /** BTW amount in EUR (minor). Empty when no BTW applies. */
+  vatMinor?: bigint;
+  notes?: string;
+  source?: string;
+};
+
 const LOCATION_BY_CLASS: Record<ClientClass, string> = {
   [ClientClass.NonEu]: 'Non-EU',
   [ClientClass.Eu]: 'EU',
   [ClientClass.EuReverseCharge]: 'EU',
   [ClientClass.Domestic]: 'Domestic',
+};
+
+const LOCATION_BY_EXPENSE_CLASS: Record<ExpenseLocationClass, string> = {
+  [ExpenseLocationClass.NonEu]: 'Non-EU',
+  [ExpenseLocationClass.Eu]: 'EU',
+  [ExpenseLocationClass.EuReverseCharge]: 'EU',
+  [ExpenseLocationClass.Domestic]: 'Domestic',
 };
 
 /**
@@ -103,6 +129,32 @@ export class SheetWriterService {
     ];
 
     this.logger.log(`Sheet append: tab=${tab} id=${input.invoiceNumber}`);
+    await this.sheets.appendRow(tab, row);
+  }
+
+  /** Append an Expense row for an approved expense and ensure the quarter tab exists. */
+  async writeExpenseRow(input: ExpenseRowInput): Promise<void> {
+    const tab = quarterTabName(input.date);
+    await this.sheets.ensureTab(tab, {
+      headers: QUARTER_TAB_HEADERS,
+      columnFormats: QUARTER_TAB_COLUMN_FORMATS,
+    });
+
+    const row: (string | number | null)[] = [
+      formatIsoDate(input.date),
+      input.paperlessDocId,
+      'Expense',
+      LOCATION_BY_EXPENSE_CLASS[input.locationClass],
+      input.from ?? 'SNS Account',
+      input.vendor,
+      formatEur(input.eurAmountMinor),
+      input.vatPercent ?? '',
+      input.vatMinor === undefined ? '' : formatEur(input.vatMinor),
+      input.notes ?? '',
+      input.source ?? '',
+    ];
+
+    this.logger.log(`Sheet append: tab=${tab} id=${input.paperlessDocId} (expense)`);
     await this.sheets.appendRow(tab, row);
   }
 }

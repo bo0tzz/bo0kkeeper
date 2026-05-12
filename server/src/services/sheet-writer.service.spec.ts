@@ -1,4 +1,4 @@
-import { ClientClass } from 'src/enum';
+import { ClientClass, ExpenseLocationClass } from 'src/enum';
 import {
   QUARTER_TAB_COLUMN_FORMATS,
   QUARTER_TAB_HEADERS,
@@ -82,6 +82,66 @@ describe('SheetWriterService', () => {
       '21%',
       41.48,
       '3D design & print services',
+      '',
+    ]);
+  });
+
+  it('writes a Domestic expense row with VAT and SNS Account as the payer', async () => {
+    await writer.writeExpenseRow({
+      date: new Date('2099-02-20T00:00:00Z'),
+      paperlessDocId: '4242',
+      vendor: 'Daily Groceries NL',
+      eurAmountMinor: 1599n,
+      locationClass: ExpenseLocationClass.Domestic,
+      vatPercent: '9%',
+      vatMinor: 132n,
+      notes: 'office snacks',
+      source: 'expense/some-uuid',
+    });
+
+    expect(ensureTab).toHaveBeenCalledWith('2099 Q1', {
+      headers: QUARTER_TAB_HEADERS,
+      columnFormats: QUARTER_TAB_COLUMN_FORMATS,
+    });
+    const [tab, row] = appendRow.mock.calls[0] as [string, (string | number | null)[]];
+    expect(tab).toBe('2099 Q1');
+    expect(row).toEqual([
+      '2099-02-20',
+      '4242',
+      'Expense',
+      'Domestic',
+      'SNS Account',
+      'Daily Groceries NL',
+      15.99,
+      '9%',
+      1.32,
+      'office snacks',
+      'expense/some-uuid',
+    ]);
+  });
+
+  it('writes a Non-EU expense row with blank VAT and a custom "From"', async () => {
+    await writer.writeExpenseRow({
+      date: new Date('2099-04-10T00:00:00Z'),
+      paperlessDocId: '7777',
+      vendor: 'AWS',
+      eurAmountMinor: 12_345n,
+      locationClass: ExpenseLocationClass.NonEu,
+      from: 'Wise',
+    });
+
+    const [, row] = appendRow.mock.calls[0] as [string, (string | number | null)[]];
+    expect(row).toEqual([
+      '2099-04-10',
+      '7777',
+      'Expense',
+      'Non-EU',
+      'Wise',
+      'AWS',
+      123.45,
+      '',
+      '',
+      '',
       '',
     ]);
   });

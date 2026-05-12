@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Logger, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { loadConfig } from 'src/config';
@@ -18,17 +18,21 @@ import {
 import { ExpenseRepository, ExpenseUpdate } from 'src/repositories/expense.repository';
 import { PaperlessService } from 'src/services/paperless.service';
 import { SettingsService } from 'src/services/settings.service';
+import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { WebhookService } from 'src/services/webhook.service';
 
 @ApiTags('Expenses')
 @Controller('/api/expenses')
 export class ExpensesController {
+  private readonly logger = new Logger(ExpensesController.name);
+
   constructor(
     private readonly expenseRepository: ExpenseRepository,
     private readonly eventRepository: EventRepository,
     private readonly paperlessService: PaperlessService,
     private readonly settingsService: SettingsService,
     private readonly webhookService: WebhookService,
+    private readonly sheetWriter: SheetWriterService,
   ) {}
 
   @Get()
@@ -106,6 +110,25 @@ export class ExpensesController {
         currency: row.currency,
       },
     });
+    // Sheet append is best-effort: a Sheets outage shouldn't roll back the
+    // approval (the row is in the DB and visible in the admin UI either way).
+    try {
+      const vatPercent = row.btwRateBps == null ? undefined : `${row.btwRateBps / 100}%`;
+      const vatMinor = row.btwMinor == null ? undefined : BigInt(row.btwMinor as bigint | string);
+      await this.sheetWriter.writeExpenseRow({
+        date: row.expenseDate instanceof Date ? row.expenseDate : new Date(row.expenseDate),
+        paperlessDocId: row.paperlessDocId,
+        vendor: row.vendor,
+        eurAmountMinor: BigInt(row.amountMinor as bigint | string),
+        locationClass: row.locationClass,
+        vatPercent,
+        vatMinor,
+        notes: row.notes ?? undefined,
+        source: `expense/${row.id}`,
+      });
+    } catch (error) {
+      this.logger.error(`Sheet write failed for expense ${row.id}: ${(error as Error).message}`);
+    }
     return mapExpense(row);
   }
 
