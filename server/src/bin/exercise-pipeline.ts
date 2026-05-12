@@ -1,0 +1,97 @@
+/**
+ * One-shot demo: ingest a fake SNS bank tx that pays an existing invoice,
+ * run the matcher, and watch a row land in the configured Google sheet.
+ *
+ * Picks the first open (unmatched) invoice in the DB and synthesises a
+ * matching bank tx with that invoice number in the description. The matcher
+ * sees the number → auto_high match → SheetWriterService appends the income
+ * row to the current-quarter tab.
+ *
+ *   pnpm --filter bo0kkeeper exec node ./dist/bin/exercise-pipeline.js
+ */
+import { Kysely } from 'kysely';
+import { randomUUID } from 'node:crypto';
+import { loadConfig } from 'src/config';
+import { BankSource } from 'src/enum';
+import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
+import { ClientRepository } from 'src/repositories/client.repository';
+import { EventRepository } from 'src/repositories/event.repository';
+import { DB } from 'src/schema';
+import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { SheetWriterService } from 'src/services/sheet-writer.service';
+import { SheetsService } from 'src/services/sheets.service';
+import { getKyselyConfig } from 'src/utils/database';
+
+async function main(): Promise<void> {
+  const config = loadConfig();
+  const db = new Kysely<DB>(getKyselyConfig(config.database));
+
+  try {
+    const openInvoice = await db
+      .selectFrom('invoice')
+      .leftJoin('bank_transaction', 'bank_transaction.matchedInvoiceId', 'invoice.id')
+      .innerJoin('client', 'client.id', 'invoice.clientId')
+      .where('bank_transaction.id', 'is', null)
+      .select([
+        'invoice.id',
+        'invoice.number',
+        'invoice.totalMinor',
+        'invoice.currency',
+        'invoice.issuedAt',
+        'client.name as clientName',
+      ])
+      .orderBy('invoice.issuedAt', 'asc')
+      .executeTakeFirst();
+
+    if (!openInvoice) {
+      console.error('No open invoices to match against. Issue one via /invoices/compose first.');
+      process.exit(2);
+    }
+
+    console.log(`Targeting invoice ${openInvoice.number} (${openInvoice.clientName}, ${openInvoice.totalMinor} ${openInvoice.currency} minor)`);
+
+    const bankRepo = new BankTransactionRepository(db);
+    const clientRepo = new ClientRepository(db);
+    const sheetWriter = new SheetWriterService(new SheetsService());
+    const eventRepo = new EventRepository(db);
+    const matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, eventRepo);
+
+    const externalId = `demo-${randomUUID().slice(0, 8)}`;
+    const ingested = await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId,
+      txDate: new Date(),
+      amountMinor: BigInt(openInvoice.totalMinor as unknown as string),
+      currency: openInvoice.currency,
+      counterpartyName: openInvoice.clientName,
+      counterpartyIban: 'NL00DEMO0000000000',
+      description: `Demo payment for invoice ${openInvoice.number}`,
+      rawPayload: { synthesized: true, by: 'exercise-pipeline' },
+    });
+    if (!ingested.ingested) {
+      console.error('Bank tx already existed — re-run with a fresh id.');
+      process.exit(2);
+    }
+
+    console.log(`Ingested bank tx ${ingested.row.id} (externalId=${externalId})`);
+
+    const match = await matcher.tryMatch(ingested.row);
+    if (!match.matched) {
+      console.error(`Matcher didn't latch: ${match.reason}`);
+      process.exit(1);
+    }
+    if (match.type !== 'invoice') {
+      console.error(`Matched the wrong kind: ${match.type}`);
+      process.exit(1);
+    }
+    console.log(`✓ matched bank tx → invoice ${openInvoice.number} (confidence=${match.confidence})`);
+    console.log(`  Check the dev sheet — a new row in the current quarter tab should be there.`);
+  } finally {
+    await db.destroy();
+  }
+}
+
+main().catch((error: unknown) => {
+  console.error(error);
+  process.exit(1);
+});
