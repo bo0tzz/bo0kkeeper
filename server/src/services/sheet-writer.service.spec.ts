@@ -5,7 +5,7 @@ import {
   quarterTabName,
   SheetWriterService,
 } from 'src/services/sheet-writer.service';
-import { SheetsService } from 'src/services/sheets.service';
+import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 beforeEach(() => {
@@ -15,14 +15,14 @@ beforeEach(() => {
 });
 
 describe('SheetWriterService', () => {
-  let sheets: SheetsService;
+  let sheets: SheetsRepository;
   let ensureTab: ReturnType<typeof vi.fn>;
   let appendRow: ReturnType<typeof vi.fn>;
   let autoResizeColumns: ReturnType<typeof vi.fn>;
   let writer: SheetWriterService;
 
   beforeEach(() => {
-    sheets = new SheetsService(vi.fn());
+    sheets = new SheetsRepository(vi.fn());
     ensureTab = vi.fn().mockResolvedValue(777);
     appendRow = vi.fn().mockResolvedValue(null);
     autoResizeColumns = vi.fn().mockResolvedValue(null);

@@ -48,8 +48,8 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 
 @Injectable()
-export class SheetsService {
-  private readonly logger = new Logger(SheetsService.name);
+export class SheetsRepository {
+  private readonly logger = new Logger(SheetsRepository.name);
   private readonly config: Config['sheets'];
   private readonly fetchFn: FetchLike;
   private accessToken?: { token: string; expiresAt: number };

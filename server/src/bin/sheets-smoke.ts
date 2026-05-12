@@ -15,7 +15,7 @@
  * right setup step. `walk through Sheets dev setup` in the project README.
  */
 import { loadConfig } from 'src/config';
-import { SheetsService } from 'src/services/sheets.service';
+import { SheetsRepository } from 'src/repositories/sheets.repository';
 
 const WRITE = process.argv.includes('--write');
 const SMOKE_TAB = 'smoke-test';
@@ -28,7 +28,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const service = new SheetsService();
+  const service = new SheetsRepository();
   console.log(`spreadsheet: ${cfg.spreadsheetId}`);
   console.log(`service account: ${cfg.serviceAccountEmail}`);
 

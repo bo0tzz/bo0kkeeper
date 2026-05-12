@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto';
-import { SheetsApiError, SheetsService } from 'src/services/sheets.service';
+import { SheetsApiError, SheetsRepository } from 'src/repositories/sheets.repository';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let testPrivateKey: string;
@@ -35,7 +35,7 @@ beforeEach(() => {
   process.env.SHEETS_SPREADSHEET_ID = 'fake-spreadsheet-id';
 });
 
-describe('SheetsService', () => {
+describe('SheetsRepository', () => {
   it('listTabs returns parsed sheet titles + ids', async () => {
     const fetchFn = vi
       .fn()
@@ -49,7 +49,7 @@ describe('SheetsService', () => {
         }),
       );
 
-    const service = new SheetsService(fetchFn);
+    const service = new SheetsRepository(fetchFn);
     const tabs = await service.listTabs();
 
     expect(tabs).toEqual([
@@ -74,7 +74,7 @@ describe('SheetsService', () => {
         }),
       );
 
-    const service = new SheetsService(fetchFn);
+    const service = new SheetsRepository(fetchFn);
     const id = await service.createTab('2099 Q3');
     expect(id).toBe(999);
 
@@ -94,7 +94,7 @@ describe('SheetsService', () => {
         }),
       );
 
-    const service = new SheetsService(fetchFn);
+    const service = new SheetsRepository(fetchFn);
     const id = await service.ensureTab('existing');
     expect(id).toBe(1);
     // Only token + listTabs, no createTab.
@@ -117,7 +117,7 @@ describe('SheetsService', () => {
       // 5. batchUpdate for bold + freeze + column formats
       .mockResolvedValueOnce(okResponse({}));
 
-    const service = new SheetsService(fetchFn);
+    const service = new SheetsRepository(fetchFn);
     const id = await service.ensureTab('2099 Q1', {
       headers: ['Date', 'Id', 'Amount'],
       columnFormats: [
@@ -172,7 +172,7 @@ describe('SheetsService', () => {
       .mockResolvedValueOnce(tokenResponse)
       .mockResolvedValueOnce(okResponse({ sheets: [{ properties: { sheetId: 42, title: 'existing' } }] }));
 
-    const service = new SheetsService(fetchFn);
+    const service = new SheetsRepository(fetchFn);
     const id = await service.ensureTab('existing', { headers: ['A', 'B'] });
     expect(id).toBe(42);
     // Only token + listTabs — no createTab, no appendRow, no batchUpdate.
@@ -185,7 +185,7 @@ describe('SheetsService', () => {
       .mockResolvedValueOnce(tokenResponse)
       .mockResolvedValueOnce(okResponse({ updates: { updatedRange: 'A2:F2' } }));
 
-    const service = new SheetsService(fetchFn);
+    const service = new SheetsRepository(fetchFn);
     await service.appendRow('2099 Q1', ['08/01/2099', '2099/001', 'Income', 'Non-EU', 'OverseasClientCo', 'Wise']);
 
     const [url, init] = fetchFn.mock.calls[1] as [string, RequestInit];
@@ -216,7 +216,7 @@ describe('SheetsService', () => {
       // 3) pad batchUpdate
       .mockResolvedValueOnce(okResponse({ replies: [] }));
 
-    const service = new SheetsService(fetchFn);
+    const service = new SheetsRepository(fetchFn);
     await service.autoResizeColumns('2099 Q1', 123, 3, 16);
 
     // First batchUpdate is the autoResize.
@@ -261,7 +261,7 @@ describe('SheetsService', () => {
 
   it('autoResizeColumns with padPx=0 skips the pad step', async () => {
     const fetchFn = vi.fn().mockResolvedValueOnce(tokenResponse).mockResolvedValueOnce(okResponse({ replies: [] }));
-    const service = new SheetsService(fetchFn);
+    const service = new SheetsRepository(fetchFn);
     await service.autoResizeColumns('2099 Q1', 123, 3, 0);
     // Just token + autoResize batchUpdate, no GET, no pad batchUpdate.
     expect(fetchFn).toHaveBeenCalledTimes(2);
@@ -274,7 +274,7 @@ describe('SheetsService', () => {
       .mockResolvedValueOnce(okResponse({ sheets: [] }))
       .mockResolvedValueOnce(okResponse({ sheets: [] }));
 
-    const service = new SheetsService(fetchFn);
+    const service = new SheetsRepository(fetchFn);
     await service.listTabs();
     await service.listTabs();
     // Token call only once across two listTabs.
@@ -290,14 +290,14 @@ describe('SheetsService', () => {
       .mockResolvedValueOnce(tokenResponse)
       .mockResolvedValueOnce(errorResponse(403, { error: { message: 'forbidden' } }));
 
-    const service = new SheetsService(fetchFn);
+    const service = new SheetsRepository(fetchFn);
     await expect(service.listTabs()).rejects.toBeInstanceOf(SheetsApiError);
   });
 
   it('throws if SHEETS_SPREADSHEET_ID is missing', async () => {
     delete process.env.SHEETS_SPREADSHEET_ID;
     const fetchFn = vi.fn();
-    const service = new SheetsService(fetchFn);
+    const service = new SheetsRepository(fetchFn);
     await expect(service.listTabs()).rejects.toThrow(/SHEETS_SPREADSHEET_ID/);
     expect(fetchFn).not.toHaveBeenCalled();
   });

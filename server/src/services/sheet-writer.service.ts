@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ClientClass, ExpenseLocationClass } from 'src/enum';
 import { Expense } from 'src/repositories/expense.repository';
-import { ColumnFormat, SheetsService } from 'src/services/sheets.service';
+import { ColumnFormat, SheetsRepository } from 'src/repositories/sheets.repository';
 
 export type IncomeRowInput = {
   /** Payment-received date (kasstelsel). DD/MM/YYYY in the row. */
@@ -80,7 +80,7 @@ export const QUARTER_TAB_HEADERS: string[] = [
 
 /**
  * Per-column number formats applied to rows 2+ of newly-created tabs. Header
- * row is excluded automatically by SheetsService.initTab.
+ * row is excluded automatically by SheetsRepository.initTab.
  *   A (Date)   — DATE format renders the ISO-written date as DD/MM/YYYY
  *   G (Amount) — CURRENCY with euro symbol
  *   H (VAT %)  — PERCENT (Sheets parses "21%" string into 0.21 under USER_ENTERED)
@@ -95,7 +95,7 @@ export const QUARTER_TAB_COLUMN_FORMATS: ColumnFormat[] = [
 
 /**
  * Composes sheet rows in the existing column layout and writes them via
- * SheetsService. Encapsulates the kasstelsel convention (sheet date = payment
+ * SheetsRepository. Encapsulates the kasstelsel convention (sheet date = payment
  * received date) and the existing tab naming (`YYYY QN` per calendar quarter).
  *
  * Sheet column order — must stay aligned with the existing manual sheet:
@@ -105,7 +105,7 @@ export const QUARTER_TAB_COLUMN_FORMATS: ColumnFormat[] = [
 export class SheetWriterService {
   private readonly logger = new Logger(SheetWriterService.name);
 
-  constructor(private readonly sheets: SheetsService) {}
+  constructor(private readonly sheets: SheetsRepository) {}
 
   /** Append an Income row for an invoice and ensure the quarter tab exists. */
   async writeIncomeRow(input: IncomeRowInput): Promise<void> {
