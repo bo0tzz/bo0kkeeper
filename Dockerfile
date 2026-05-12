@@ -93,8 +93,10 @@ EXPOSE 2283
 # exists in node:bookworm-slim.
 USER node
 
-# Healthcheck hits the existing /api/health route (Public, no auth).
+# Container HEALTHCHECK hits the readiness probe so docker/k8s see "healthy"
+# only when the process is up AND the DB ping succeeds. K8s deployments
+# should also wire a separate liveness probe at /api/health.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||2283)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||2283)+'/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "/app/server/dist/main.js"]
