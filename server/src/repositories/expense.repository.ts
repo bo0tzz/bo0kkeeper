@@ -68,7 +68,25 @@ export class ExpenseRepository {
       .$if(!!filter.status, (qb) => qb.where('status', '=', filter.status!))
       .$if(!!filter.locationClass, (qb) => qb.where('locationClass', '=', filter.locationClass!))
       .$if(!!filter.from, (qb) => qb.where('expenseDate', '>=', filter.from!))
-      .$if(!!filter.to, (qb) => qb.where('expenseDate', '<=', filter.to!));
+      .$if(!!filter.to, (qb) => qb.where('expenseDate', '<=', filter.to!))
+      .$if(filter.matched === false, (qb) =>
+        qb.where(({ not, exists, selectFrom }) =>
+          not(
+            exists(
+              selectFrom('bank_transaction')
+                .select('id')
+                .whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
+            ),
+          ),
+        ),
+      )
+      .$if(filter.matched === true, (qb) =>
+        qb.where(({ exists, selectFrom }) =>
+          exists(
+            selectFrom('bank_transaction').select('id').whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
+          ),
+        ),
+      );
 
     const [items, totalRow] = await Promise.all([
       baseQuery
@@ -120,6 +138,15 @@ export type ExpenseListFilter = {
   from?: Date;
   /** Inclusive upper bound on expenseDate. */
   to?: Date;
+  /**
+   * Filter by whether a bank_transaction is matched to this expense.
+   *   false → only unmatched (no row in bank_transaction has matchedExpenseId = this.id)
+   *   true  → only matched
+   *   undefined → no filter
+   * Drives the dashboard's "Approved, unmatched" tile — the new failure
+   * mode where an expense has been approved but no bank tx has landed yet.
+   */
+  matched?: boolean;
   limit: number;
   offset: number;
 };

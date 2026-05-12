@@ -35,6 +35,11 @@ export type ListExpensesQuery = {
   from?: string;
   /** YYYY-MM-DD */
   to?: string;
+  /**
+   * Filter by bank-tx match state. `false` returns only expenses with no
+   * matching bank_transaction; `true` only those that have one.
+   */
+  matched?: boolean;
   limit?: number;
   offset?: number;
 };

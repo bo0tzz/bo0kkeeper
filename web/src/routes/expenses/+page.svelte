@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
   import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
   import {
@@ -36,7 +37,13 @@
 
   const PAGE_SIZE = 50;
 
-  let status = $state<ExpenseStatus | ''>('');
+  // URL-driven initial filters — lets the dashboard's "Approved, no bank
+  // match" tile link directly to /expenses?status=approved&matched=false.
+  const initialStatus = (page.url.searchParams.get('status') ?? '') as ExpenseStatus | '';
+  const initialMatched = page.url.searchParams.get('matched');
+
+  let status = $state<ExpenseStatus | ''>(initialStatus);
+  let matched = $state<'' | 'true' | 'false'>(initialMatched === 'true' || initialMatched === 'false' ? initialMatched : '');
   let offset = $state(0);
   let data = $state<ListExpensesResponse | null>(null);
   let loading = $state(false);
@@ -97,6 +104,7 @@
     try {
       data = await listExpenses({
         status: status || undefined,
+        matched: matched === '' ? undefined : matched === 'true',
         limit: PAGE_SIZE,
         offset,
       });
@@ -316,6 +324,21 @@
           offset = 0;
         }}
       />
+      {#if matched !== ''}
+        <Badge color="warning">
+          {matched === 'false' ? 'Unmatched only' : 'Matched only'}
+          <button
+            type="button"
+            class="ml-2 underline"
+            onclick={() => {
+              matched = '';
+              offset = 0;
+            }}
+          >
+            clear
+          </button>
+        </Badge>
+      {/if}
     </HStack>
 
     {#if rescanError}

@@ -11,7 +11,7 @@
  */
 type ApiOptions = {
   fetch?: typeof fetch;
-  query?: Record<string, string | number | undefined>;
+  query?: Record<string, string | number | boolean | undefined>;
 };
 
 /** Per-field issue from the backend's Zod validation (matches ZodError.issues). */
@@ -198,7 +198,7 @@ function safeParseJson(text: string): unknown {
   }
 }
 
-function buildQuery(params: Record<string, string | number | undefined>): string {
+function buildQuery(params: Record<string, string | number | boolean | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== '') {

@@ -12,6 +12,15 @@ const ListExpensesQuerySchema = z
     from: isoDateToDate.optional(),
     /** YYYY-MM-DD inclusive upper bound on expense date. */
     to: isoDateToDate.optional(),
+    /**
+     * Whether the expense has been matched to a bank_transaction.
+     * `false` → unmatched only (drives the "approved, unmatched" dashboard
+     * tile). `true` → matched only. Omit for no filter.
+     */
+    matched: z
+      .enum(['true', 'false'])
+      .transform((v) => v === 'true')
+      .optional(),
     limit: z.coerce.number().int().min(1).max(200).default(50),
     offset: z.coerce.number().int().min(0).default(0),
   })

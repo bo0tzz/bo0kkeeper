@@ -27,8 +27,13 @@
   type Counts = {
     pendingWiseCredits: number;
     pendingExpenseReviews: number;
+    /** Approved expenses with no matched bank_transaction — the new failure
+     * mode under bank-tx-match-only sheet writes. */
+    approvedUnmatchedExpenses: number;
     unmatchedBankTx: number;
     failedEvents: number;
+    /** Count of sheet.write_failed system events in the last 30 days. */
+    sheetWriteFailures30d: number;
     /** Count of ingest.dropped_before_cutover system events in the last 30 days. */
     cutoverDrops30d: number;
     /** Most recent receivedAt for any Wise event, ISO string. Null if none. */
@@ -70,34 +75,55 @@
       const year = now.getUTCFullYear();
       const quarter = Math.floor(now.getUTCMonth() / 3) + 1;
       const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const [wise, expenses, bankTx, bankingSession, agg, failed, lastWise, lastPaperless, drops, systemInfo] =
-        await Promise.all([
-          listEvents({
-            source: 'wise',
-            eventType: 'balances#credit',
-            status: 'pending',
-            limit: 1,
-          }) as Promise<ListEventsResponse>,
-          listExpenses({ status: 'pending_review', limit: 1 }) as Promise<ListExpensesResponse>,
-          listBankTransactions({ status: 'unmatched', limit: 1 }).catch(() => ({ items: [], total: 0 })),
-          getLatestBankingSession().catch(() => null),
-          getQuarterlyAggregate(year, quarter).catch(() => null),
-          listEvents({ status: 'failed', limit: 1 }) as Promise<ListEventsResponse>,
-          listEvents({ source: 'wise', limit: 1 }) as Promise<ListEventsResponse>,
-          listEvents({ source: 'paperless', limit: 1 }) as Promise<ListEventsResponse>,
-          listEvents({
-            source: 'system',
-            eventType: 'ingest.dropped_before_cutover',
-            since: since30d,
-            limit: 1,
-          }) as Promise<ListEventsResponse>,
-          getSystemInfo(),
-        ]);
+      const [
+        wise,
+        expenses,
+        approvedUnmatched,
+        bankTx,
+        bankingSession,
+        agg,
+        failed,
+        lastWise,
+        lastPaperless,
+        drops,
+        sheetFails,
+        systemInfo,
+      ] = await Promise.all([
+        listEvents({
+          source: 'wise',
+          eventType: 'balances#credit',
+          status: 'pending',
+          limit: 1,
+        }) as Promise<ListEventsResponse>,
+        listExpenses({ status: 'pending_review', limit: 1 }) as Promise<ListExpensesResponse>,
+        listExpenses({ status: 'approved', matched: false, limit: 1 }) as Promise<ListExpensesResponse>,
+        listBankTransactions({ status: 'unmatched', limit: 1 }).catch(() => ({ items: [], total: 0 })),
+        getLatestBankingSession().catch(() => null),
+        getQuarterlyAggregate(year, quarter).catch(() => null),
+        listEvents({ status: 'failed', limit: 1 }) as Promise<ListEventsResponse>,
+        listEvents({ source: 'wise', limit: 1 }) as Promise<ListEventsResponse>,
+        listEvents({ source: 'paperless', limit: 1 }) as Promise<ListEventsResponse>,
+        listEvents({
+          source: 'system',
+          eventType: 'ingest.dropped_before_cutover',
+          since: since30d,
+          limit: 1,
+        }) as Promise<ListEventsResponse>,
+        listEvents({
+          source: 'system',
+          eventType: 'sheet.write_failed',
+          since: since30d,
+          limit: 1,
+        }) as Promise<ListEventsResponse>,
+        getSystemInfo(),
+      ]);
       counts = {
         pendingWiseCredits: wise.total,
         pendingExpenseReviews: expenses.total,
+        approvedUnmatchedExpenses: approvedUnmatched.total,
         unmatchedBankTx: bankTx.total,
         failedEvents: failed.total,
+        sheetWriteFailures30d: sheetFails.total,
         cutoverDrops30d: drops.total,
         lastWiseEventAt: lastWise.items[0]?.receivedAt ?? null,
         lastPaperlessEventAt: lastPaperless.items[0]?.receivedAt ?? null,
@@ -147,7 +173,12 @@
       <Text>Loading…</Text>
     {:else if counts}
       {@const totalThingsToDo =
-        counts.pendingWiseCredits + counts.pendingExpenseReviews + counts.unmatchedBankTx + counts.failedEvents}
+        counts.pendingWiseCredits +
+        counts.pendingExpenseReviews +
+        counts.approvedUnmatchedExpenses +
+        counts.unmatchedBankTx +
+        counts.failedEvents +
+        counts.sheetWriteFailures30d}
       {@const reconnectDays = bankingExpiryDays(counts.bankingSession)}
       {@const wiseQuietDays = daysSince(counts.lastWiseEventAt)}
       {@const paperlessQuietDays = daysSince(counts.lastPaperlessEventAt)}
@@ -244,6 +275,27 @@
                 </HStack>
                 {#if counts.pendingExpenseReviews > 0}
                   <Button href={resolve('/expenses')} variant="outline">Review →</Button>
+                {/if}
+              </Stack>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Approved, no bank match</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <Stack gap={3}>
+                <HStack class="items-center justify-between">
+                  <Heading size="medium" tag="h3">{counts.approvedUnmatchedExpenses}</Heading>
+                  <Badge color={counts.approvedUnmatchedExpenses === 0 ? 'secondary' : 'warning'}>
+                    {counts.approvedUnmatchedExpenses === 0 ? 'clean' : 'waiting for bank'}
+                  </Badge>
+                </HStack>
+                {#if counts.approvedUnmatchedExpenses > 0}
+                  <Button href={`${resolve('/expenses')}?status=approved&matched=false`} variant="outline">
+                    Review →
+                  </Button>
                 {/if}
               </Stack>
             </CardBody>
@@ -348,6 +400,30 @@
                   {counts.cutoverDrops30d === 0 ? 'none' : '30d'}
                 </Badge>
               </HStack>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Sheet write failures</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <Stack gap={3}>
+                <HStack class="items-center justify-between">
+                  <Heading size="medium" tag="h3">{counts.sheetWriteFailures30d}</Heading>
+                  <Badge color={counts.sheetWriteFailures30d === 0 ? 'secondary' : 'danger'}>
+                    {counts.sheetWriteFailures30d === 0 ? 'clean' : '30d'}
+                  </Badge>
+                </HStack>
+                {#if counts.sheetWriteFailures30d > 0}
+                  <Button
+                    href={`${resolve('/events')}?source=system&eventType=sheet.write_failed`}
+                    variant="outline"
+                  >
+                    Investigate →
+                  </Button>
+                {/if}
+              </Stack>
             </CardBody>
           </Card>
         </div>
