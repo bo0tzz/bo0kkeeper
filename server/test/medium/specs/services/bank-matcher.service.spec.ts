@@ -272,6 +272,19 @@ describe('BankMatcherService', () => {
       identifier: invoice.number,
       bankTxId: ingest.row.id,
     });
+
+    // The bank_tx has no sheetRowAt because the write failed — it's now a
+    // candidate for the retry job.
+    expect(refetched?.sheetRowAt).toBeNull();
+
+    // Recover: stop rejecting, run the retry job. It should pick up the
+    // bank_tx, re-invoke the write, and mark sheetRowAt.
+    sheetWriter.writeIncomeRow.mockResolvedValue(void 0);
+    const retryResult = await matcher.retryFailedSheetWrites({});
+    expect(retryResult.attempted).toBe(1);
+    expect(retryResult.succeeded).toBe(1);
+    const recovered = await bankRepo.findById(ingest.row.id);
+    expect(recovered?.sheetRowAt).toBeInstanceOf(Date);
   });
 
   it('returns matched:false when no signal is present', async () => {

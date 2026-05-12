@@ -57,5 +57,10 @@ export class AppModule implements OnModuleInit {
     // webhooks. Wise is much more lenient on call quotas than PSD2 ASPSPs
     // so we can poll relatively aggressively.
     await this.jobRepository.schedule(JobName.WiseReconcile, '0 */4 * * *', {});
+    // Sheet-write retry every hour. The failure mode (Sheets API hiccup,
+    // rate limit, transient network) typically self-recovers fast, so a
+    // tight cadence keeps the dashboard tile close to zero. Also exposed
+    // as a manual trigger on the dashboard for "do it now" reactions.
+    await this.jobRepository.schedule(JobName.SheetWriteRetry, '0 * * * *', {});
   }
 }
