@@ -371,7 +371,10 @@ export class BankMatcherService {
         invoiceNumber: reference,
         eurAmountMinor,
         client: { name: nonEuClient?.name ?? 'Wise', class: ClientClass.NonEu },
-        from: bankTx.counterpartyName ?? 'Wise',
+        // Omit `from` — writeIncomeRow falls back to client.name, which is the
+        // originating Non-EU client (e.g. "OverseasClientCo"). The bank-tx
+        // counterparty on the SNS side is always "Wise" (the routing service),
+        // which is the wrong bookkeeping party.
         source: `wise_transfer/${transfer.id}`,
       });
     } catch (error) {

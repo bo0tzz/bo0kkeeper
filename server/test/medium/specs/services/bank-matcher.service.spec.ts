@@ -130,11 +130,16 @@ describe('BankMatcherService', () => {
       invoiceNumber: string;
       eurAmountMinor: bigint;
       client: { name: string; class: ClientClass };
+      from?: string;
     };
     expect(args.invoiceNumber).toBe('TXN-0044');
     expect(args.eurAmountMinor).toBe(404_572n);
     expect(args.client.name).toBe(nonEuClient.name);
     expect(args.client.class).toBe(ClientClass.NonEu);
+    // Do NOT carry the bank counterparty into From — that's "Wise" (the
+    // routing service), not the originating Non-EU client. Falling through
+    // lets writeIncomeRow default From to client.name.
+    expect(args.from).toBeUndefined();
   });
 
   it('matches a bank tx to an invoice via YYYY/NNN reference', async () => {
