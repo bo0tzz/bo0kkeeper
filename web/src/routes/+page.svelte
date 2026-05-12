@@ -9,7 +9,12 @@
   } from '$lib/services/banking.service';
   import { listEvents, type ListEventsResponse } from '$lib/services/events.service';
   import { listExpenses, type ListExpensesResponse } from '$lib/services/expenses.service';
-  import { getSystemInfo, retrySheetWrites, type SystemInfo } from '$lib/services/system.service';
+  import {
+    getSheetWriteStatus,
+    getSystemInfo,
+    retrySheetWrites,
+    type SystemInfo,
+  } from '$lib/services/system.service';
   import {
     Alert,
     Badge,
@@ -37,6 +42,8 @@
     failedEvents: number;
     /** Count of sheet.write_failed system events in the last 30 days. */
     sheetWriteFailures30d: number;
+    /** Entities that should have a sheet row but don't, past the healing window. */
+    staleSheetWrites: number;
     /** Count of ingest.dropped_before_cutover system events in the last 30 days. */
     cutoverDrops30d: number;
     /** Most recent receivedAt for any Wise event, ISO string. Null if none. */
@@ -106,6 +113,7 @@
         lastPaperless,
         drops,
         sheetFails,
+        sheetWriteStatus,
         systemInfo,
       ] = await Promise.all([
         listEvents({
@@ -134,6 +142,7 @@
           since: since30d,
           limit: 1,
         }) as Promise<ListEventsResponse>,
+        getSheetWriteStatus().catch(() => ({ staleCount: 0 })),
         getSystemInfo(),
       ]);
       const invoiceUnmatched = agg?.warnings.find((w) => w.kind === 'invoice_unmatched');
@@ -145,6 +154,7 @@
         unmatchedBankTx: bankTx.total,
         failedEvents: failed.total,
         sheetWriteFailures30d: sheetFails.total,
+        staleSheetWrites: sheetWriteStatus.staleCount,
         cutoverDrops30d: drops.total,
         lastWiseEventAt: lastWise.items[0]?.receivedAt ?? null,
         lastPaperlessEventAt: lastPaperless.items[0]?.receivedAt ?? null,
@@ -199,7 +209,7 @@
         counts.approvedUnmatchedExpenses +
         counts.unmatchedBankTx +
         counts.failedEvents +
-        counts.sheetWriteFailures30d}
+        counts.staleSheetWrites}
       {@const reconnectDays = bankingExpiryDays(counts.bankingSession)}
       {@const wiseQuietDays = daysSince(counts.lastWiseEventAt)}
       {@const paperlessQuietDays = daysSince(counts.lastPaperlessEventAt)}
@@ -437,33 +447,48 @@
 
           <Card>
             <CardHeader>
-              <CardTitle>Sheet write failures</CardTitle>
+              <CardTitle>Sheet writes</CardTitle>
             </CardHeader>
             <CardBody>
               <Stack gap={3}>
                 <HStack class="items-center justify-between">
-                  <Heading size="medium" tag="h3">{counts.sheetWriteFailures30d}</Heading>
-                  <Badge color={counts.sheetWriteFailures30d === 0 ? 'secondary' : 'danger'}>
-                    {counts.sheetWriteFailures30d === 0 ? 'clean' : '30d'}
+                  <Heading size="medium" tag="h3">{counts.staleSheetWrites}</Heading>
+                  <Badge
+                    color={counts.staleSheetWrites > 0
+                      ? 'danger'
+                      : counts.sheetWriteFailures30d > 0
+                        ? 'secondary'
+                        : 'secondary'}
+                  >
+                    {counts.staleSheetWrites > 0 ? 'stale!' : 'clean'}
                   </Badge>
                 </HStack>
                 {#if counts.sheetWriteFailures30d > 0}
+                  <Text size="small" color="muted">
+                    {counts.sheetWriteFailures30d} failed attempt{counts.sheetWriteFailures30d === 1 ? '' : 's'} in 30d
+                  </Text>
+                {/if}
+                {#if counts.staleSheetWrites > 0 || counts.sheetWriteFailures30d > 0}
                   <HStack gap={2}>
-                    <Button
-                      href={`${resolve('/events')}?source=system&eventType=sheet.write_failed`}
-                      variant="outline"
-                      size="small"
-                    >
-                      Investigate →
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="small"
-                      disabled={retryingSheetWrites}
-                      onclick={triggerSheetWriteRetry}
-                    >
-                      {retryingSheetWrites ? 'Retrying…' : 'Retry now'}
-                    </Button>
+                    {#if counts.sheetWriteFailures30d > 0}
+                      <Button
+                        href={`${resolve('/events')}?source=system&eventType=sheet.write_failed`}
+                        variant="outline"
+                        size="small"
+                      >
+                        Investigate →
+                      </Button>
+                    {/if}
+                    {#if counts.staleSheetWrites > 0}
+                      <Button
+                        variant="outline"
+                        size="small"
+                        disabled={retryingSheetWrites}
+                        onclick={triggerSheetWriteRetry}
+                      >
+                        {retryingSheetWrites ? 'Retrying…' : 'Retry now'}
+                      </Button>
+                    {/if}
                   </HStack>
                 {/if}
                 {#if retryFlash}

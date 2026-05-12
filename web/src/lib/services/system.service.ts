@@ -33,3 +33,14 @@ export const getIntegrations = (fetchFn?: typeof fetch) =>
  */
 export const retrySheetWrites = (fetchFn?: typeof fetch) =>
   apiPost<{ enqueued: true }>('/api/system/retry-sheet-writes', {}, { fetch: fetchFn });
+
+export type SheetWriteStatus = {
+  staleCount: number;
+};
+
+/**
+ * Current sheet-write health — how many entities should have a sheet row
+ * but don't (and have been waiting past the retry healing window).
+ */
+export const getSheetWriteStatus = (fetchFn?: typeof fetch) =>
+  apiGet<SheetWriteStatus>('/api/system/sheet-write-status', { fetch: fetchFn });
