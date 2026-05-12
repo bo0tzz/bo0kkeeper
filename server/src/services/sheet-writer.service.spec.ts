@@ -18,14 +18,17 @@ describe('SheetWriterService', () => {
   let sheets: SheetsService;
   let ensureTab: ReturnType<typeof vi.fn>;
   let appendRow: ReturnType<typeof vi.fn>;
+  let autoResizeColumns: ReturnType<typeof vi.fn>;
   let writer: SheetWriterService;
 
   beforeEach(() => {
     sheets = new SheetsService(vi.fn());
-    ensureTab = vi.fn().mockResolvedValue(0);
+    ensureTab = vi.fn().mockResolvedValue(777);
     appendRow = vi.fn().mockResolvedValue(null);
+    autoResizeColumns = vi.fn().mockResolvedValue(null);
     sheets.ensureTab = ensureTab;
     sheets.appendRow = appendRow;
+    sheets.autoResizeColumns = autoResizeColumns;
     writer = new SheetWriterService(sheets);
   });
 
@@ -144,6 +147,29 @@ describe('SheetWriterService', () => {
       '',
       '',
     ]);
+  });
+
+  it('income write fits columns to data after appending', async () => {
+    await writer.writeIncomeRow({
+      date: new Date('2099-01-15T00:00:00Z'),
+      invoiceNumber: '2099/001',
+      eurAmountMinor: 100n,
+      client: { name: 'X', class: ClientClass.Domestic },
+    });
+    expect(autoResizeColumns).toHaveBeenCalledOnce();
+    expect(autoResizeColumns).toHaveBeenCalledWith(777, QUARTER_TAB_HEADERS.length);
+  });
+
+  it('expense write fits columns to data after appending', async () => {
+    await writer.writeExpenseRow({
+      date: new Date('2099-01-15T00:00:00Z'),
+      paperlessDocId: 'x',
+      vendor: 'Y',
+      eurAmountMinor: 100n,
+      locationClass: ExpenseLocationClass.Domestic,
+    });
+    expect(autoResizeColumns).toHaveBeenCalledOnce();
+    expect(autoResizeColumns).toHaveBeenCalledWith(777, QUARTER_TAB_HEADERS.length);
   });
 
   it('quarterTabName: month boundaries', () => {

@@ -109,7 +109,7 @@ export class SheetWriterService {
   /** Append an Income row for an invoice and ensure the quarter tab exists. */
   async writeIncomeRow(input: IncomeRowInput): Promise<void> {
     const tab = quarterTabName(input.date);
-    await this.sheets.ensureTab(tab, {
+    const sheetId = await this.sheets.ensureTab(tab, {
       headers: QUARTER_TAB_HEADERS,
       columnFormats: QUARTER_TAB_COLUMN_FORMATS,
     });
@@ -130,12 +130,13 @@ export class SheetWriterService {
 
     this.logger.log(`Sheet append: tab=${tab} id=${input.invoiceNumber}`);
     await this.sheets.appendRow(tab, row);
+    await this.sheets.autoResizeColumns(sheetId, QUARTER_TAB_HEADERS.length);
   }
 
   /** Append an Expense row for an approved expense and ensure the quarter tab exists. */
   async writeExpenseRow(input: ExpenseRowInput): Promise<void> {
     const tab = quarterTabName(input.date);
-    await this.sheets.ensureTab(tab, {
+    const sheetId = await this.sheets.ensureTab(tab, {
       headers: QUARTER_TAB_HEADERS,
       columnFormats: QUARTER_TAB_COLUMN_FORMATS,
     });
@@ -156,6 +157,7 @@ export class SheetWriterService {
 
     this.logger.log(`Sheet append: tab=${tab} id=${input.paperlessDocId} (expense)`);
     await this.sheets.appendRow(tab, row);
+    await this.sheets.autoResizeColumns(sheetId, QUARTER_TAB_HEADERS.length);
   }
 }
 

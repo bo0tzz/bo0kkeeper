@@ -163,6 +163,32 @@ export class SheetsService {
   }
 
   /**
+   * Re-fit all columns of a tab to their widest cell. Sheets has no
+   * "auto-fit always" mode — autoResizeDimensions is an explicit action,
+   * so we fire it after each row write to keep widths honest.
+   */
+  async autoResizeColumns(sheetId: number, columnCount: number): Promise<void> {
+    const id = this.requireSpreadsheetId();
+    await this.request(`/v4/spreadsheets/${id}:batchUpdate`, {
+      method: 'POST',
+      body: {
+        requests: [
+          {
+            autoResizeDimensions: {
+              dimensions: {
+                sheetId,
+                dimension: 'COLUMNS',
+                startIndex: 0,
+                endIndex: columnCount,
+              },
+            },
+          },
+        ],
+      },
+    });
+  }
+
+  /**
    * Get an OAuth access token via the service-account JWT-bearer grant.
    * Caches until ~30s before expiry (Google tokens last 1 hour).
    */

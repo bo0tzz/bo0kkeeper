@@ -196,6 +196,23 @@ describe('SheetsService', () => {
     expect(body.values).toEqual([['08/01/2099', '2099/001', 'Income', 'Non-EU', 'OverseasClientCo', 'Wise']]);
   });
 
+  it('autoResizeColumns batchUpdates a COLUMNS autoResizeDimensions request', async () => {
+    const fetchFn = vi.fn().mockResolvedValueOnce(tokenResponse).mockResolvedValueOnce(okResponse({ replies: [] }));
+    const service = new SheetsService(fetchFn);
+    await service.autoResizeColumns(123, 11);
+    const [url, init] = fetchFn.mock.calls[1] as [string, RequestInit];
+    expect(url).toContain(':batchUpdate');
+    expect(JSON.parse(init.body as string)).toEqual({
+      requests: [
+        {
+          autoResizeDimensions: {
+            dimensions: { sheetId: 123, dimension: 'COLUMNS', startIndex: 0, endIndex: 11 },
+          },
+        },
+      ],
+    });
+  });
+
   it('token cache: second request reuses access token', async () => {
     const fetchFn = vi
       .fn()
