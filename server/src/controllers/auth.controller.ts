@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { loadConfig } from 'src/config';
@@ -105,17 +105,16 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(
-    @Req() req: Request,
-    @Res({ passthrough: false }) res: Response,
-    @Body('post_logout_uri') postLogoutUri?: string,
-  ) {
+  async logout(@Req() req: Request, @Res({ passthrough: false }) res: Response) {
     const idToken = req.cookies[ID_TOKEN_COOKIE];
     const cookieOpts = { httpOnly: true, secure: this.cookieSecure, sameSite: 'lax' as const, path: '/' };
     res.clearCookie(ID_TOKEN_COOKIE, cookieOpts);
     res.clearCookie(REFRESH_TOKEN_COOKIE, { ...cookieOpts, path: REFRESH_TOKEN_PATH });
 
-    const endSessionUrl = await this.authService.getEndSessionUrl(idToken, postLogoutUri);
+    // post_logout_redirect_uri is not accepted from the request: it was previously
+    // an unvalidated string passed to the IDP, and the SPA never sets one anyway.
+    // The IDP redirects to whatever it has registered as the default.
+    const endSessionUrl = await this.authService.getEndSessionUrl(idToken);
     res.json({ endSessionUrl });
   }
 

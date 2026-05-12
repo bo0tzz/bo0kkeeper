@@ -75,7 +75,9 @@ export class TypstRepository implements OnModuleInit {
   /** Spawn `typst` with given args; resolves on exit code 0, rejects otherwise. */
   protected runTypst(args: string[]): Promise<void> {
     return new Promise((resolvePromise, rejectPromise) => {
-      this.logger.debug(`typst ${args.join(' ')}`);
+      // Don't log the args directly — they contain absolute temp paths and would
+      // leak per-render filesystem locations into any debug-level log shipper.
+      this.logger.debug(`typst ${args[0] ?? ''} (${args.length - 1} args)`);
       const proc = spawn(this.typstBin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
       let stderr = '';
       proc.stderr.on('data', (chunk: Buffer) => {

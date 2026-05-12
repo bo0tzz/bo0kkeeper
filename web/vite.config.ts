@@ -23,7 +23,6 @@ export default defineConfig({
   },
   server: {
     proxy,
-    allowedHosts: true,
   },
   preview: {
     proxy,

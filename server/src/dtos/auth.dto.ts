@@ -2,8 +2,17 @@ import { createZodDto } from 'nestjs-zod';
 import z from 'zod';
 
 const AuthLoginSchema = z.object({
-  /** Optional path within the app to return to after login. */
-  return_to: z.string().startsWith('/').optional(),
+  /**
+   * Optional path within the app to return to after login. Same-origin
+   * pathname only — leading `/` plus a non-`/` next char so that
+   * protocol-relative URLs (`//evil.com`) don't slip past as "starts with /".
+   * Express's `res.redirect('//evil.com')` would otherwise send the browser
+   * off-origin.
+   */
+  return_to: z
+    .string()
+    .regex(/^\/($|[^/])/, { error: 'must be a same-origin path' })
+    .optional(),
 });
 export class AuthLoginDto extends createZodDto(AuthLoginSchema) {}
 
