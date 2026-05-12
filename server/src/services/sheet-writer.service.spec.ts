@@ -1,5 +1,10 @@
 import { ClientClass } from 'src/enum';
-import { quarterTabName, SheetWriterService } from 'src/services/sheet-writer.service';
+import {
+  QUARTER_TAB_COLUMN_FORMATS,
+  QUARTER_TAB_HEADERS,
+  quarterTabName,
+  SheetWriterService,
+} from 'src/services/sheet-writer.service';
 import { SheetsService } from 'src/services/sheets.service';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -33,11 +38,14 @@ describe('SheetWriterService', () => {
       source: 'wise:transfer/9999999',
     });
 
-    expect(ensureTab).toHaveBeenCalledWith('2099 Q1');
+    expect(ensureTab).toHaveBeenCalledWith('2099 Q1', {
+      headers: QUARTER_TAB_HEADERS,
+      columnFormats: QUARTER_TAB_COLUMN_FORMATS,
+    });
     const [tab, row] = appendRow.mock.calls[0] as [string, (string | number | null)[]];
     expect(tab).toBe('2099 Q1');
     expect(row).toEqual([
-      '15/01/2099',
+      '2099-01-15',
       '2099/001',
       'Income',
       'Non-EU',
@@ -64,7 +72,7 @@ describe('SheetWriterService', () => {
 
     const [, row] = appendRow.mock.calls[0] as [string, (string | number | null)[]];
     expect(row).toEqual([
-      '05/03/2099',
+      '2099-03-05',
       '2099/006',
       'Income',
       'Domestic',

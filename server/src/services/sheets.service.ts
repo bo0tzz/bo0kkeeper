@@ -18,6 +18,20 @@ export type SheetTab = {
   /** 0-based row index of the next empty row (cached from last read). */
 };
 
+export type ColumnFormat = {
+  /** 0-based column index. */
+  index: number;
+  type: 'DATE' | 'CURRENCY' | 'PERCENT' | 'NUMBER';
+  pattern: string;
+};
+
+export type TabInitSpec = {
+  /** Header row values, written to A1:…1. */
+  headers: string[];
+  /** Number-format requests, applied to rows 2+ on the named columns. */
+  columnFormats?: ColumnFormat[];
+};
+
 export class SheetsApiError extends Error {
   constructor(
     public status: number,
@@ -64,14 +78,72 @@ export class SheetsService {
     return replies[0]?.addSheet.properties.sheetId;
   }
 
-  /** Ensure a tab with the given title exists; return its sheetId. */
-  async ensureTab(title: string): Promise<number> {
+  /**
+   * Ensure a tab with the given title exists; return its sheetId.
+   *
+   * When `init` is supplied and the tab is newly created, the header row is
+   * written and per-column number formats + a bold/frozen header row are
+   * applied in one batch. Existing tabs are returned unchanged — we never
+   * stomp on whatever the user has already done by hand.
+   */
+  async ensureTab(title: string, init?: TabInitSpec): Promise<number> {
     const tabs = await this.listTabs();
     const existing = tabs.find((t) => t.title === title);
     if (existing) {
       return existing.sheetId;
     }
-    return this.createTab(title);
+    const sheetId = await this.createTab(title);
+    if (init) {
+      await this.initTab(title, sheetId, init);
+    }
+    return sheetId;
+  }
+
+  /**
+   * Write the header row + apply header bold/freeze + per-column number
+   * formats. Called only when ensureTab just created the tab.
+   */
+  private async initTab(title: string, sheetId: number, init: TabInitSpec): Promise<void> {
+    const id = this.requireSpreadsheetId();
+
+    // Header row goes in via appendRow so values are normal strings (no
+    // formula parsing surprises). USER_ENTERED is fine for plain text.
+    await this.appendRow(title, init.headers);
+
+    const requests: unknown[] = [
+      {
+        repeatCell: {
+          range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
+          cell: { userEnteredFormat: { textFormat: { bold: true } } },
+          fields: 'userEnteredFormat.textFormat.bold',
+        },
+      },
+      {
+        updateSheetProperties: {
+          properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
+          fields: 'gridProperties.frozenRowCount',
+        },
+      },
+    ];
+    for (const cf of init.columnFormats ?? []) {
+      requests.push({
+        repeatCell: {
+          range: {
+            sheetId,
+            // Skip the header row — column number format applies to data rows only.
+            startRowIndex: 1,
+            startColumnIndex: cf.index,
+            endColumnIndex: cf.index + 1,
+          },
+          cell: { userEnteredFormat: { numberFormat: { type: cf.type, pattern: cf.pattern } } },
+          fields: 'userEnteredFormat.numberFormat',
+        },
+      });
+    }
+    await this.request(`/v4/spreadsheets/${id}:batchUpdate`, {
+      method: 'POST',
+      body: { requests },
+    });
   }
 
   /**

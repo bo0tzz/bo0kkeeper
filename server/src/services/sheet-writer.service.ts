@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ClientClass } from 'src/enum';
-import { SheetsService } from 'src/services/sheets.service';
+import { ColumnFormat, SheetsService } from 'src/services/sheets.service';
 
 export type IncomeRowInput = {
   /** Payment-received date (kasstelsel). DD/MM/YYYY in the row. */
@@ -33,6 +33,40 @@ const LOCATION_BY_CLASS: Record<ClientClass, string> = {
 };
 
 /**
+ * Header row for newly-created quarter tabs. Matches the column order below.
+ * Existing manual tabs are left alone — only tabs SheetWriterService creates
+ * get this header.
+ */
+export const QUARTER_TAB_HEADERS: string[] = [
+  'Date',
+  'Id',
+  'Type',
+  'Location',
+  'From',
+  'To',
+  'Amount',
+  'VAT %',
+  'VAT',
+  'Notes',
+  'Source',
+];
+
+/**
+ * Per-column number formats applied to rows 2+ of newly-created tabs. Header
+ * row is excluded automatically by SheetsService.initTab.
+ *   A (Date)   — DATE format renders the ISO-written date as DD/MM/YYYY
+ *   G (Amount) — CURRENCY with euro symbol
+ *   H (VAT %)  — PERCENT (Sheets parses "21%" string into 0.21 under USER_ENTERED)
+ *   I (VAT)    — CURRENCY with euro symbol
+ */
+export const QUARTER_TAB_COLUMN_FORMATS: ColumnFormat[] = [
+  { index: 0, type: 'DATE', pattern: 'dd/mm/yyyy' },
+  { index: 6, type: 'CURRENCY', pattern: '"€"#,##0.00' },
+  { index: 7, type: 'PERCENT', pattern: '0%' },
+  { index: 8, type: 'CURRENCY', pattern: '"€"#,##0.00' },
+];
+
+/**
  * Composes sheet rows in the existing column layout and writes them via
  * SheetsService. Encapsulates the kasstelsel convention (sheet date = payment
  * received date) and the existing tab naming (`YYYY QN` per calendar quarter).
@@ -49,10 +83,13 @@ export class SheetWriterService {
   /** Append an Income row for an invoice and ensure the quarter tab exists. */
   async writeIncomeRow(input: IncomeRowInput): Promise<void> {
     const tab = quarterTabName(input.date);
-    await this.sheets.ensureTab(tab);
+    await this.sheets.ensureTab(tab, {
+      headers: QUARTER_TAB_HEADERS,
+      columnFormats: QUARTER_TAB_COLUMN_FORMATS,
+    });
 
     const row: (string | number | null)[] = [
-      formatDutchDate(input.date),
+      formatIsoDate(input.date),
       input.invoiceNumber,
       'Income',
       LOCATION_BY_CLASS[input.client.class],
@@ -77,11 +114,17 @@ export function quarterTabName(date: Date): string {
   return `${year} Q${quarter}`;
 }
 
-function formatDutchDate(date: Date): string {
+/**
+ * ISO date string. Sheets parses YYYY-MM-DD unambiguously regardless of
+ * spreadsheet locale, and the DATE column format renders it as DD/MM/YYYY on
+ * screen — so the user sees Dutch-style dates and Sheets stores real date
+ * values it can sort/filter by.
+ */
+function formatIsoDate(date: Date): string {
   const day = String(date.getUTCDate()).padStart(2, '0');
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
   const year = date.getUTCFullYear();
-  return `${day}/${month}/${year}`;
+  return `${year}-${month}-${day}`;
 }
 
 function formatEur(minor: bigint): number {

@@ -7,7 +7,12 @@
  * sees the number → auto_high match → SheetWriterService appends the income
  * row to the current-quarter tab.
  *
- *   pnpm --filter bo0kkeeper exec node ./dist/bin/exercise-pipeline.js
+ *   node ./dist/bin/exercise-pipeline.js                  # tx-date = now
+ *   node ./dist/bin/exercise-pipeline.js --date 2026-07-15  # tx-date = explicit
+ *
+ * The `--date` form is handy when you want to land a row in a quarter tab
+ * that doesn't exist yet — useful for verifying the header / formatting
+ * behaviour on a fresh tab.
  */
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
@@ -22,9 +27,26 @@ import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { SheetsService } from 'src/services/sheets.service';
 import { getKyselyConfig } from 'src/utils/database';
 
+function parseDateArg(): Date {
+  const idx = process.argv.indexOf('--date');
+  if (idx === -1) {
+    return new Date();
+  }
+  const value = process.argv[idx + 1];
+  if (!value) {
+    throw new Error('--date requires a YYYY-MM-DD value');
+  }
+  const parsed = new Date(`${value}T12:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new TypeError(`--date value "${value}" is not a valid ISO date`);
+  }
+  return parsed;
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const db = new Kysely<DB>(getKyselyConfig(config.database));
+  const txDate = parseDateArg();
 
   try {
     const openInvoice = await db
@@ -57,10 +79,11 @@ async function main(): Promise<void> {
     const matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, eventRepo);
 
     const externalId = `demo-${randomUUID().slice(0, 8)}`;
+    console.log(`Using tx-date ${txDate.toISOString().slice(0, 10)} (→ quarter tab will reflect this date)`);
     const ingested = await bankRepo.ingest({
       source: BankSource.SnsCsv,
       externalId,
-      txDate: new Date(),
+      txDate,
       amountMinor: BigInt(openInvoice.totalMinor as unknown as string),
       currency: openInvoice.currency,
       counterpartyName: openInvoice.clientName,

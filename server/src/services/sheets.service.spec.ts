@@ -101,6 +101,84 @@ describe('SheetsService', () => {
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
+  it('ensureTab with init writes header row + applies bold/freeze + column formats', async () => {
+    const fetchFn = vi
+      .fn()
+      // 1. token
+      .mockResolvedValueOnce(tokenResponse)
+      // 2. listTabs — empty, so the tab doesn't exist
+      .mockResolvedValueOnce(okResponse({ sheets: [] }))
+      // 3. createTab (batchUpdate addSheet)
+      .mockResolvedValueOnce(
+        okResponse({ replies: [{ addSheet: { properties: { sheetId: 777, title: '2099 Q1' } } }] }),
+      )
+      // 4. appendRow for the header
+      .mockResolvedValueOnce(okResponse({}))
+      // 5. batchUpdate for bold + freeze + column formats
+      .mockResolvedValueOnce(okResponse({}));
+
+    const service = new SheetsService(fetchFn);
+    const id = await service.ensureTab('2099 Q1', {
+      headers: ['Date', 'Id', 'Amount'],
+      columnFormats: [
+        { index: 0, type: 'DATE', pattern: 'dd/mm/yyyy' },
+        { index: 2, type: 'CURRENCY', pattern: '"€"#,##0.00' },
+      ],
+    });
+    expect(id).toBe(777);
+
+    // Header was written.
+    const [appendUrl, appendInit] = fetchFn.mock.calls[3] as [string, RequestInit];
+    expect(appendUrl).toContain(':append');
+    expect(JSON.parse(appendInit.body as string).values).toEqual([['Date', 'Id', 'Amount']]);
+
+    // Final batchUpdate has bold + freeze + 2 column-format repeatCells.
+    const [batchUrl, batchInit] = fetchFn.mock.calls[4] as [string, RequestInit];
+    expect(batchUrl).toContain(':batchUpdate');
+    const body = JSON.parse(batchInit.body as string) as { requests: unknown[] };
+    expect(body.requests).toHaveLength(4);
+    // Bold the header (row 0).
+    expect(body.requests[0]).toMatchObject({
+      repeatCell: {
+        range: { sheetId: 777, startRowIndex: 0, endRowIndex: 1 },
+        cell: { userEnteredFormat: { textFormat: { bold: true } } },
+      },
+    });
+    // Freeze row 1.
+    expect(body.requests[1]).toMatchObject({
+      updateSheetProperties: {
+        properties: { sheetId: 777, gridProperties: { frozenRowCount: 1 } },
+      },
+    });
+    // Column 0 DATE format, skipping the header row.
+    expect(body.requests[2]).toMatchObject({
+      repeatCell: {
+        range: { sheetId: 777, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: 1 },
+        cell: { userEnteredFormat: { numberFormat: { type: 'DATE', pattern: 'dd/mm/yyyy' } } },
+      },
+    });
+    // Column 2 CURRENCY format.
+    expect(body.requests[3]).toMatchObject({
+      repeatCell: {
+        range: { sheetId: 777, startRowIndex: 1, startColumnIndex: 2, endColumnIndex: 3 },
+        cell: { userEnteredFormat: { numberFormat: { type: 'CURRENCY', pattern: '"€"#,##0.00' } } },
+      },
+    });
+  });
+
+  it('ensureTab with init does NOT re-write headers when the tab already exists', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse)
+      .mockResolvedValueOnce(okResponse({ sheets: [{ properties: { sheetId: 42, title: 'existing' } }] }));
+
+    const service = new SheetsService(fetchFn);
+    const id = await service.ensureTab('existing', { headers: ['A', 'B'] });
+    expect(id).toBe(42);
+    // Only token + listTabs — no createTab, no appendRow, no batchUpdate.
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
   it('appendRow targets values:append on the named tab', async () => {
     const fetchFn = vi
       .fn()
