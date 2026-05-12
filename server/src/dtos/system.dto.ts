@@ -26,3 +26,15 @@ const IntegrationsResponseSchema = z
   })
   .meta({ id: 'IntegrationsResponseDto' });
 export class IntegrationsResponseDto extends createZodDto(IntegrationsResponseSchema) {}
+
+const SheetWriteStatusSchema = z
+  .object({
+    /**
+     * Entities that should have a sheet row but don't, and have been in that
+     * state for longer than the retry-job healing window. Non-zero means the
+     * retry loop can't recover on its own — operator should investigate.
+     */
+    staleCount: z.number().int().min(0),
+  })
+  .meta({ id: 'SheetWriteStatusDto' });
+export class SheetWriteStatusDto extends createZodDto(SheetWriteStatusSchema) {}

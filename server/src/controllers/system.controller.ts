@@ -2,10 +2,15 @@ import { Controller, Get, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { loadConfig } from 'src/config';
 import { Authenticated } from 'src/decorators';
-import { IntegrationsResponseDto, SystemInfoDto } from 'src/dtos/system.dto';
+import { IntegrationsResponseDto, SheetWriteStatusDto, SystemInfoDto } from 'src/dtos/system.dto';
 import { JobName } from 'src/enum';
+import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
+import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { SystemHealthService } from 'src/services/system-health.service';
+
+/** Treat a missing sheet row as "stale" if it's been pending longer than this. */
+const SHEET_WRITE_STALE_AFTER_MS = 60 * 60 * 1000;
 
 /**
  * Runtime invariants the UI needs to know about — env-sourced bits that
@@ -18,6 +23,8 @@ export class SystemController {
   constructor(
     private readonly systemHealthService: SystemHealthService,
     private readonly jobRepository: JobRepository,
+    private readonly bankTransactionRepository: BankTransactionRepository,
+    private readonly expenseRepository: ExpenseRepository,
   ) {}
 
   @Get('info')
@@ -48,5 +55,22 @@ export class SystemController {
   async retrySheetWrites(): Promise<{ enqueued: true }> {
     await this.jobRepository.queue(JobName.SheetWriteRetry, {});
     return { enqueued: true };
+  }
+
+  /**
+   * Current sheet-write health — counts entities that should have a sheet
+   * row but don't and have been waiting longer than the retry-job healing
+   * window. Distinct from the `sheet.write_failed` event count, which is
+   * historical noise that doesn't tell you whether the system has actually
+   * recovered.
+   */
+  @Get('sheet-write-status')
+  @Authenticated()
+  async getSheetWriteStatus(): Promise<SheetWriteStatusDto> {
+    const [bankTxStale, expenseStale] = await Promise.all([
+      this.bankTransactionRepository.countStaleSheetWrites(SHEET_WRITE_STALE_AFTER_MS),
+      this.expenseRepository.countStaleSheetWrites(SHEET_WRITE_STALE_AFTER_MS),
+    ]);
+    return { staleCount: bankTxStale + expenseStale };
   }
 }
