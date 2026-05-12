@@ -7,10 +7,17 @@ import { applyCommonAppConfig, serveWebStatic } from 'src/app.common';
 import { AppModule } from 'src/app.module';
 import { loadConfig } from 'src/config';
 import { APP_NAME } from 'src/constants';
+import { runMigrations } from 'src/utils/migrations';
 
 async function bootstrap() {
   const config = loadConfig();
   process.title = `${APP_NAME}-server`;
+
+  // Run migrations before Nest instantiates — many onModuleInit hooks
+  // (JobRepository.setup, SettingsService.ensureInitialized) read schema
+  // that the migrations create. Failure here aborts the boot, k8s sees
+  // unhealthy, no traffic served.
+  await runMigrations(config.database);
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   applyCommonAppConfig(app);

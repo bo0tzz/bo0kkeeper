@@ -45,7 +45,9 @@ Memory budget is generous because pg-boss runs in-process — a busy job period 
 
 "Optional" means the app boots fine without them, but the corresponding feature is dark. In practice for this user all six are required.
 
-The two webhook endpoints (`/api/webhooks/wise`, `/api/webhooks/paperless`) need to be reachable from outside the cluster — Wise / paperless POST inbound.
+**Inbound reach:**
+- `/api/webhooks/wise` — needs to be reachable from the public internet (Wise's servers POST here).
+- `/api/webhooks/paperless` — only needs to be reachable from paperless. If paperless runs in the same cluster, internal Service routing is fine; doesn't have to be exposed publicly.
 
 ## Health probes
 
@@ -67,27 +69,15 @@ readinessProbe:
 
 ## Migrations
 
-Run as an `initContainer` on the same image before the main container starts. Migration tooling (`sql-tools` from `@immich/sql-tools`) is installed in the image.
+Built-in. The server runs pending migrations at boot, before Nest's module init or HTTP listen — no init container, no pre-deploy Job. On a fresh DB the server creates all tables and starts; on an up-to-date DB it's a no-op. If migrations fail, boot fails, the readiness probe stays 503, and k8s leaves the pod un-routed.
 
-```yaml
-initContainers:
-  - name: migrations
-    image: <same as main>
-    workingDir: /app/server  # so the default -f dist/schema/migrations resolves
-    command: ["/app/server/node_modules/.bin/sql-tools"]
-    args:    ["-u", "$(DATABASE_URL)", "migrations", "run"]
-    env:
-      - name: DATABASE_URL
-        valueFrom: { secretKeyRef: { name: bo0kkeeper-secrets, key: DB_URL } }
-```
-
-Idempotent — re-running is safe. Failure here should block the rollout.
+Concurrent pods are safe (`kysely_migrations_lock` table serializes them) but you should still keep `replicas: 1` for the reasons in the section below.
 
 ## Env vars — non-secret (ConfigMap)
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `NODE_ENV` | YES | `development` | **Must be `production`**. Triggers fail-closed refinements: WISE_WEBHOOK_VERIFY=true + WISE_WEBHOOK_PUBLIC_KEY set, PAPERLESS_WEBHOOK_TOKEN set, refuse-to-boot otherwise. |
+| `NODE_ENV` | — | image sets `production` | Already defaulted in the Dockerfile runtime stage. Only override for non-prod variants. `production` triggers fail-closed refinements: WISE_WEBHOOK_VERIFY=true + WISE_WEBHOOK_PUBLIC_KEY set, PAPERLESS_WEBHOOK_TOKEN set, refuse-to-boot otherwise. |
 | `HOST` | no | `0.0.0.0` | Bind address. Leave at default. |
 | `PORT` | no | `2283` | Listening port. Match the Service. |
 | `WEB_DIST_DIR` | YES | (image sets `/app/web`) | Where the static SPA lives. The image's ENV already sets this; don't override unless you're doing something exotic. |
@@ -106,17 +96,8 @@ Idempotent — re-running is safe. Failure here should block the rollout.
 | `PAPERLESS_BASE_URL` | optional | — | Paperless instance URL, no trailing slash. E.g. `https://paperless.example.com`. |
 | `ENABLE_BANKING_API_BASE_URL` | no | `https://api.enablebanking.com` | Leave default. |
 | `ENABLE_BANKING_REDIRECT_URI` | optional | — | `https://<public-hostname>/api/banking/auth/callback`. Required if using Enable Banking. |
-| `ISSUER_KVK` | optional | `'CONFIGURE'` | KvK number printed on invoices. One-time boot seed — operator can later edit via /settings. |
-| `ISSUER_VAT_ID` | optional | `'CONFIGURE'` | Same: VAT id, one-time boot seed. |
-| `ISSUER_ADDRESS_LINE1` | optional | `'CONFIGURE'` | Same: invoice issuer address. |
-| `ISSUER_POSTAL_CODE` | optional | `'CONFIGURE'` | Same. |
-| `ISSUER_CITY` | optional | `'CONFIGURE'` | Same. |
-| `ISSUER_COUNTRY` | optional | `'CONFIGURE'` | Same. |
-| `ISSUER_IBAN` | optional | `'CONFIGURE'` | Same: IBAN printed on invoices. |
-| `PAPERLESS_EXPENSE_TAGS` | no | `Business,Bills` | Comma-separated. Boot seed only. |
-| `PAPERLESS_OUTGOING_INVOICE_TAGS` | no | `Business,Invoice,bo0kkeeper` | Comma-separated. Boot seed only. |
 
-ISSUER_* and PAPERLESS_*_TAGS are **only** consulted on a fresh DB at first boot — `SettingsService.ensureInitialized()` seeds the `app_settings` row from them, after which the operator edits via `/settings`. Safe to omit from the ConfigMap if the DB already has settings; required on first deploy.
+Invoice-issuer info (KvK, VAT id, address, IBAN) and paperless tag-gates live in the `app_settings` DB row and are edited via `/settings` in the UI — not env vars. First boot seeds the row with `'CONFIGURE'` placeholders; configure those values via the UI before issuing invoices or ingesting expenses.
 
 ## Env vars — secrets (Secret, SOPS-managed)
 
@@ -147,7 +128,7 @@ Group these into a single `bo0kkeeper-secrets` Secret unless your tooling prefer
 
 - **Service**: ClusterIP on 2283.
 - **Ingress**: terminate TLS, route `/` to the Service. No path-based split needed — the server handles both API (`/api/*`) and SPA fallback for everything else.
-- **Webhook reachability**: the public hostname must accept POST at `/api/webhooks/wise` and `/api/webhooks/paperless`. Both endpoints verify signatures/tokens; safe to expose without IP allowlisting.
+- **Webhook reachability**: the public hostname must accept POST at `/api/webhooks/wise` (Wise's servers POST here). `/api/webhooks/paperless` only needs to be reachable from paperless — internal-cluster routing is enough if paperless lives in the same cluster. Both endpoints verify signatures/tokens; the Wise one is safe to expose without IP allowlisting.
 - **Outbound**: needs egress to all listed external dependencies. No DNS-pin / proxy gymnastics required.
 
 ## What NOT to do
