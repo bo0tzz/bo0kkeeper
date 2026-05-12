@@ -1,9 +1,9 @@
 import { Kysely } from 'kysely';
 import { loadConfig } from 'src/config';
 import { EventRepository } from 'src/repositories/event.repository';
+import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
-import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { WiseDraftService } from 'src/services/wise-draft.service';
 import { getKyselyConfig } from 'src/utils/database';
 

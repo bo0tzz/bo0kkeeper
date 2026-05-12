@@ -260,7 +260,10 @@ describe('SheetsRepository', () => {
   });
 
   it('autoResizeColumns with padPx=0 skips the pad step', async () => {
-    const fetchFn = vi.fn().mockResolvedValueOnce(tokenResponse).mockResolvedValueOnce(okResponse({ replies: [] }));
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(tokenResponse)
+      .mockResolvedValueOnce(okResponse({ replies: [] }));
     const service = new SheetsRepository(fetchFn);
     await service.autoResizeColumns('2099 Q1', 123, 3, 0);
     // Just token + autoResize batchUpdate, no GET, no pad batchUpdate.

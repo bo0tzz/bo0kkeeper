@@ -2,7 +2,14 @@ import { BadRequestException } from '@nestjs/common';
 import type { Response } from 'express';
 import { Kysely } from 'kysely';
 import { BankingController } from 'src/controllers/banking.controller';
-import { BankingSessionStatus, BankSource, JobName, MatchConfidence, WiseTransferDirection, WiseTransferState } from 'src/enum';
+import {
+  BankingSessionStatus,
+  BankSource,
+  JobName,
+  MatchConfidence,
+  WiseTransferDirection,
+  WiseTransferState,
+} from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
@@ -76,9 +83,7 @@ describe('BankingController', () => {
       status: BankingSessionStatus.Active,
       applicationSessionId: 'eb-1',
       expiresAt: new Date('2026-08-06T12:00:00Z'),
-      accountsJson: [
-        { uid: 'acct-1', currency: 'EUR', name: 'Business', iban: 'NL01TEST', product: 'Current' },
-      ],
+      accountsJson: [{ uid: 'acct-1', currency: 'EUR', name: 'Business', iban: 'NL01TEST', product: 'Current' }],
     });
 
     const dto = await controller.getLatestSession();
@@ -115,9 +120,7 @@ describe('BankingController', () => {
 
   it('GET /auth/callback rejects when neither code+state nor error are present', async () => {
     const res = fakeRes();
-    await expect(controller.callback(undefined, undefined, undefined, res)).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(controller.callback(undefined, undefined, undefined, res)).rejects.toThrow(BadRequestException);
   });
 
   it('POST /sync enqueues BankingSyncAll with the caller IP for PSU-IP-Address', async () => {

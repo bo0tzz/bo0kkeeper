@@ -104,9 +104,7 @@ export class InvoiceComposerService {
     // differ.
     const outgoingInvoiceTags = await this.settingsService.getPaperlessOutgoingInvoiceTags();
     const tagIds =
-      outgoingInvoiceTags.length === 0
-        ? undefined
-        : await this.paperlessService.resolveTagIds(outgoingInvoiceTags);
+      outgoingInvoiceTags.length === 0 ? undefined : await this.paperlessService.resolveTagIds(outgoingInvoiceTags);
 
     const issuedAt = invoice.issuedAt instanceof Date ? invoice.issuedAt : new Date(invoice.issuedAt);
     const upload = await this.paperlessService.uploadDocument({

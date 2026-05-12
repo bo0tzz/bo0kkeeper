@@ -18,10 +18,10 @@ import { BankSource } from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
+import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
-import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { getKyselyConfig } from 'src/utils/database';
 
 if (process.env.NODE_ENV === 'production') {

@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { checkCutover } from 'src/utils/cutover';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 describe('checkCutover', () => {
   // OIDC vars are required by loadConfig() — set permissively so we can vary

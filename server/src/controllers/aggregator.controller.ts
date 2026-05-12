@@ -87,10 +87,7 @@ export class AggregatorController {
   @Get('quarterly/export.xlsx')
   @Authenticated()
   @ApiQueryFromDto(QuarterlyAggregateQueryDto)
-  async exportQuarterly(
-    @Query() query: QuarterlyAggregateQueryDto,
-    @Res() res: Response,
-  ): Promise<void> {
+  async exportQuarterly(@Query() query: QuarterlyAggregateQueryDto, @Res() res: Response): Promise<void> {
     const { buffer, filename } = await this.exportService.exportQuarter(query.year, query.quarter);
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

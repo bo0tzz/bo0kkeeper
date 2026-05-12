@@ -67,16 +67,45 @@ export class BookkeepingExportService {
 
     // Process bottom-up: each section's row numbers are stable until something
     // *below* it is grown. Inbound Non EU is last in the file; grow it first.
-    fillSection(sheet, ib.nonEu, ib.afterEnd, expenses.filter((e) => e.classification === ExpenseLocationClass.NonEu));
-    fillSection(sheet, ib.eu, ib.nonEu, expenses.filter((e) =>
-      e.classification === ExpenseLocationClass.Eu || e.classification === ExpenseLocationClass.EuReverseCharge,
-    ));
-    fillSection(sheet, ib.domestic, ib.eu, expenses.filter((e) => e.classification === ExpenseLocationClass.Domestic));
-    fillSection(sheet, ob.nonEu, ob.afterEnd, invoices.filter((i) => i.classification === ClientClass.NonEu));
-    fillSection(sheet, ob.eu, ob.nonEu, invoices.filter((i) =>
-      i.classification === ClientClass.Eu || i.classification === ClientClass.EuReverseCharge,
-    ));
-    fillSection(sheet, ob.domestic, ob.eu, invoices.filter((i) => i.classification === ClientClass.Domestic));
+    fillSection(
+      sheet,
+      ib.nonEu,
+      ib.afterEnd,
+      expenses.filter((e) => e.classification === ExpenseLocationClass.NonEu),
+    );
+    fillSection(
+      sheet,
+      ib.eu,
+      ib.nonEu,
+      expenses.filter(
+        (e) =>
+          e.classification === ExpenseLocationClass.Eu || e.classification === ExpenseLocationClass.EuReverseCharge,
+      ),
+    );
+    fillSection(
+      sheet,
+      ib.domestic,
+      ib.eu,
+      expenses.filter((e) => e.classification === ExpenseLocationClass.Domestic),
+    );
+    fillSection(
+      sheet,
+      ob.nonEu,
+      ob.afterEnd,
+      invoices.filter((i) => i.classification === ClientClass.NonEu),
+    );
+    fillSection(
+      sheet,
+      ob.eu,
+      ob.nonEu,
+      invoices.filter((i) => i.classification === ClientClass.Eu || i.classification === ClientClass.EuReverseCharge),
+    );
+    fillSection(
+      sheet,
+      ob.domestic,
+      ob.eu,
+      invoices.filter((i) => i.classification === ClientClass.Domestic),
+    );
 
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     const filename = `Bookkeeping list ${formatDateForFilename(periodStart)}-${formatDateForFilename(inclusiveEnd)}.xlsx`;
@@ -270,12 +299,7 @@ const DATA_COL_END = 8;
  * reserved row (using ExcelJS's row duplication, which copies styles and
  * shifts subsequent rows down) before writing.
  */
-function fillSection(
-  sheet: ExcelJS.Worksheet,
-  sectionStart: number,
-  sectionEnd: number,
-  data: ExportRow[],
-): void {
+function fillSection(sheet: ExcelJS.Worksheet, sectionStart: number, sectionEnd: number, data: ExportRow[]): void {
   const reserved = sectionEnd - sectionStart;
   const overflow = data.length - reserved;
   if (overflow > 0) {

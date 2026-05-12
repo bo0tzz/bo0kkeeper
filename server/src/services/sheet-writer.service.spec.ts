@@ -1,11 +1,11 @@
 import { ClientClass, ExpenseLocationClass } from 'src/enum';
+import { SheetsRepository } from 'src/repositories/sheets.repository';
 import {
   QUARTER_TAB_COLUMN_FORMATS,
   QUARTER_TAB_HEADERS,
   quarterTabName,
   SheetWriterService,
 } from 'src/services/sheet-writer.service';
-import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 beforeEach(() => {
@@ -134,19 +134,7 @@ describe('SheetWriterService', () => {
     });
 
     const [, row] = appendRow.mock.calls[0] as [string, (string | number | null)[]];
-    expect(row).toEqual([
-      '2099-04-10',
-      '7777',
-      'Expense',
-      'Non-EU',
-      'Wise',
-      'AWS',
-      123.45,
-      '',
-      '',
-      '',
-      '',
-    ]);
+    expect(row).toEqual(['2099-04-10', '7777', 'Expense', 'Non-EU', 'Wise', 'AWS', 123.45, '', '', '', '']);
   });
 
   it('income write fits columns to data after appending', async () => {

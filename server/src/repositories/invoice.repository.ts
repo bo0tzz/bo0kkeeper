@@ -77,12 +77,7 @@ export class InvoiceRepository {
    * so the UI can size the pager without a second round trip. Newest
    * issuedAt first (ties broken by number desc).
    */
-  async findPaginated(input: {
-    year?: number;
-    status?: 'open' | 'paid';
-    offset: number;
-    limit: number;
-  }): Promise<{
+  async findPaginated(input: { year?: number; status?: 'open' | 'paid'; offset: number; limit: number }): Promise<{
     items: Array<Invoice & { clientName: string | null; matchedBankTxId: string | null }>;
     total: number;
   }> {
@@ -101,9 +96,9 @@ export class InvoiceRepository {
       query = query.where('bank_transaction.id', 'is', null);
     }
 
-    const totalRow = (await query
-      .select((eb) => eb.fn.countAll<string>().as('count'))
-      .executeTakeFirst()) as { count: string } | undefined;
+    const totalRow = (await query.select((eb) => eb.fn.countAll<string>().as('count')).executeTakeFirst()) as
+      | { count: string }
+      | undefined;
     const total = Number(totalRow?.count ?? 0);
 
     const items = (await query

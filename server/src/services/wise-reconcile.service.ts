@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnJob } from 'src/decorators';
 import { EventSource, JobName, QueueName, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
-import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
 import { WiseApiError, WiseApiRepository } from 'src/repositories/wise-api.repository';
+import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
 
 /**
  * Belt-and-braces for missed `transfers#state-change` webhooks.
@@ -79,11 +79,7 @@ export class WiseReconcileService {
     this.logger.warn(
       `wise transfer ${row.wiseTransferId}: local=${row.state} upstream=${upstream.state} (likely missed webhook)`,
     );
-    await this.wiseTransferRepository.updateState(
-      row.wiseTransferId,
-      upstream.state as WiseTransferState,
-      new Date(),
-    );
+    await this.wiseTransferRepository.updateState(row.wiseTransferId, upstream.state as WiseTransferState, new Date());
     return 'updated';
   }
 }

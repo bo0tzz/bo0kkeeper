@@ -201,10 +201,10 @@ export class PaperlessRepository {
     // tag ids" — Django ORM convention. The DRF list endpoint paginates by
     // `next` URL; walk until null.
     const params = new URLSearchParams({
-      'tags__id__all': tagIds.join(','),
-      'created__date__gte': since,
-      'page_size': '100',
-      'ordering': 'created',
+      tags__id__all: tagIds.join(','),
+      created__date__gte: since,
+      page_size: '100',
+      ordering: 'created',
     });
     let url: string | null = `${baseUrl}/api/documents/?${params.toString()}`;
     while (url) {
@@ -214,7 +214,11 @@ export class PaperlessRepository {
       });
       const text = await response.text();
       if (!response.ok) {
-        throw new PaperlessApiError(response.status, safeJson(text), `Paperless documents list failed: ${response.status}`);
+        throw new PaperlessApiError(
+          response.status,
+          safeJson(text),
+          `Paperless documents list failed: ${response.status}`,
+        );
       }
       const page = safeJson(text) as { results: PaperlessDocument[]; next: string | null };
       all.push(...page.results);

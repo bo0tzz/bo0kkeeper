@@ -132,9 +132,7 @@ VwIDAQAB
     it('throws when verification is enabled but no key is configured', () => {
       process.env.WISE_WEBHOOK_PUBLIC_KEY = '';
       const unconfigured = new WebhookService(eventRepository, jobRepository);
-      expect(() => unconfigured.verifyWiseSignature(REF_BODY, REF_SIG)).toThrow(
-        /WISE_WEBHOOK_PUBLIC_KEY is not set/,
-      );
+      expect(() => unconfigured.verifyWiseSignature(REF_BODY, REF_SIG)).toThrow(/WISE_WEBHOOK_PUBLIC_KEY is not set/);
     });
   });
 

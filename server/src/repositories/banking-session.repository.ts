@@ -37,12 +37,7 @@ export class BankingSessionRepository {
 
   /** Most recent session of any status. UI uses this to render the connection card. */
   findLatest(): Promise<BankingSession | undefined> {
-    return this.db
-      .selectFrom('banking_session')
-      .selectAll()
-      .orderBy('createdAt', 'desc')
-      .limit(1)
-      .executeTakeFirst();
+    return this.db.selectFrom('banking_session').selectAll().orderBy('createdAt', 'desc').limit(1).executeTakeFirst();
   }
 
   update(id: string, patch: BankingSessionUpdate): Promise<BankingSession> {

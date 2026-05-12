@@ -4,8 +4,8 @@ import { EventSource } from 'src/enum';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
-import { SettingsService } from 'src/services/settings.service';
 import { WiseApiRepository } from 'src/repositories/wise-api.repository';
+import { SettingsService } from 'src/services/settings.service';
 
 export type IntegrationStatus = 'healthy' | 'degraded' | 'broken' | 'not_configured';
 
@@ -292,8 +292,6 @@ export class SystemHealthService {
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms).unref(),
-    ),
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`timeout after ${ms}ms`)), ms).unref()),
   ]);
 }

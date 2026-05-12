@@ -3,11 +3,6 @@ import { BankingSessionStatus, BankSource, WiseTransferDirection, WiseTransferSt
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
-import { EventRepository } from 'src/repositories/event.repository';
-import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
-import { DB } from 'src/schema';
-import { BankMatcherService } from 'src/services/bank-matcher.service';
-import { BankingSyncService, mapTransaction } from 'src/services/banking-sync.service';
 import {
   EnableBankingAccount,
   EnableBankingApiError,
@@ -15,6 +10,11 @@ import {
   EnableBankingTransaction,
   ListTransactionsResult,
 } from 'src/repositories/enable-banking.repository';
+import { EventRepository } from 'src/repositories/event.repository';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
+import { DB } from 'src/schema';
+import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { BankingSyncService, mapTransaction } from 'src/services/banking-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

@@ -1,9 +1,9 @@
 import { Kysely } from 'kysely';
 import { WiseTransferDirection, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
+import { WiseApiError, WiseApiRepository, WiseTransfer } from 'src/repositories/wise-api.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
-import { WiseApiError, WiseApiRepository, WiseTransfer } from 'src/repositories/wise-api.repository';
 import { WiseReconcileService } from 'src/services/wise-reconcile.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,11 +15,7 @@ beforeEach(() => {
   process.env.CUTOVER_DATE ??= '2000-01-01';
 });
 
-function makeWiseTransfer(
-  id: number,
-  state: WiseTransfer['state'],
-  rate: WiseTransfer['rate'] = '0.85',
-): WiseTransfer {
+function makeWiseTransfer(id: number, state: WiseTransfer['state'], rate: WiseTransfer['rate'] = '0.85'): WiseTransfer {
   return {
     id,
     state,

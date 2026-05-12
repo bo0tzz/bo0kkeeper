@@ -72,10 +72,7 @@ const ClosePeriodBodySchema = z
   .meta({ id: 'ClosePeriodDto' });
 export class ClosePeriodDto extends createZodDto(ClosePeriodBodySchema) {}
 
-export function mapAggregate(
-  value: QuarterlyAggregate,
-  closedAt: Date | null = null,
-): QuarterlyAggregateResponseDto {
+export function mapAggregate(value: QuarterlyAggregate, closedAt: Date | null = null): QuarterlyAggregateResponseDto {
   return {
     year: value.year,
     quarter: value.quarter,

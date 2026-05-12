@@ -21,12 +21,7 @@ export class PeriodCloseRepository {
   }
 
   findAll(): Promise<PeriodClose[]> {
-    return this.db
-      .selectFrom('period_close')
-      .selectAll()
-      .orderBy('year', 'desc')
-      .orderBy('quarter', 'desc')
-      .execute();
+    return this.db.selectFrom('period_close').selectAll().orderBy('year', 'desc').orderBy('quarter', 'desc').execute();
   }
 
   /** Mark a quarter as filed. Idempotent — re-closing updates `closedAt`. */
@@ -46,10 +41,6 @@ export class PeriodCloseRepository {
   }
 
   async reopen(year: number, quarter: number): Promise<void> {
-    await this.db
-      .deleteFrom('period_close')
-      .where('year', '=', year)
-      .where('quarter', '=', quarter)
-      .execute();
+    await this.db.deleteFrom('period_close').where('year', '=', year).where('quarter', '=', quarter).execute();
   }
 }

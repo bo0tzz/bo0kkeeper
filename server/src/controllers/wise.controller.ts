@@ -8,8 +8,8 @@ import {
   WiseTransferResponseDto,
 } from 'src/dtos/wise.dto';
 import { JobName, WiseTransferState } from 'src/enum';
-import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
 import { JobRepository } from 'src/repositories/job.repository';
+import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
 import { WiseDraftService } from 'src/services/wise-draft.service';
 
 @ApiTags('Wise')

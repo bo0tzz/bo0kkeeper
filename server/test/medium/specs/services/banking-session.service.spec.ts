@@ -1,16 +1,16 @@
 import { Kysely } from 'kysely';
 import { BankingSessionStatus, JobName } from 'src/enum';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
-import { EventRepository } from 'src/repositories/event.repository';
-import { JobRepository } from 'src/repositories/job.repository';
-import { DB } from 'src/schema';
-import { BankingSessionService } from 'src/services/banking-session.service';
 import {
   CreateSessionResult,
   EnableBankingRepository,
   StartAuthInput,
   StartAuthResult,
 } from 'src/repositories/enable-banking.repository';
+import { EventRepository } from 'src/repositories/event.repository';
+import { JobRepository } from 'src/repositories/job.repository';
+import { DB } from 'src/schema';
+import { BankingSessionService } from 'src/services/banking-session.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -87,9 +87,7 @@ describe('BankingSessionService', () => {
   it('startAuth rolls the pending row to expired if the API call fails (no orphans)', async () => {
     api.startAuth.mockRejectedValue(new Error('upstream down'));
 
-    await expect(service.startAuth({ aspspName: 'Mock ASPSP', aspspCountry: 'NL' })).rejects.toThrow(
-      /upstream down/,
-    );
+    await expect(service.startAuth({ aspspName: 'Mock ASPSP', aspspCountry: 'NL' })).rejects.toThrow(/upstream down/);
 
     // No active sessions; the row landed in expired.
     expect(await repo.findActive()).toHaveLength(0);
@@ -149,9 +147,7 @@ describe('BankingSessionService', () => {
     await service.completeCallback({ code: 'c1', state: pending!.oauthState });
 
     // Replay attempt on the same state — already active.
-    await expect(service.completeCallback({ code: 'c1', state: pending!.oauthState })).rejects.toThrow(
-      /not pending/,
-    );
+    await expect(service.completeCallback({ code: 'c1', state: pending!.oauthState })).rejects.toThrow(/not pending/);
     expect(api.createSession).toHaveBeenCalledOnce();
   });
 

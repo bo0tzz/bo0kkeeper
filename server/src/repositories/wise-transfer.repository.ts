@@ -69,9 +69,9 @@ export class WiseTransferRepository {
       query = query.where('state', '=', input.state);
     }
 
-    const totalRow = (await query
-      .select((eb) => eb.fn.countAll<string>().as('count'))
-      .executeTakeFirst()) as { count: string } | undefined;
+    const totalRow = (await query.select((eb) => eb.fn.countAll<string>().as('count')).executeTakeFirst()) as
+      | { count: string }
+      | undefined;
     const total = Number(totalRow?.count ?? 0);
 
     const items = (await query

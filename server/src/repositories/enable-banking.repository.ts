@@ -191,9 +191,7 @@ export class EnableBankingRepository {
       return null;
     }
     const preferred =
-      balances.find((b) => b.balance_type === 'ITAV') ??
-      balances.find((b) => b.balance_type === 'CLBD') ??
-      balances[0];
+      balances.find((b) => b.balance_type === 'ITAV') ?? balances.find((b) => b.balance_type === 'CLBD') ?? balances[0];
     return {
       amountMinor: BigInt(Math.round(Number.parseFloat(preferred.balance_amount.amount) * 100)),
       currency: preferred.balance_amount.currency,

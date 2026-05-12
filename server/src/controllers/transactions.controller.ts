@@ -3,10 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
-import {
-  ListTransactionsQueryDto,
-  ListTransactionsResponseDto,
-} from 'src/dtos/transactions.dto';
+import { ListTransactionsQueryDto, ListTransactionsResponseDto } from 'src/dtos/transactions.dto';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
@@ -87,11 +84,7 @@ export class TransactionsController {
     if (ids.length === 0) {
       return new Map();
     }
-    const rows = await this.db
-      .selectFrom('invoice')
-      .select(['id', 'number'])
-      .where('id', 'in', ids)
-      .execute();
+    const rows = await this.db.selectFrom('invoice').select(['id', 'number']).where('id', 'in', ids).execute();
     return new Map(rows.map((r) => [r.id, r.number]));
   }
 
@@ -99,11 +92,7 @@ export class TransactionsController {
     if (ids.length === 0) {
       return new Map();
     }
-    const rows = await this.db
-      .selectFrom('expense')
-      .select(['id', 'vendor'])
-      .where('id', 'in', ids)
-      .execute();
+    const rows = await this.db.selectFrom('expense').select(['id', 'vendor']).where('id', 'in', ids).execute();
     return new Map(rows.map((r) => [r.id, r.vendor]));
   }
 }

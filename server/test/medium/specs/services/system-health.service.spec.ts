@@ -2,11 +2,11 @@ import { Kysely } from 'kysely';
 import { BankingSessionStatus } from 'src/enum';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { EventRepository } from 'src/repositories/event.repository';
-import { DB } from 'src/schema';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
+import { WiseApiRepository } from 'src/repositories/wise-api.repository';
+import { DB } from 'src/schema';
 import { SettingsService } from 'src/services/settings.service';
 import { SystemHealthService } from 'src/services/system-health.service';
-import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,11 +39,13 @@ describe('SystemHealthService', () => {
     await db.destroy();
   });
 
-  function makeService(overrides: {
-    paperlessTags?: string[];
-    paperlessTagsExist?: { name: string; exists: boolean; id: number | null }[];
-    wisePingFails?: boolean;
-  } = {}): SystemHealthService {
+  function makeService(
+    overrides: {
+      paperlessTags?: string[];
+      paperlessTagsExist?: { name: string; exists: boolean; id: number | null }[];
+      wisePingFails?: boolean;
+    } = {},
+  ): SystemHealthService {
     const paperless = {
       checkTagsExist: vi.fn().mockResolvedValue(overrides.paperlessTagsExist ?? []),
     } as unknown as PaperlessRepository;

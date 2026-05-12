@@ -128,9 +128,7 @@ export class BankingController {
   @Get('transactions')
   @Authenticated()
   @ApiQueryFromDto(ListBankTransactionsQueryDto)
-  async listTransactions(
-    @Query() query: ListBankTransactionsQueryDto,
-  ): Promise<ListBankTransactionsResponseDto> {
+  async listTransactions(@Query() query: ListBankTransactionsQueryDto): Promise<ListBankTransactionsResponseDto> {
     const { items, total } = await this.bankTransactionRepository.findPaginated({
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,

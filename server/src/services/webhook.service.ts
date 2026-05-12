@@ -102,7 +102,11 @@ export class WebhookService {
    * at the cutover gate" — useful for catching mis-configured cutovers
    * or unexpected upstream backfilling.
    */
-  private async recordCutoverDrop(source: EventSource, droppedExternalId: string, droppedOccurredAt: string): Promise<void> {
+  private async recordCutoverDrop(
+    source: EventSource,
+    droppedExternalId: string,
+    droppedOccurredAt: string,
+  ): Promise<void> {
     await this.eventRepository.recordAction({
       source: EventSource.System,
       eventType: 'ingest.dropped_before_cutover',

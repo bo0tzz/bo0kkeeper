@@ -91,17 +91,19 @@ export class SettingsService implements OnModuleInit {
     return s.paperlessOutgoingInvoiceTags;
   }
 
-  async update(patch: Partial<{
-    issuerKvk: string;
-    issuerVatId: string;
-    issuerAddressLine1: string;
-    issuerPostalCode: string;
-    issuerCity: string;
-    issuerCountry: string;
-    issuerIban: string;
-    paperlessExpenseTags: string[];
-    paperlessOutgoingInvoiceTags: string[];
-  }>): Promise<AppSettings> {
+  async update(
+    patch: Partial<{
+      issuerKvk: string;
+      issuerVatId: string;
+      issuerAddressLine1: string;
+      issuerPostalCode: string;
+      issuerCity: string;
+      issuerCountry: string;
+      issuerIban: string;
+      paperlessExpenseTags: string[];
+      paperlessOutgoingInvoiceTags: string[];
+    }>,
+  ): Promise<AppSettings> {
     const current = await this.get();
     return this.repository.update(current.id, patch);
   }

@@ -18,12 +18,12 @@ import { BankTransactionRepository } from 'src/repositories/bank-transaction.rep
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
+import { PaperlessRepository } from 'src/repositories/paperless.repository';
+import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
-import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
-import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { WebhookService } from 'src/services/webhook.service';
 import { getKyselyConfig } from 'src/utils/database';
 
@@ -114,7 +114,9 @@ async function main(): Promise<void> {
 
     await matcher.manualMatch(bankIngest.row.id, { type: 'expense', targetId: approved.id });
     console.log(`✓ manual-matched bank tx → expense ${approved.id}`);
-    console.log(`  Check the dev sheet — a new Expense row dated ${txDate.toISOString().slice(0, 10)} should be there.`);
+    console.log(
+      `  Check the dev sheet — a new Expense row dated ${txDate.toISOString().slice(0, 10)} should be there.`,
+    );
   } finally {
     await db.destroy();
   }

@@ -180,9 +180,7 @@ export class BankMatcherService {
     // for an expense, inflows look for an invoice. Sheet-write deliberately
     // skipped on auto_low; promotion to manual via the link UI handles that.
     const isOutflow = BigInt(bankTx.amountMinor as bigint | number | string) < 0n;
-    const heuristic = isOutflow
-      ? await this.tryExpenseHeuristic(bankTx)
-      : await this.tryInvoiceHeuristic(bankTx);
+    const heuristic = isOutflow ? await this.tryExpenseHeuristic(bankTx) : await this.tryInvoiceHeuristic(bankTx);
     if (heuristic) {
       return heuristic;
     }
@@ -426,9 +424,7 @@ export class BankMatcherService {
       .where('matchedAt', 'is not', null)
       .where('matchConfidence', 'in', [MatchConfidence.AutoHigh, MatchConfidence.Manual])
       .where('sheetRowAt', 'is', null)
-      .where((eb) =>
-        eb.or([eb('matchedInvoiceId', 'is not', null), eb('matchedTransferId', 'is not', null)]),
-      )
+      .where((eb) => eb.or([eb('matchedInvoiceId', 'is not', null), eb('matchedTransferId', 'is not', null)]))
       .execute();
 
     for (const bankTx of incomeRows as BankTransaction[]) {
@@ -879,4 +875,3 @@ function toDate(value: Date | string | number): Date {
 function addDays(d: Date, days: number): Date {
   return new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
 }
-

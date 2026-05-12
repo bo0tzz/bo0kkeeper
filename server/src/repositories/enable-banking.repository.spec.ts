@@ -31,7 +31,12 @@ afterAll(() => {
   delete process.env.ENABLE_BANKING_API_BASE_URL;
 });
 
-function decodeJwt(jwt: string): { header: Record<string, unknown>; claims: Record<string, unknown>; signingInput: string; signatureB64Url: string } {
+function decodeJwt(jwt: string): {
+  header: Record<string, unknown>;
+  claims: Record<string, unknown>;
+  signingInput: string;
+  signatureB64Url: string;
+} {
   const [headerB64, claimsB64, sigB64] = jwt.split('.');
   const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString('utf8'));
   const claims = JSON.parse(Buffer.from(claimsB64, 'base64url').toString('utf8'));
@@ -56,9 +61,7 @@ describe('EnableBankingRepository — JWT', () => {
     const verifier = createVerify('RSA-SHA256');
     verifier.update(signingInput);
     verifier.end();
-    expect(
-      verifier.verify(createPublicKey(publicKey), Buffer.from(signatureB64Url, 'base64url')),
-    ).toBe(true);
+    expect(verifier.verify(createPublicKey(publicKey), Buffer.from(signatureB64Url, 'base64url'))).toBe(true);
   });
 
   it('throws when no app id or key is configured', () => {
@@ -152,8 +155,8 @@ describe('EnableBankingRepository — wire shapes', () => {
   });
 
   it('surfaces non-2xx responses as EnableBankingApiError with status + body', async () => {
-    const fetchSpy = fakeFetch(
-      () => Response.json({ error: 'AUTHORIZATION_FAILED', description: 'expired session' }, { status: 401 }),
+    const fetchSpy = fakeFetch(() =>
+      Response.json({ error: 'AUTHORIZATION_FAILED', description: 'expired session' }, { status: 401 }),
     );
     const service = new EnableBankingRepository(fetchSpy);
     await expect(service.createSession('bad')).rejects.toMatchObject({

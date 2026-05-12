@@ -1,22 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnJob } from 'src/decorators';
 import { BankingSessionStatus, BankSource, EventSource, JobName, QueueName } from 'src/enum';
-import {
-  BankTransactionRepository,
-  NewBankTransaction,
-} from 'src/repositories/bank-transaction.repository';
-import {
-  BankingSession,
-  BankingSessionRepository,
-} from 'src/repositories/banking-session.repository';
-import { EventRepository } from 'src/repositories/event.repository';
-import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { BankTransactionRepository, NewBankTransaction } from 'src/repositories/bank-transaction.repository';
+import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import {
   EnableBankingAccount,
   EnableBankingApiError,
   EnableBankingRepository,
   EnableBankingTransaction,
 } from 'src/repositories/enable-banking.repository';
+import { EventRepository } from 'src/repositories/event.repository';
+import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { JobOf } from 'src/types';
+import { checkCutover } from 'src/utils/cutover';
 
 /**
  * Account row as we stash it in `banking_session.accountsJson` — the API
@@ -40,8 +36,6 @@ type AccountWithBalance = EnableBankingAccount & {
     asOf: string;
   };
 };
-import { JobOf } from 'src/types';
-import { checkCutover } from 'src/utils/cutover';
 
 /**
  * Pulls Enable Banking transactions for every active session, ingests them
@@ -90,9 +84,7 @@ export class BankingSyncService {
       ingested += result.ingested;
       matched += result.matched;
     }
-    this.logger.log(
-      `banking sync: ${sessions.length} session(s), ${ingested} new tx, ${matched} matched`,
-    );
+    this.logger.log(`banking sync: ${sessions.length} session(s), ${ingested} new tx, ${matched} matched`);
     await this.eventRepository.recordAction({
       source: EventSource.System,
       eventType: 'banking.sync.completed',
@@ -145,9 +137,7 @@ export class BankingSyncService {
           break;
         }
         // Per-account failures are logged and shrugged off — next cron tick retries.
-        this.logger.error(
-          `account ${account.uid} sync failed in session ${session.id}: ${(error as Error).message}`,
-        );
+        this.logger.error(`account ${account.uid} sync failed in session ${session.id}: ${(error as Error).message}`);
       }
     }
     if (!revoked) {

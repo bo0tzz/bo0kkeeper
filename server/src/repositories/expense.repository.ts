@@ -83,7 +83,9 @@ export class ExpenseRepository {
       .$if(filter.matched === true, (qb) =>
         qb.where(({ exists, selectFrom }) =>
           exists(
-            selectFrom('bank_transaction').select('id').whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
+            selectFrom('bank_transaction')
+              .select('id')
+              .whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
           ),
         ),
       );

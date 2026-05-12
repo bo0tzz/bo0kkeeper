@@ -4,9 +4,9 @@ import { Config, loadConfig } from 'src/config';
 import { OnJob } from 'src/decorators';
 import { BankingSessionStatus, EventSource, JobName, QueueName } from 'src/enum';
 import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
+import { EnableBankingAccount, EnableBankingRepository } from 'src/repositories/enable-banking.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
-import { EnableBankingAccount, EnableBankingRepository } from 'src/repositories/enable-banking.repository';
 
 /**
  * Drives the PSD2 consent flow against Enable Banking. Two entry points:

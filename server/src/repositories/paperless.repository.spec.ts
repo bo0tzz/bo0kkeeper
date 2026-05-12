@@ -96,9 +96,15 @@ describe('PaperlessRepository', () => {
 
   describe('checkTagsExist', () => {
     it('returns per-name existence + id from the live tag set', async () => {
-      const fetchFn = vi
-        .fn()
-        .mockResolvedValueOnce(okResponse({ results: [{ id: 1, name: 'Business' }, { id: 2, name: 'Bills' }], next: null }));
+      const fetchFn = vi.fn().mockResolvedValueOnce(
+        okResponse({
+          results: [
+            { id: 1, name: 'Business' },
+            { id: 2, name: 'Bills' },
+          ],
+          next: null,
+        }),
+      );
       const service = new PaperlessRepository(fetchFn);
       const result = await service.checkTagsExist(['Business', 'Buisness', 'Bills']);
       expect(result).toEqual([
@@ -109,9 +115,7 @@ describe('PaperlessRepository', () => {
     });
 
     it('is case-sensitive — paperless tags are', async () => {
-      const fetchFn = vi
-        .fn()
-        .mockResolvedValueOnce(okResponse({ results: [{ id: 1, name: 'Business' }], next: null }));
+      const fetchFn = vi.fn().mockResolvedValueOnce(okResponse({ results: [{ id: 1, name: 'Business' }], next: null }));
       const service = new PaperlessRepository(fetchFn);
       const result = await service.checkTagsExist(['business']);
       expect(result[0].exists).toBe(false);

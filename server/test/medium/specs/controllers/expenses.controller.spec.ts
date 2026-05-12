@@ -12,8 +12,8 @@ import { ExpenseLocationClass, ExpenseStatus, JobName } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository, NewExpense } from 'src/repositories/expense.repository';
 import { JobRepository } from 'src/repositories/job.repository';
-import { DB } from 'src/schema';
 import { PaperlessDocument, PaperlessRepository } from 'src/repositories/paperless.repository';
+import { DB } from 'src/schema';
 import { SettingsService } from 'src/services/settings.service';
 import { WebhookService } from 'src/services/webhook.service';
 import { getKyselyDB } from 'test/utils';
@@ -47,13 +47,7 @@ describe('ExpensesController', () => {
     const stubPaperless = {} as unknown as PaperlessRepository;
     const stubSettings = {} as unknown as SettingsService;
     const stubWebhook = {} as unknown as WebhookService;
-    controller = new ExpensesController(
-      repo,
-      new EventRepository(db),
-      stubPaperless,
-      stubSettings,
-      stubWebhook,
-    );
+    controller = new ExpensesController(repo, new EventRepository(db), stubPaperless, stubSettings, stubWebhook);
   });
 
   afterEach(async () => {
@@ -172,8 +166,24 @@ describe('ExpensesController', () => {
     it('synthesizes events and enqueues jobs for each doc', async () => {
       process.env.CUTOVER_DATE = '2026-01-01';
       const docs: PaperlessDocument[] = [
-        { id: 101, title: 'Receipt A', correspondent: null, document_type: null, tags: [1, 2], created: '2026-03-15', added: '2026-03-15' },
-        { id: 102, title: 'Receipt B', correspondent: null, document_type: null, tags: [1, 2], created: '2026-04-01', added: '2026-04-01' },
+        {
+          id: 101,
+          title: 'Receipt A',
+          correspondent: null,
+          document_type: null,
+          tags: [1, 2],
+          created: '2026-03-15',
+          added: '2026-03-15',
+        },
+        {
+          id: 102,
+          title: 'Receipt B',
+          correspondent: null,
+          document_type: null,
+          tags: [1, 2],
+          created: '2026-04-01',
+          added: '2026-04-01',
+        },
       ];
       const { controller: c, jobQueue } = buildRescanController(repo, db, { docs, tags: ['Business', 'Bills'] });
 
@@ -186,7 +196,15 @@ describe('ExpensesController', () => {
     it('reports alreadyIngested when re-running on docs whose events already exist', async () => {
       process.env.CUTOVER_DATE = '2026-01-01';
       const docs: PaperlessDocument[] = [
-        { id: 201, title: 'Already', correspondent: null, document_type: null, tags: [1], created: '2026-02-15', added: '2026-02-15' },
+        {
+          id: 201,
+          title: 'Already',
+          correspondent: null,
+          document_type: null,
+          tags: [1],
+          created: '2026-02-15',
+          added: '2026-02-15',
+        },
       ];
       const { controller: c } = buildRescanController(repo, db, { docs, tags: ['Business'] });
 

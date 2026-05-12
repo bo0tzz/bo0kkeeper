@@ -1,9 +1,9 @@
 import { Kysely } from 'kysely';
 import { EventSource, WiseTransferDirection } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
+import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
-import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { WiseDraftService } from 'src/services/wise-draft.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

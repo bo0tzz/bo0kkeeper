@@ -111,9 +111,7 @@ export class BankTransactionRepository {
       .where('matchedAt', '<', threshold)
       .where('matchConfidence', 'in', [MatchConfidence.AutoHigh, MatchConfidence.Manual])
       .where('sheetRowAt', 'is', null)
-      .where((eb) =>
-        eb.or([eb('matchedInvoiceId', 'is not', null), eb('matchedTransferId', 'is not', null)]),
-      )
+      .where((eb) => eb.or([eb('matchedInvoiceId', 'is not', null), eb('matchedTransferId', 'is not', null)]))
       .executeTakeFirstOrThrow()) as { total: string | number };
     return Number(result.total);
   }
@@ -166,9 +164,9 @@ export class BankTransactionRepository {
       }
     }
 
-    const totalRow = (await query
-      .select((eb) => eb.fn.countAll<string>().as('count'))
-      .executeTakeFirst()) as { count: string } | undefined;
+    const totalRow = (await query.select((eb) => eb.fn.countAll<string>().as('count')).executeTakeFirst()) as
+      | { count: string }
+      | undefined;
     const total = Number(totalRow?.count ?? 0);
 
     const items = (await query

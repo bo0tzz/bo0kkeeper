@@ -12,16 +12,23 @@
 import { Kysely } from 'kysely';
 import { randomUUID } from 'node:crypto';
 import { loadConfig } from 'src/config';
-import { BankingSessionStatus, BankSource, EventSource, ExpenseLocationClass, WiseTransferDirection, WiseTransferState } from 'src/enum';
+import {
+  BankingSessionStatus,
+  BankSource,
+  EventSource,
+  ExpenseLocationClass,
+  WiseTransferDirection,
+  WiseTransferState,
+} from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
+import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
-import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { getKyselyConfig } from 'src/utils/database';
 
 async function main(): Promise<void> {
