@@ -44,6 +44,12 @@ describe('InvoiceComposerService', () => {
     paperless = new PaperlessRepository();
     paperless.uploadDocument = vi.fn().mockResolvedValue({ taskId: 'task-uuid-1' });
     paperless.waitForDocumentId = vi.fn().mockResolvedValue('paperless-doc-42');
+    // composer also resolves tag names → ids when tags are configured.
+    // SettingsService defaults to `Business,Invoice,bo0kkeeper`, so this
+    // path always runs and needs stubbing — otherwise the real call hits
+    // the paperless REST API (works locally with PAPERLESS_BASE_URL set,
+    // fails in CI without it).
+    paperless.resolveTagIds = vi.fn().mockResolvedValue([1, 2, 3]);
 
     jobs = fakeJobRepo();
     const settingsService = new SettingsService(new AppSettingsRepository(db));
