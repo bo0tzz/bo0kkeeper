@@ -1,0 +1,39 @@
+**/node_modules
+**/dist
+**/build
+**/.svelte-kit
+**/coverage
+**/.next
+**/.cache
+# TypeScript incremental-build cache. Lives outside dist/ at server/, so
+# the **/dist rule alone doesn't catch it. If COPY'd into the build context
+# while dist/ is excluded, tsc skips emitting because it believes the cache
+# matches — runtime then fails with missing module errors. Always rebuild
+# from scratch inside the image.
+**/*.tsbuildinfo
+
+# Local-only state
+data/
+.env
+.env.*
+!.env.example
+server/test/medium/.testcontainers
+tools/browser-harness/state.json
+tools/browser-harness/screenshots
+
+# Editor / VCS
+.git
+.github
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Generated client SDK; rebuilt in the image's build stage
+open-api/typescript-sdk/dist
+open-api/server-openapi-specs.json
+server/server-openapi-specs.json
+
+# Logs + scratch
+*.log
+.pnpm-store

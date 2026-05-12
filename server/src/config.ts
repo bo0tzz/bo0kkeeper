@@ -85,6 +85,14 @@ const ConfigSchema = z
     SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY: z.string().optional(),
     /** Spreadsheet id (the long string in the gdrive URL). */
     SHEETS_SPREADSHEET_ID: z.string().optional(),
+
+    /**
+     * Filesystem path to the built SvelteKit static site. When set, the server
+     * also serves the web app at `/` (SPA fallback for client routes). Empty
+     * in dev — Vite serves the web on its own port — set in the prod Docker
+     * image so a single container serves both API and frontend.
+     */
+    WEB_DIST_DIR: z.string().optional(),
   })
   // Fail-closed webhook authentication in production. The two webhook endpoints
   // (Wise, paperless) are publicly reachable; if signature/token verification is
@@ -158,6 +166,8 @@ export type Config = {
     serviceAccountPrivateKey?: string;
     spreadsheetId?: string;
   };
+  /** Optional path to the SvelteKit static build; when set, server serves the SPA too. */
+  webDistDir?: string;
 };
 
 export function loadConfig(): Config {
@@ -219,5 +229,6 @@ export function loadConfig(): Config {
       serviceAccountPrivateKey: result.data.SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY,
       spreadsheetId: result.data.SHEETS_SPREADSHEET_ID,
     },
+    webDistDir: result.data.WEB_DIST_DIR,
   };
 }
