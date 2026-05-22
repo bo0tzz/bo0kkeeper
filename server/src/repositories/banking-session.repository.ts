@@ -50,6 +50,21 @@ export class BankingSessionRepository {
   }
 
   /**
+   * Mark every currently-live (active or pending) session as expired.
+   * Called when starting a new session — there's only ever one bank
+   * connected at a time, and stacking old rows next to the new one is
+   * just visual noise + audit confusion.
+   */
+  async expireAllLive(): Promise<number> {
+    const result = await this.db
+      .updateTable('banking_session')
+      .set({ status: BankingSessionStatus.Expired, updatedAt: new Date() })
+      .where('status', 'in', [BankingSessionStatus.Active, BankingSessionStatus.Pending])
+      .executeTakeFirst();
+    return Number(result.numUpdatedRows ?? 0);
+  }
+
+  /**
    * Garbage-collect pending sessions older than `cutoff` (auth started, never
    * came back). Returns the number of rows updated.
    */

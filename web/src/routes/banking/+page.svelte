@@ -489,9 +489,40 @@
               </Button>
             {/if}
             <Button variant="ghost" disabled={starting} onclick={reconnect}>
-              {starting ? 'Starting…' : 'Reconnect'}
+              {starting ? 'Starting…' : `Reconnect to ${session.aspspName}`}
             </Button>
           </HStack>
+
+          {#if needsReconnect || reconnectSoon}
+            <div class="rounded-md border border-dashed p-4">
+              <Stack gap={2}>
+                <Text size="small" color="muted">…or connect a different bank:</Text>
+                <HStack gap={3} class="items-end">
+                  <Field label="Bank">
+                    <Select
+                      bind:value={selectedAspspName}
+                      options={[
+                        { value: '', label: aspsps.length === 0 ? 'Loading…' : 'Pick a bank' },
+                        ...aspsps.map((a) => ({ value: a.name, label: `${a.name} (${a.country})` })),
+                      ]}
+                    />
+                  </Field>
+                  <Field label="Account type">
+                    <Select
+                      bind:value={selectedPsuType}
+                      options={[
+                        { value: 'personal', label: 'Personal' },
+                        { value: 'business', label: 'Business' },
+                      ]}
+                    />
+                  </Field>
+                  <Button disabled={starting || !selectedAspspName} onclick={connect}>
+                    {starting ? 'Starting…' : 'Connect'}
+                  </Button>
+                </HStack>
+              </Stack>
+            </div>
+          {/if}
         </Stack>
       </div>
     {/if}

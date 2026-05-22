@@ -62,6 +62,15 @@ export class BankingSessionService {
     const PSD2_MAX_CONSENT_DAYS = 90;
     const validUntil = new Date(Date.now() + PSD2_MAX_CONSENT_DAYS * 24 * 60 * 60 * 1000);
 
+    // We only support one live bank at a time. Anything currently active or
+    // pending gets marked expired before we mint the new pending row — that
+    // way stale or stuck sessions don't pile up alongside the real one and
+    // confuse the /banking UI's "latest session" view.
+    const expired = await this.sessionRepository.expireAllLive();
+    if (expired > 0) {
+      this.logger.log(`Expired ${expired} prior live session(s) before starting new auth`);
+    }
+
     const session = await this.sessionRepository.create({
       oauthState,
       aspspName: input.aspspName,
