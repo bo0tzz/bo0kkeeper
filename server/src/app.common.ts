@@ -9,6 +9,15 @@ import { join } from 'node:path';
 type WithRawBody = Express.Request & { rawBody?: string };
 
 export function applyCommonAppConfig(app: NestExpressApplication) {
+  // Trust the immediate upstream proxy (k8s Ingress / Envoy) so `req.protocol`
+  // reflects the public-facing scheme, not the in-cluster HTTP hop. Critical
+  // for OAuth: the callback constructs the redirect_uri it sends to the IDP
+  // token endpoint from `req.protocol`. Without trust-proxy the IDP sees
+  // http:// while the registered URI is https:// → invalid_grant. In dev
+  // (no proxy) the header is absent and Express falls back to the connection
+  // protocol — safe no-op.
+  app.set('trust proxy', 1);
+
   app.use(cookieParser());
   app.use(compression());
   app.use(
