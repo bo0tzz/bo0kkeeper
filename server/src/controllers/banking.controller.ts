@@ -17,6 +17,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import {
+  BankingAspspsQueryDto,
+  BankingAspspsResponseDto,
   BankingSessionResponseDto,
   BankingStartAuthDto,
   BankingStartAuthResponseDto,
@@ -30,6 +32,7 @@ import {
 import { BankTxCategory, EventSource, JobName } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
+import { EnableBankingRepository } from 'src/repositories/enable-banking.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
@@ -57,7 +60,28 @@ export class BankingController {
     private readonly bankTransactionRepository: BankTransactionRepository,
     private readonly matcher: BankMatcherService,
     private readonly eventRepository: EventRepository,
+    private readonly enableBanking: EnableBankingRepository,
   ) {}
+
+  /**
+   * Bank catalog for the picker on /banking. Proxies Enable Banking's
+   * `/aspsps`; that endpoint needs a JWT we mint server-side, so the SPA
+   * goes through us. Filterable by country (default NL).
+   */
+  @Get('aspsps')
+  @Authenticated()
+  @ApiQueryFromDto(BankingAspspsQueryDto)
+  async listAspsps(@Query() query: BankingAspspsQueryDto): Promise<BankingAspspsResponseDto> {
+    const country = query.country ?? 'NL';
+    const aspsps = await this.enableBanking.listAspsps(country);
+    return {
+      aspsps: aspsps.map((a) => ({
+        name: a.name,
+        country: a.country,
+        psuTypes: a.psu_types,
+      })),
+    };
+  }
 
   @Post('auth/start')
   @Authenticated()

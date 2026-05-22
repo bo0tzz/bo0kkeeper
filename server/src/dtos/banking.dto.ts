@@ -3,13 +3,34 @@ import z from 'zod';
 
 const StartAuthBodySchema = z
   .object({
-    /** ASPSP name as listed by Enable Banking. Default to Mock ASPSP for dev. */
-    aspspName: z.string().min(1).default('Mock ASPSP'),
-    aspspCountry: z.string().length(2).default('NL'),
+    /** ASPSP name as listed in Enable Banking's `/aspsps` catalog. */
+    aspspName: z.string().min(1),
+    aspspCountry: z.string().length(2),
     psuType: z.enum(['personal', 'business']).default('personal'),
   })
   .meta({ id: 'BankingStartAuthDto' });
 export class BankingStartAuthDto extends createZodDto(StartAuthBodySchema) {}
+
+const AspspsQuerySchema = z
+  .object({
+    /** ISO-3166 alpha-2 country code. Default NL — the only relevant one today. */
+    country: z.string().length(2).default('NL'),
+  })
+  .meta({ id: 'BankingAspspsQueryDto' });
+export class BankingAspspsQueryDto extends createZodDto(AspspsQuerySchema) {}
+
+const AspspsResponseSchema = z
+  .object({
+    aspsps: z.array(
+      z.object({
+        name: z.string(),
+        country: z.string(),
+        psuTypes: z.array(z.enum(['personal', 'business'])),
+      }),
+    ),
+  })
+  .meta({ id: 'BankingAspspsResponseDto' });
+export class BankingAspspsResponseDto extends createZodDto(AspspsResponseSchema) {}
 
 const StartAuthResponseSchema = z
   .object({

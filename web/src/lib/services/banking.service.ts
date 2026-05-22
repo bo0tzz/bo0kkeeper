@@ -28,8 +28,8 @@ export type BankingSession = {
 };
 
 export type StartAuthRequest = {
-  aspspName?: string;
-  aspspCountry?: string;
+  aspspName: string;
+  aspspCountry: string;
   psuType?: 'personal' | 'business';
 };
 
@@ -38,10 +38,19 @@ export type StartAuthResponse = {
   redirectUrl: string;
 };
 
+export type BankingAspsp = {
+  name: string;
+  country: string;
+  psuTypes: ('personal' | 'business')[];
+};
+
 export const getLatestBankingSession = (fetchFn?: typeof fetch) =>
   apiGet<BankingSession | null>('/api/banking/session', { fetch: fetchFn });
 
-export const startBankingAuth = (body: StartAuthRequest = {}, fetchFn?: typeof fetch) =>
+export const listBankingAspsps = (country = 'NL', fetchFn?: typeof fetch) =>
+  apiGet<{ aspsps: BankingAspsp[] }>('/api/banking/aspsps', { fetch: fetchFn, query: { country } });
+
+export const startBankingAuth = (body: StartAuthRequest, fetchFn?: typeof fetch) =>
   apiPost<StartAuthResponse>('/api/banking/auth/start', body, { fetch: fetchFn });
 
 export const syncBankingNow = (fetchFn?: typeof fetch) =>

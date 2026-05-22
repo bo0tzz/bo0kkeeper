@@ -13,6 +13,7 @@ import {
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
+import { EnableBankingRepository } from 'src/repositories/enable-banking.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
@@ -63,7 +64,16 @@ describe('BankingController', () => {
     const clientRepo = new ClientRepository(db);
     const sheetWriter = { writeIncomeRow: vi.fn().mockResolvedValue(void 0) } as unknown as SheetWriterService;
     const matcher = new BankMatcherService(db, bankTxRepo, clientRepo, sheetWriter, new EventRepository(db));
-    controller = new BankingController(service, repo, jobRepo, bankTxRepo, matcher, new EventRepository(db));
+    const enableBankingStub = { listAspsps: vi.fn().mockResolvedValue([]) } as unknown as EnableBankingRepository;
+    controller = new BankingController(
+      service,
+      repo,
+      jobRepo,
+      bankTxRepo,
+      matcher,
+      new EventRepository(db),
+      enableBankingStub,
+    );
   });
 
   afterEach(async () => {

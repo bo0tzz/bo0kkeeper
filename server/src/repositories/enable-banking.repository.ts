@@ -47,6 +47,18 @@ export type EnableBankingAccount = {
   accountId?: { iban?: string };
 };
 
+/**
+ * One bank in Enable Banking's catalog. Many fields available in the raw
+ * response (auth methods, logos, etc.) but only what the UI picker needs
+ * is projected here.
+ */
+export type EnableBankingAspsp = {
+  name: string;
+  country: string;
+  psu_types: ('personal' | 'business')[];
+  logo?: string;
+};
+
 export type CreateSessionResult = {
   sessionId: string;
   accounts: EnableBankingAccount[];
@@ -120,6 +132,17 @@ export class EnableBankingRepository {
   constructor(@Optional() fetchFn: FetchLike = fetch) {
     this.config = loadConfig().enableBanking;
     this.fetchFn = fetchFn;
+  }
+
+  /**
+   * List banks (ASPSPs) supported by Enable Banking. Filterable by country.
+   * Used by the /banking UI's bank picker so the operator doesn't have to
+   * type the exact catalog name by hand.
+   */
+  async listAspsps(country?: string): Promise<EnableBankingAspsp[]> {
+    const path = country ? `/aspsps?country=${encodeURIComponent(country)}` : '/aspsps';
+    const data = (await this.request(path, { method: 'GET' })) as { aspsps: EnableBankingAspsp[] };
+    return data.aspsps ?? [];
   }
 
   async startAuth(input: StartAuthInput): Promise<StartAuthResult> {

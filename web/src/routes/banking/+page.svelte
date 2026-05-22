@@ -4,12 +4,14 @@
   import {
     clearBankTxMatch,
     getLatestBankingSession,
+    listBankingAspsps,
     listBankTransactions,
     listMatchCandidates,
     setBankTxCategory,
     setBankTxMatch,
     startBankingAuth,
     syncBankingNow,
+    type BankingAspsp,
     type BankingSession,
     type BankTransaction,
     type BankTxCategory,
@@ -47,6 +49,11 @@
   let syncing = $state(false);
   let error = $state<string | null>(null);
   let info = $state<string | null>(null);
+
+  // ASPSP picker: loaded once from the catalog. Persists across reconnects.
+  let aspsps = $state<BankingAspsp[]>([]);
+  let selectedAspspName = $state<string>('');
+  let selectedPsuType = $state<'personal' | 'business'>('personal');
 
   let dateFrom = $state('');
   let dateTo = $state('');
@@ -94,7 +101,7 @@
     loading = true;
     error = null;
     try {
-      await Promise.all([loadSession(), loadTx()]);
+      await Promise.all([loadSession(), loadTx(), loadAspsps()]);
     } finally {
       loading = false;
     }
@@ -130,15 +137,48 @@
     };
   }
 
-  async function connect() {
+  async function connectWith(name: string, country: string, psuType: 'personal' | 'business') {
     starting = true;
     error = null;
     try {
-      const result = await startBankingAuth({});
+      const result = await startBankingAuth({ aspspName: name, aspspCountry: country, psuType });
       globalThis.location.href = result.redirectUrl;
     } catch (error_) {
       error = (error_ as Error).message;
       starting = false;
+    }
+  }
+
+  async function connect() {
+    const aspsp = aspsps.find((a) => a.name === selectedAspspName);
+    if (!aspsp) {
+      error = 'Pick a bank first.';
+      return;
+    }
+    await connectWith(aspsp.name, aspsp.country, selectedPsuType);
+  }
+
+  async function reconnect() {
+    if (!session) {
+      return;
+    }
+    const psuType = session.psuType === 'business' ? 'business' : 'personal';
+    await connectWith(session.aspspName, session.aspspCountry, psuType);
+  }
+
+  async function loadAspsps() {
+    try {
+      const result = await listBankingAspsps('NL');
+      aspsps = result.aspsps;
+      // Default to whatever the existing session uses, otherwise leave empty
+      // so the operator has to make an explicit choice.
+      const current = session;
+      if (current && aspsps.some((a) => a.name === current.aspspName)) {
+        selectedAspspName = current.aspspName;
+      }
+    } catch (error_) {
+      // Non-fatal: show the catalog as empty + an error message.
+      error = `Couldn't load bank list: ${(error_ as Error).message}`;
     }
   }
 
@@ -338,8 +378,26 @@
         <Stack gap={3}>
           <Heading size="medium" tag="h2">No bank connected</Heading>
           <Text color="muted">Connect a bank via Enable Banking to start ingesting transactions automatically.</Text>
-          <HStack>
-            <Button color="primary" disabled={starting} onclick={connect}>
+          <HStack gap={3} class="items-end">
+            <Field label="Bank">
+              <Select
+                bind:value={selectedAspspName}
+                options={[
+                  { value: '', label: aspsps.length === 0 ? 'Loading…' : 'Pick a bank' },
+                  ...aspsps.map((a) => ({ value: a.name, label: `${a.name} (${a.country})` })),
+                ]}
+              />
+            </Field>
+            <Field label="Account type">
+              <Select
+                bind:value={selectedPsuType}
+                options={[
+                  { value: 'personal', label: 'Personal' },
+                  { value: 'business', label: 'Business' },
+                ]}
+              />
+            </Field>
+            <Button color="primary" disabled={starting || !selectedAspspName} onclick={connect}>
               {starting ? 'Starting…' : 'Connect bank'}
             </Button>
           </HStack>
@@ -430,8 +488,8 @@
                 {syncing ? 'Queuing…' : 'Sync now'}
               </Button>
             {/if}
-            <Button variant="ghost" disabled={starting} onclick={connect}>
-              {starting ? 'Starting…' : needsReconnect || reconnectSoon ? 'Reconnect' : 'Connect another'}
+            <Button variant="ghost" disabled={starting} onclick={reconnect}>
+              {starting ? 'Starting…' : 'Reconnect'}
             </Button>
           </HStack>
         </Stack>

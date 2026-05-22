@@ -179,7 +179,14 @@ export class OidcRepository {
     if (!jwksUri) {
       throw new Error('IDP does not advertise a jwks_uri');
     }
-    this.jwks = createRemoteJWKSet(new URL(jwksUri));
+    // Cache the JWKS for 10 minutes max. Without this the lib caches the first
+    // response forever, which means any IDP-side signing-config change (e.g.
+    // swapping the Signing Key on an Authentik provider) requires a pod
+    // restart before the next login can succeed. 10 minutes self-heals while
+    // still avoiding hitting the IDP on every verify.
+    this.jwks = createRemoteJWKSet(new URL(jwksUri), {
+      cacheMaxAge: 10 * 60 * 1000,
+    });
     return this.jwks;
   }
 }
