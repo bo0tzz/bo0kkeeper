@@ -259,10 +259,14 @@ export class EnableBankingRepository {
     const text = await response.text();
     const data: unknown = text ? safeJson(text) : null;
     if (!response.ok) {
+      // Include the response body in the message — 422 in particular comes
+      // with a JSON envelope explaining what was rejected, and burying it
+      // on the error object makes "POST /auth failed: 422" useless in logs.
+      const bodyPreview = text ? ` body=${text.slice(0, 500)}` : '';
       throw new EnableBankingApiError(
         response.status,
         data,
-        `Enable Banking ${opts.method} ${path} failed: ${response.status}`,
+        `Enable Banking ${opts.method} ${path} failed: ${response.status}${bodyPreview}`,
       );
     }
     return data;
