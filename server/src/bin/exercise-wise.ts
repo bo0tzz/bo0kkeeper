@@ -18,6 +18,7 @@ import { BankSource } from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
+import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
@@ -77,9 +78,10 @@ async function main(): Promise<void> {
 
     const bankRepo = new BankTransactionRepository(db);
     const clientRepo = new ClientRepository(db);
+    const expenseRepo = new ExpenseRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
     const eventRepo = new EventRepository(db);
-    const matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, eventRepo);
+    const matcher = new BankMatcherService(db, bankRepo, clientRepo, expenseRepo, sheetWriter, eventRepo);
 
     const externalId = `demo-wise-${randomUUID().slice(0, 8)}`;
     console.log(`Using tx-date ${txDate.toISOString().slice(0, 10)} (→ quarter tab will reflect this date)`);

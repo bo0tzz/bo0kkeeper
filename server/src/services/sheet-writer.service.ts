@@ -29,8 +29,12 @@ export type IncomeRowInput = {
 export type ExpenseRowInput = {
   /** Payment-out date (kasstelsel). Drives the quarter tab + Date cell. */
   date: Date;
-  /** Identifier in the Id column. Paperless doc id is the canonical reference. */
-  paperlessDocId: string;
+  /**
+   * Identifier in the Id column. Paperless doc id for the common case;
+   * for auto-created bank-fee expenses (no Paperless doc), falls back to the
+   * expense's own id so the row remains traceable back to /expenses.
+   */
+  id: string;
   vendor: string;
   /** Always recorded in EUR on the sheet. */
   eurAmountMinor: bigint;
@@ -144,7 +148,7 @@ export class SheetWriterService {
 
     const row: (string | number | null)[] = [
       formatIsoDate(input.date),
-      input.paperlessDocId,
+      input.id,
       'Expense',
       LOCATION_BY_EXPENSE_CLASS[input.locationClass],
       input.from ?? 'SNS Account',
@@ -156,7 +160,7 @@ export class SheetWriterService {
       input.source ?? '',
     ];
 
-    this.logger.log(`Sheet append: tab=${tab} id=${input.paperlessDocId} (expense)`);
+    this.logger.log(`Sheet append: tab=${tab} id=${input.id} (expense)`);
     await this.sheets.appendRow(tab, row);
     await this.sheets.autoResizeColumns(tab, sheetId, QUARTER_TAB_HEADERS.length);
   }
@@ -176,7 +180,7 @@ export function expenseToSheetRow(expense: Expense, date: Date): ExpenseRowInput
   const vatMinor = expense.btwMinor == null ? undefined : BigInt(expense.btwMinor as bigint | string);
   return {
     date,
-    paperlessDocId: expense.paperlessDocId,
+    id: expense.paperlessDocId ?? expense.id,
     vendor: expense.vendor,
     eurAmountMinor: BigInt(expense.amountMinor as bigint | string),
     locationClass: expense.locationClass,

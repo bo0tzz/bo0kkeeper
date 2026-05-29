@@ -72,7 +72,14 @@ describe('BankMatcherService', () => {
       writeIncomeRow: ReturnType<typeof vi.fn>;
       writeExpenseRow: ReturnType<typeof vi.fn>;
     };
-    matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, new EventRepository(db));
+    matcher = new BankMatcherService(
+      db,
+      bankRepo,
+      clientRepo,
+      new ExpenseRepository(db),
+      sheetWriter,
+      new EventRepository(db),
+    );
   });
 
   afterEach(async () => {
@@ -379,7 +386,7 @@ describe('BankMatcherService', () => {
     // Sheet row written with the bank-tx date (kasstelsel), not the receipt date.
     expect(sheetWriter.writeExpenseRow).toHaveBeenCalledOnce();
     const args = sheetWriter.writeExpenseRow.mock.calls[0][0] as {
-      paperlessDocId: string;
+      id: string;
       vendor: string;
       eurAmountMinor: bigint;
       date: Date;
@@ -387,7 +394,7 @@ describe('BankMatcherService', () => {
       vatMinor: bigint | undefined;
       source: string;
     };
-    expect(args.paperlessDocId).toBe('manual-doc-1');
+    expect(args.id).toBe('manual-doc-1');
     expect(args.vendor).toBe('Acme Cables');
     expect(args.eurAmountMinor).toBe(12_100n);
     expect(args.date.toISOString().slice(0, 10)).toBe('2099-04-10');
@@ -527,83 +534,223 @@ describe('BankMatcherService', () => {
     expect(summary.unmatched).toBe(1);
   });
 
-  describe('auto-categorize recurring fee patterns', () => {
-    it('sets fee category and emits a system event for known SNS patterns', async () => {
-      const row = await ingestSnsFeeRow(bankRepo, 'fee:klantonderzoek', 'Kosten Klantonderzoek');
+  describe('recurring fee handling', () => {
+    describe('without BTW (category branch)', () => {
+      it('sets fee category for known SNS patterns and returns matched=false', async () => {
+        const row = await ingestSnsFeeRow(bankRepo, 'fee:klantonderzoek', 'Kosten Klantonderzoek');
 
-      const result = await matcher.tryAutoCategorize(row);
-      expect(result.categorized).toBe(true);
-      if (result.categorized) {
-        expect(result.category).toBe('fee');
-      }
+        const result = await matcher.tryHandleRecurringFee(row);
+        expect(result).toEqual({ matched: false, reason: 'auto-categorized as fee' });
 
-      const refetched = await bankRepo.findById(row.id);
-      expect(refetched?.category).toBe('fee');
-      expect(refetched?.matchedAt).toBeNull();
+        const refetched = await bankRepo.findById(row.id);
+        expect(refetched?.category).toBe('fee');
+        expect(refetched?.matchedAt).toBeNull();
+      });
+
+      it('matches case-insensitively across the SNS fee patterns', async () => {
+        const a = await ingestSnsFeeRow(bankRepo, 'fee:rekening', 'KOSTEN REKENING April');
+        const b = await ingestSnsFeeRow(bankRepo, 'fee:betaalverzoek', 'Kosten betaalverzoek');
+        const c = await ingestSnsFeeRow(bankRepo, 'fee:gebruik', 'Kosten gebruik betaalrekening April');
+
+        const ra = await matcher.tryHandleRecurringFee(a);
+        const rb = await matcher.tryHandleRecurringFee(b);
+        const rc = await matcher.tryHandleRecurringFee(c);
+        expect(ra?.matched).toBe(false);
+        expect(rb?.matched).toBe(false);
+        expect(rc?.matched).toBe(false);
+
+        const ar = await bankRepo.findById(a.id);
+        const br = await bankRepo.findById(b.id);
+        const cr = await bankRepo.findById(c.id);
+        expect(ar?.category).toBe('fee');
+        expect(br?.category).toBe('fee');
+        expect(cr?.category).toBe('fee');
+      });
+
+      it('returns null when no pattern matches', async () => {
+        const row = await ingestSnsFeeRow(bankRepo, 'fee:none', 'Just a normal payment');
+        const result = await matcher.tryHandleRecurringFee(row);
+        expect(result).toBeNull();
+        const refetched = await bankRepo.findById(row.id);
+        expect(refetched?.category).toBeNull();
+      });
+
+      it('returns null on already-categorized rows (idempotent)', async () => {
+        const row = await ingestSnsFeeRow(bankRepo, 'fee:already', 'Kosten rekening');
+        await matcher.tryHandleRecurringFee(row);
+        const refetched = await bankRepo.findById(row.id);
+        const result = await matcher.tryHandleRecurringFee(refetched!);
+        expect(result).toBeNull();
+      });
+
+      it('returns null on already-matched rows', async () => {
+        const row = await ingestSnsFeeRow(bankRepo, 'fee:matched', 'Kosten Klantonderzoek');
+        await db
+          .updateTable('bank_transaction')
+          .set({
+            matchedAt: new Date(),
+            matchConfidence: MatchConfidence.Manual,
+            matchedExpenseId: '00000000-0000-0000-0000-000000000099',
+          })
+          .where('id', '=', row.id)
+          .execute();
+        const refetched = await bankRepo.findById(row.id);
+        const result = await matcher.tryHandleRecurringFee(refetched!);
+        expect(result).toBeNull();
+      });
+
+      it('tryMatch short-circuits when a row is auto-categorized first', async () => {
+        const row = await ingestSnsFeeRow(bankRepo, 'fee:via-trymatch', 'Kosten betaalverzoek');
+        const result = await matcher.tryMatch(row);
+        expect(result.matched).toBe(false);
+        if (!result.matched) {
+          expect(result.reason).toContain('auto-categorized');
+        }
+        const refetched = await bankRepo.findById(row.id);
+        expect(refetched?.category).toBe('fee');
+      });
     });
 
-    it('matches case-insensitively across the SNS fee patterns', async () => {
-      const a = await ingestSnsFeeRow(bankRepo, 'fee:rekening', 'KOSTEN REKENING April');
-      const b = await ingestSnsFeeRow(bankRepo, 'fee:betaalverzoek', 'Kosten betaalverzoek');
-      const c = await ingestSnsFeeRow(bankRepo, 'fee:gebruik', 'Kosten gebruik betaalrekening April');
+    describe('with BTW (auto-create Expense branch)', () => {
+      const KLANTONDERZOEK_DESC =
+        'Kosten Klantonderzoek de Willigen IT Services Mei 2026 21% BTW BTW bedrag: 0,32 BTW BTW-nummer Volksbank: NL813633683B01';
 
-      const aResult = await matcher.tryAutoCategorize(a);
-      const bResult = await matcher.tryAutoCategorize(b);
-      const cResult = await matcher.tryAutoCategorize(c);
-      expect(aResult.categorized).toBe(true);
-      expect(bResult.categorized).toBe(true);
-      expect(cResult.categorized).toBe(true);
+      it('auto-creates an Approved Expense, links the bank-tx, writes the sheet row', async () => {
+        const row = await ingestSnsFeeRow(bankRepo, 'fee:btw:1', KLANTONDERZOEK_DESC);
 
-      const ar = await bankRepo.findById(a.id);
-      const br = await bankRepo.findById(b.id);
-      const cr = await bankRepo.findById(c.id);
-      expect(ar?.category).toBe('fee');
-      expect(br?.category).toBe('fee');
-      expect(cr?.category).toBe('fee');
+        const result = await matcher.tryHandleRecurringFee(row);
+        expect(result?.matched).toBe(true);
+        if (!result || !result.matched) {
+          throw new Error('expected matched=true');
+        }
+        expect(result.type).toBe('expense');
+        if (result.type !== 'expense') {
+          throw new Error('expected type=expense');
+        }
+        expect(result.confidence).toBe(MatchConfidence.AutoHigh);
+
+        const expense = await new ExpenseRepository(db).findById(result.expenseId);
+        expect(expense).toBeDefined();
+        expect(expense!.sourceBankTxId).toBe(row.id);
+        expect(expense!.paperlessDocId).toBeNull();
+        expect(expense!.status).toBe('approved');
+        expect(expense!.reviewedAt).not.toBeNull();
+        expect(expense!.vendor).toBe('Volksbank');
+        expect(expense!.btwRateBps).toBe(2100);
+        expect(String(expense!.btwMinor)).toBe('32');
+        expect(String(expense!.amountMinor)).toBe('182');
+        expect(expense!.locationClass).toBe('domestic');
+
+        const refetched = await bankRepo.findById(row.id);
+        expect(refetched?.matchedExpenseId).toBe(result.expenseId);
+        expect(refetched?.category).toBeNull();
+        expect(refetched?.matchConfidence).toBe(MatchConfidence.AutoHigh);
+
+        // Sheet row was written via the normal expense path.
+        expect(sheetWriter.writeExpenseRow).toHaveBeenCalledOnce();
+      });
+
+      it('is idempotent on repeat invocation (reprocess loop)', async () => {
+        const row = await ingestSnsFeeRow(bankRepo, 'fee:btw:idempotent', KLANTONDERZOEK_DESC);
+        const expenseRepo = new ExpenseRepository(db);
+
+        const first = await matcher.tryHandleRecurringFee(row);
+        if (!first || !first.matched || first.type !== 'expense') {
+          throw new Error('expected matched expense outcome');
+        }
+
+        // Clear the match (simulating Unmatch in the UI), then re-run the rule.
+        await db
+          .updateTable('bank_transaction')
+          .set({ matchedExpenseId: null, matchedAt: null, matchConfidence: null, category: null })
+          .where('id', '=', row.id)
+          .execute();
+        const cleared = await bankRepo.findById(row.id);
+        const second = await matcher.tryHandleRecurringFee(cleared!);
+        if (!second || !second.matched || second.type !== 'expense') {
+          throw new Error('expected matched expense outcome on second run');
+        }
+
+        expect(second.expenseId).toBe(first.expenseId);
+
+        // Verify there's still exactly one fee-Expense for this bank-tx.
+        const found = await expenseRepo.findBySourceBankTxId(row.id);
+        expect(found?.id).toBe(first.expenseId);
+      });
+
+      it('records an audit event for the BTW expense match', async () => {
+        const row = await ingestSnsFeeRow(bankRepo, 'fee:btw:event', KLANTONDERZOEK_DESC);
+        await matcher.tryHandleRecurringFee(row);
+
+        const events = await db
+          .selectFrom('event')
+          .selectAll()
+          .where('eventType', '=', 'banking.tx.auto_fee_expense_matched')
+          .execute();
+        expect(events.length).toBeGreaterThanOrEqual(1);
+        const payload = events[0].payload as Record<string, unknown>;
+        expect(payload.bankTxId).toBe(row.id);
+        expect(payload.btwRateBps).toBe(2100);
+        expect(payload.btwMinor).toBe('32');
+      });
+
+      it('tryMatch returns the create-Expense outcome end-to-end', async () => {
+        const row = await ingestSnsFeeRow(bankRepo, 'fee:btw:trymatch', KLANTONDERZOEK_DESC);
+        const result = await matcher.tryMatch(row);
+        expect(result.matched).toBe(true);
+        if (result.matched && result.type === 'expense') {
+          expect(result.confidence).toBe(MatchConfidence.AutoHigh);
+        } else {
+          throw new Error('expected matched expense outcome');
+        }
+      });
     });
 
-    it('leaves rows alone when no pattern matches', async () => {
-      const row = await ingestSnsFeeRow(bankRepo, 'fee:none', 'Just a normal payment');
-      const result = await matcher.tryAutoCategorize(row);
-      expect(result.categorized).toBe(false);
-      const refetched = await bankRepo.findById(row.id);
-      expect(refetched?.category).toBeNull();
-    });
+    describe('reprocess', () => {
+      const KLANTONDERZOEK_DESC =
+        'Kosten Klantonderzoek de Willigen Mei 2026 21% BTW BTW bedrag: 0,32 BTW BTW-nummer Volksbank: NL813633683B01';
 
-    it('skips already-categorized rows (idempotent)', async () => {
-      const row = await ingestSnsFeeRow(bankRepo, 'fee:already', 'Kosten rekening');
-      await matcher.tryAutoCategorize(row);
-      const refetched = await bankRepo.findById(row.id);
-      // Calling again should be a no-op rather than another setCategory write.
-      const result = await matcher.tryAutoCategorize(refetched!);
-      expect(result.categorized).toBe(false);
-    });
+      it('clears stale category and re-runs the matcher (the klantonderzoek backfill case)', async () => {
+        // Simulates the prod state today: a row was auto-categorised as `fee` by
+        // the OLD rule (no BTW branch). After the rule change ships, Reprocess
+        // should clear the category, rerun, and now create the Expense + match.
+        const row = await ingestSnsFeeRow(bankRepo, 'fee:reprocess:1', KLANTONDERZOEK_DESC);
+        await bankRepo.setCategory(row.id, 'fee' as never); // pretend old rule fired
+        const before = await bankRepo.findById(row.id);
+        expect(before?.category).toBe('fee');
 
-    it('skips already-matched rows', async () => {
-      const row = await ingestSnsFeeRow(bankRepo, 'fee:matched', 'Kosten Klantonderzoek');
-      await db
-        .updateTable('bank_transaction')
-        .set({
-          matchedAt: new Date(),
-          matchConfidence: MatchConfidence.Manual,
-          matchedExpenseId: '00000000-0000-0000-0000-000000000099',
-        })
-        .where('id', '=', row.id)
-        .execute();
-      const refetched = await bankRepo.findById(row.id);
-      const result = await matcher.tryAutoCategorize(refetched!);
-      expect(result.categorized).toBe(false);
-    });
+        const { row: after, result } = await matcher.reprocess(row.id);
+        expect(after.category).toBeNull();
+        expect(after.matchedExpenseId).not.toBeNull();
+        expect(result.matched).toBe(true);
 
-    it('tryMatch short-circuits when a row is auto-categorized first', async () => {
-      const row = await ingestSnsFeeRow(bankRepo, 'fee:via-trymatch', 'Kosten betaalverzoek');
-      const result = await matcher.tryMatch(row);
-      expect(result.matched).toBe(false);
-      if (!result.matched) {
-        expect(result.reason).toContain('auto-categorized');
-      }
-      const refetched = await bankRepo.findById(row.id);
-      expect(refetched?.category).toBe('fee');
+        // Audit event recorded.
+        const events = await db
+          .selectFrom('event')
+          .selectAll()
+          .where('eventType', '=', 'banking.tx.reprocessed')
+          .execute();
+        expect(events.length).toBeGreaterThanOrEqual(1);
+      });
+
+      it('refuses to reprocess a matched row (must unlink first)', async () => {
+        const row = await ingestSnsFeeRow(bankRepo, 'fee:reprocess:matched', KLANTONDERZOEK_DESC);
+        // Hard-set a fake match to simulate a currently-matched state.
+        await db
+          .updateTable('bank_transaction')
+          .set({
+            matchedAt: new Date(),
+            matchConfidence: MatchConfidence.Manual,
+            matchedExpenseId: '00000000-0000-0000-0000-000000000099',
+          })
+          .where('id', '=', row.id)
+          .execute();
+        await expect(matcher.reprocess(row.id)).rejects.toThrow(/currently matched/);
+      });
+
+      it('throws on unknown bank-tx id', async () => {
+        await expect(matcher.reprocess('00000000-0000-0000-0000-000000000999')).rejects.toThrow(/not found/);
+      });
     });
   });
 

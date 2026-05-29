@@ -7,6 +7,7 @@
     listBankingAspsps,
     listBankTransactions,
     listMatchCandidates,
+    reprocessBankTx,
     setBankTxCategory,
     setBankTxMatch,
     startBankingAuth,
@@ -311,6 +312,22 @@
   }
 
   /**
+   * Re-runs the matcher against this row with current rules. Useful after a
+   * matcher rule change has shifted the right outcome (e.g. a fee that now
+   * gets auto-extracted as an Expense with BTW). Backend enforces the
+   * categorised-but-not-matched precondition; matched rows must be Unlinked
+   * first.
+   */
+  async function reprocess(tx: BankTransaction) {
+    try {
+      const updated = await reprocessBankTx(tx.id);
+      replaceTx(updated);
+    } catch (error_) {
+      error = (error_ as Error).message;
+    }
+  }
+
+  /**
    * Promote an auto_low match to manual. Re-uses the same target (whichever
    * matched* FK is set) and PUTs the existing endpoint, which writes the
    * sheet row this time (auto_low skips it; manual + auto_high don't).
@@ -602,6 +619,7 @@
                         onChange={(value) => changeCategory(tx, value)}
                       />
                       <Button size="small" variant="ghost" onclick={() => changeCategory(tx, '')}>Clear</Button>
+                      <Button size="small" variant="ghost" onclick={() => reprocess(tx)}>Reprocess</Button>
                     </div>
                   {:else}
                     <div class="flex flex-wrap items-center gap-2">

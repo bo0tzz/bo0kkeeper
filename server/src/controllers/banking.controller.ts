@@ -244,6 +244,30 @@ export class BankingController {
     const row = await this.matcher.clearMatch(id);
     return toBankTransactionDto(row);
   }
+
+  /**
+   * Re-run the matcher against an existing row using current rules. Used to
+   * pull rows in their pre-rule-change state into the new state without
+   * out-of-band SQL. Initial scope: categorised-but-not-matched rows.
+   * Already-matched rows must be unmatched first.
+   */
+  @Post('transactions/:id/reprocess')
+  @Authenticated()
+  async reprocess(@Param('id', ParseUUIDPipe) id: string): Promise<BankTransactionResponseDto> {
+    try {
+      const { row } = await this.matcher.reprocess(id);
+      return toBankTransactionDto(row);
+    } catch (error) {
+      const message = (error as Error).message;
+      if (message.includes('not found')) {
+        throw new NotFoundException(message);
+      }
+      if (message.includes('currently matched')) {
+        throw new BadRequestException(message);
+      }
+      throw error;
+    }
+  }
 }
 
 function toBankTransactionDto(row: BankTransaction): BankTransactionResponseDto {

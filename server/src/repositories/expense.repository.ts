@@ -46,6 +46,47 @@ export class ExpenseRepository {
     >;
   }
 
+  /**
+   * Look up an auto-created bank-fee expense by its source bank-tx.
+   * Used by the matcher's create-Expense branch to stay idempotent on
+   * reprocess / repeat ingest.
+   */
+  findBySourceBankTxId(bankTxId: string): Promise<Expense | undefined> {
+    return this.db
+      .selectFrom('expense')
+      .selectAll()
+      .where('sourceBankTxId', '=', bankTxId)
+      .executeTakeFirst() as Promise<Expense | undefined>;
+  }
+
+  /**
+   * Idempotent insert for an auto-created bank-fee expense, keyed on
+   * `sourceBankTxId`. Status is `approved` and `reviewedAt` is set on
+   * creation — these are deterministically derived from a recognised
+   * recurring-fee pattern, no human review needed. `paperlessDocId` is null:
+   * the bank statement line itself is the *vereenvoudigde factuur*.
+   */
+  async ingestFromBankFee(input: NewExpense & { sourceBankTxId: string }): Promise<IngestResult> {
+    const inserted = (await this.db
+      .insertInto('expense')
+      .values(input)
+      .onConflict((oc) => oc.column('sourceBankTxId').doNothing())
+      .returningAll()
+      .executeTakeFirst()) as Expense | undefined;
+
+    if (inserted) {
+      return { ingested: true, row: inserted };
+    }
+
+    const existing = await this.db
+      .selectFrom('expense')
+      .select('id')
+      .where('sourceBankTxId', '=', input.sourceBankTxId)
+      .executeTakeFirstOrThrow();
+
+    return { ingested: false, existingId: existing.id };
+  }
+
   /** Pending review queue, oldest first (oldest receipts probably need attention sooner). */
   findPendingReview(limit = 100): Promise<Expense[]> {
     return this.db

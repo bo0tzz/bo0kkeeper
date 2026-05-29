@@ -2,55 +2,94 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { OnJob } from 'src/decorators';
-import { BankTxCategory, ClientClass, EventSource, ExpenseStatus, JobName, MatchConfidence, QueueName } from 'src/enum';
+import {
+  BankTxCategory,
+  ClientClass,
+  EventSource,
+  ExpenseLocationClass,
+  ExpenseStatus,
+  JobName,
+  MatchConfidence,
+  QueueName,
+} from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
+import { Expense, ExpenseRepository } from 'src/repositories/expense.repository';
 import { DB } from 'src/schema';
 import { expenseToSheetRow, SheetWriterService } from 'src/services/sheet-writer.service';
 import { JobOf } from 'src/types';
+import { parseBtwFromDescription } from 'src/utils/btw-description';
 
 const TXN_REF_PATTERN = /\bTXN-\d{4,}\b/;
 const INVOICE_NUMBER_PATTERN = /\b\d{4}\/\d{3}\b/;
 
 /**
- * Description-substring rules for recurring rows that aren't a real
- * income/expense and should skip the matcher entirely. Fees here are SNS-
- * specific monthly charges (Klantonderzoek, account maintenance,
- * payment-request) — the user's bank, not Wise. Add patterns as new
- * recurring rows show up; deliberately a code constant rather than a DB
- * table because the set is small, stable, and reviewed in PR.
+ * Description-substring rules for recurring bank-fee rows. Two outcomes per
+ * rule, depending on whether the bank-tx description carries a parseable BTW
+ * breakdown ("21% BTW BTW bedrag: 0,32"):
+ *
+ * - With BTW (e.g. SNS klantonderzoek): an Approved Expense is auto-created
+ *   with `sourceBankTxId` set, the bank-tx is matched to it, the sheet row
+ *   fires through the normal expense path, and the BTW lands in the
+ *   quarterly aggregator's deductible total. The bank statement line is the
+ *   *vereenvoudigde factuur* (Art. 35a Wet OB) — no separate document needed.
+ * - Without BTW: the bank-tx is categorized to `fallbackCategory`, which
+ *   excludes it from matching + sheet writes (the row has no further
+ *   bookkeeping side-effect).
+ *
+ * Code constant rather than a DB table because the set is small, stable, and
+ * reviewed in PR. All current rules target SNS service fees from Volksbank
+ * (the legal entity SNS/ASN/RegioBank trade under, per the BTW number on the
+ * bank statement).
  */
-type AutoCategoryRule = {
+type RecurringFeeRule = {
   /** Substring match against bank description, case-insensitive. */
   descriptionContains: string;
-  category: BankTxCategory;
   /** Operator-readable explanation that lands in the audit event. */
   reason: string;
+  /** Vendor field on the auto-created Expense when BTW parses. */
+  vendor: string;
+  /** Location class on the auto-created Expense when BTW parses. */
+  locationClass: ExpenseLocationClass;
+  /** Category applied to the bank-tx when no BTW parses. */
+  fallbackCategory: BankTxCategory;
 };
 
-const AUTO_CATEGORY_RULES: readonly AutoCategoryRule[] = [
+const SNS_VENDOR = 'Volksbank';
+
+const RECURRING_FEE_RULES: readonly RecurringFeeRule[] = [
   {
     descriptionContains: 'klantonderzoek',
-    category: BankTxCategory.Fee,
     reason: 'SNS Klantonderzoek monthly fee',
+    vendor: SNS_VENDOR,
+    locationClass: ExpenseLocationClass.Domestic,
+    fallbackCategory: BankTxCategory.Fee,
   },
   {
     descriptionContains: 'kosten rekening',
-    category: BankTxCategory.Fee,
     reason: 'SNS account maintenance fee',
+    vendor: SNS_VENDOR,
+    locationClass: ExpenseLocationClass.Domestic,
+    fallbackCategory: BankTxCategory.Fee,
   },
   {
     descriptionContains: 'kosten gebruik betaalrekening',
-    category: BankTxCategory.Fee,
     reason: 'SNS payment-account usage fee',
+    vendor: SNS_VENDOR,
+    locationClass: ExpenseLocationClass.Domestic,
+    fallbackCategory: BankTxCategory.Fee,
   },
   {
     descriptionContains: 'kosten betaalverzoek',
-    category: BankTxCategory.Fee,
     reason: 'SNS payment-request fee',
+    vendor: SNS_VENDOR,
+    locationClass: ExpenseLocationClass.Domestic,
+    fallbackCategory: BankTxCategory.Fee,
   },
 ];
+
+const FEE_EXPENSE_NOTE = 'Auto-created from bank-tx; statement line is vereenvoudigde factuur (Art. 35a Wet OB).';
 
 export type MatchResult =
   | { matched: true; type: 'wise_transfer'; transferId: string; confidence: MatchConfidence }
@@ -128,6 +167,7 @@ export class BankMatcherService {
     @InjectKysely() private readonly db: Kysely<DB>,
     private readonly bankTransactionRepository: BankTransactionRepository,
     private readonly clientRepository: ClientRepository,
+    private readonly expenseRepository: ExpenseRepository,
     private readonly sheetWriter: SheetWriterService,
     private readonly eventRepository: EventRepository,
   ) {}
@@ -142,11 +182,13 @@ export class BankMatcherService {
       return { matched: false, reason: `categorized as ${bankTx.category}` };
     }
 
-    // Recognized recurring fees / known-pattern rows are auto-categorized
-    // and bypass the matcher entirely — they have no counterpart to link to.
-    const autocat = await this.tryAutoCategorize(bankTx);
-    if (autocat.categorized) {
-      return { matched: false, reason: `auto-categorized as ${autocat.category}` };
+    // Recognised recurring bank-fee rows handle here before the heuristics.
+    // Two outcomes: BTW-parseable fees become an auto-created Approved
+    // Expense (and a real match); BTW-less fees get categorised to skip the
+    // matcher entirely. Either way, the caller is done with this row.
+    const feeOutcome = await this.tryHandleRecurringFee(bankTx);
+    if (feeOutcome) {
+      return feeOutcome;
     }
 
     const description = bankTx.description ?? '';
@@ -194,29 +236,122 @@ export class BankMatcherService {
   }
 
   /**
-   * Set the category on rows whose description matches a known recurring-fee
-   * pattern. Audit-trails as a `banking.tx.auto_categorized` system event.
-   * Returns whether anything was applied.
+   * Handle a bank-tx that matches a known recurring-fee rule. Returns the
+   * resulting MatchResult (which the caller threads through) or null when no
+   * rule applies / the row is already handled.
+   *
+   * Two outcomes when a rule matches:
+   * - description has a parseable BTW breakdown → auto-create an Approved
+   *   Expense, link the bank-tx, write the sheet row, return matched=true
+   * - description has no BTW → categorise the bank-tx, audit-event it,
+   *   return matched=false (the row is dealt with — it's just outside the
+   *   bookkeeping flow)
+   *
+   * Idempotent on repeat invocation: a second call against the same bank-tx
+   * after a previous match was cleared finds the existing fee-Expense by
+   * `sourceBankTxId` and re-links rather than creating a duplicate.
    */
-  async tryAutoCategorize(
-    bankTx: BankTransaction,
-  ): Promise<{ categorized: true; category: BankTxCategory; reason: string } | { categorized: false }> {
+  async tryHandleRecurringFee(bankTx: BankTransaction): Promise<MatchResult | null> {
     if (bankTx.matchedAt || bankTx.category) {
-      return { categorized: false };
+      return null;
     }
-    const description = (bankTx.description ?? '').toLowerCase();
-    const rule = AUTO_CATEGORY_RULES.find((r) => description.includes(r.descriptionContains));
+    const description = bankTx.description ?? '';
+    const lower = description.toLowerCase();
+    const rule = RECURRING_FEE_RULES.find((r) => lower.includes(r.descriptionContains));
     if (!rule) {
-      return { categorized: false };
+      return null;
     }
-    await this.bankTransactionRepository.setCategory(bankTx.id, rule.category);
+
+    const btw = parseBtwFromDescription(description);
+    if (btw) {
+      const expense = await this.createOrFindFeeExpense(bankTx, rule, btw);
+      await this.persistExpenseMatch(bankTx.id, expense.id, MatchConfidence.AutoHigh);
+      await this.eventRepository.recordAction({
+        source: EventSource.System,
+        eventType: 'banking.tx.auto_fee_expense_matched',
+        payload: {
+          bankTxId: bankTx.id,
+          expenseId: expense.id,
+          rule: rule.reason,
+          btwRateBps: btw.rateBps,
+          btwMinor: String(btw.amountMinor),
+        },
+      });
+      this.logger.log(
+        `bank_tx ${bankTx.id} → fee expense ${expense.id} (${rule.reason}, BTW ${btw.rateBps / 100}% €${(Number(btw.amountMinor) / 100).toFixed(2)})`,
+      );
+      const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
+      try {
+        await this.sheetWriter.writeExpenseRow(expenseToSheetRow(expense, txDate));
+        await this.markExpenseSheetRowAt(expense.id);
+      } catch (error) {
+        const message = (error as Error).message;
+        this.logger.error(`Sheet write failed for fee expense ${expense.id}: ${message}`);
+        await this.recordSheetWriteFailure({
+          kind: 'expense',
+          bankTxId: bankTx.id,
+          identifier: expense.id,
+          message,
+        });
+      }
+      return {
+        matched: true,
+        type: 'expense',
+        expenseId: expense.id,
+        confidence: MatchConfidence.AutoHigh,
+      };
+    }
+
+    await this.bankTransactionRepository.setCategory(bankTx.id, rule.fallbackCategory);
     await this.eventRepository.recordAction({
       source: EventSource.System,
       eventType: 'banking.tx.auto_categorized',
-      payload: { bankTxId: bankTx.id, category: rule.category, reason: rule.reason },
+      payload: { bankTxId: bankTx.id, category: rule.fallbackCategory, reason: rule.reason },
     });
-    this.logger.log(`bank_tx ${bankTx.id} auto-categorized as ${rule.category} (${rule.reason})`);
-    return { categorized: true, category: rule.category, reason: rule.reason };
+    this.logger.log(`bank_tx ${bankTx.id} auto-categorized as ${rule.fallbackCategory} (${rule.reason})`);
+    return { matched: false, reason: `auto-categorized as ${rule.fallbackCategory}` };
+  }
+
+  /**
+   * Idempotent: looks up an existing fee-Expense by `sourceBankTxId`, or
+   * creates a new Approved one if none exists. Reprocessing the same bank-tx
+   * does NOT create duplicates.
+   */
+  private async createOrFindFeeExpense(
+    bankTx: BankTransaction,
+    rule: RecurringFeeRule,
+    btw: { rateBps: number; amountMinor: bigint },
+  ): Promise<Expense> {
+    const existing = await this.expenseRepository.findBySourceBankTxId(bankTx.id);
+    if (existing) {
+      return existing;
+    }
+    const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
+    const now = new Date();
+    const grossMinor = absBigInt(BigInt(bankTx.amountMinor as bigint | number | string));
+    const result = await this.expenseRepository.ingestFromBankFee({
+      sourceBankTxId: bankTx.id,
+      paperlessDocId: null,
+      vendor: rule.vendor,
+      expenseDate: txDate,
+      amountMinor: grossMinor,
+      currency: bankTx.currency,
+      btwRateBps: btw.rateBps,
+      btwMinor: btw.amountMinor,
+      locationClass: rule.locationClass,
+      status: ExpenseStatus.Approved,
+      reviewedAt: now,
+      notes: FEE_EXPENSE_NOTE,
+    });
+    if (result.ingested) {
+      return result.row;
+    }
+    // Lost the race: another caller inserted in between our find and create.
+    const row = await this.expenseRepository.findById(result.existingId);
+    if (!row) {
+      throw new Error(`expense ${result.existingId} disappeared after race`);
+    }
+    return row;
   }
 
   private async tryExpenseHeuristic(bankTx: BankTransaction): Promise<MatchResult | null> {
@@ -489,7 +624,7 @@ export class BankMatcherService {
         await this.recordSheetWriteFailure({
           kind: 'expense',
           bankTxId: row.bankTxId,
-          identifier: row.paperlessDocId,
+          identifier: row.paperlessDocId ?? row.id,
           message,
         });
       }
@@ -735,7 +870,7 @@ export class BankMatcherService {
           await this.recordSheetWriteFailure({
             kind: 'expense',
             bankTxId: bankTx.id,
-            identifier: expense.paperlessDocId,
+            identifier: expense.paperlessDocId ?? expense.id,
             message,
           });
         }
@@ -756,6 +891,55 @@ export class BankMatcherService {
       },
     });
     return refreshed;
+  }
+
+  /**
+   * Operator-driven re-run of the matcher against an existing row. Closes the
+   * rule-evolution loop: when `RECURRING_FEE_RULES` (or any other matcher
+   * heuristic) gains a new pattern or branch, the operator can re-process
+   * rows already stuck in their pre-change state through the UI instead of
+   * needing a SQL/script backfill.
+   *
+   * Initial scope: categorised-but-not-matched rows. For matched rows the
+   * operator unmatches first (existing affordance), then reprocesses.
+   * Already-unmatched rows are also fine — the matcher just re-runs.
+   */
+  async reprocess(bankTxId: string): Promise<{ row: BankTransaction; result: MatchResult }> {
+    const before = await this.bankTransactionRepository.findById(bankTxId);
+    if (!before) {
+      throw new Error(`bank_transaction ${bankTxId} not found`);
+    }
+    if (before.matchedAt) {
+      throw new Error(`bank_transaction ${bankTxId} is currently matched; unmatch first before reprocessing`);
+    }
+    // Clear any stale category so tryMatch's early-return doesn't short-circuit.
+    if (before.category) {
+      await this.bankTransactionRepository.setCategory(bankTxId, null);
+    }
+    const refreshed = await this.bankTransactionRepository.findById(bankTxId);
+    if (!refreshed) {
+      throw new Error(`bank_transaction ${bankTxId} disappeared during reprocess`);
+    }
+    const result = await this.tryMatch(refreshed);
+    const after = await this.bankTransactionRepository.findById(bankTxId);
+    if (!after) {
+      throw new Error(`bank_transaction ${bankTxId} disappeared during reprocess`);
+    }
+    await this.eventRepository.recordAction({
+      source: EventSource.Manual,
+      eventType: 'banking.tx.reprocessed',
+      payload: {
+        bankTxId,
+        priorCategory: before.category,
+        result: result.matched
+          ? { matched: true, type: result.type, confidence: result.confidence }
+          : { matched: false, reason: result.reason },
+      },
+    });
+    this.logger.log(
+      `bank_tx ${bankTxId} reprocessed: ${result.matched ? `matched (${result.type})` : `unmatched (${result.reason})`}`,
+    );
+    return { row: after, result };
   }
 
   /** Operator unlink: clears all match fields. Sheet rows aren't rewound. */

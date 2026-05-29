@@ -41,7 +41,7 @@ async function main(): Promise<void> {
     const expenseRepo = new ExpenseRepository(db);
     const transferRepo = new WiseTransferRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
-    const matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, eventRepo);
+    const matcher = new BankMatcherService(db, bankRepo, clientRepo, expenseRepo, sheetWriter, eventRepo);
 
     console.log('=== Wise transfers (varied states) ===');
     await ensureWiseTransfer(transferRepo, {

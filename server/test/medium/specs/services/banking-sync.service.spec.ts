@@ -11,6 +11,7 @@ import {
   ListTransactionsResult,
 } from 'src/repositories/enable-banking.repository';
 import { EventRepository } from 'src/repositories/event.repository';
+import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
@@ -112,8 +113,9 @@ describe('BankingSyncService', () => {
     sessionRepo = new BankingSessionRepository(db);
     bankRepo = new BankTransactionRepository(db);
     const clientRepo = new ClientRepository(db);
+    const expenseRepo = new ExpenseRepository(db);
     const sheetWriter = { append: vi.fn().mockResolvedValue(void 0) } as unknown as SheetWriterService;
-    matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, new EventRepository(db));
+    matcher = new BankMatcherService(db, bankRepo, clientRepo, expenseRepo, sheetWriter, new EventRepository(db));
     api = fakeApi([]);
     service = new BankingSyncService(sessionRepo, bankRepo, api, matcher, new EventRepository(db));
   });

@@ -15,6 +15,7 @@ import { BankingSessionRepository } from 'src/repositories/banking-session.repos
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EnableBankingRepository } from 'src/repositories/enable-banking.repository';
 import { EventRepository } from 'src/repositories/event.repository';
+import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
@@ -62,8 +63,16 @@ describe('BankingController', () => {
       queue: vi.fn().mockResolvedValue('fake-job-id'),
     } as unknown as JobRepository & { queue: ReturnType<typeof vi.fn> };
     const clientRepo = new ClientRepository(db);
+    const expenseRepo = new ExpenseRepository(db);
     const sheetWriter = { writeIncomeRow: vi.fn().mockResolvedValue(void 0) } as unknown as SheetWriterService;
-    const matcher = new BankMatcherService(db, bankTxRepo, clientRepo, sheetWriter, new EventRepository(db));
+    const matcher = new BankMatcherService(
+      db,
+      bankTxRepo,
+      clientRepo,
+      expenseRepo,
+      sheetWriter,
+      new EventRepository(db),
+    );
     const enableBankingStub = { listAspsps: vi.fn().mockResolvedValue([]) } as unknown as EnableBankingRepository;
     controller = new BankingController(
       service,

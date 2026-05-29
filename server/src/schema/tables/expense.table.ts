@@ -11,26 +11,45 @@ import {
 } from '@immich/sql-tools';
 import { ColumnType } from 'kysely';
 import { ExpenseLocationClass, ExpenseStatus } from 'src/enum';
+import { BankTransactionTable } from 'src/schema/tables/bank-transaction.table';
 import { EventTable } from 'src/schema/tables/event.table';
 
 /**
- * Receipt/expense row — one per paperless document we want to record as a
- * bookkeeping expense. Created in `pending_review` state from the paperless
- * post-consume webhook with OCR-extracted fields; user edits + approves in
- * the admin UI (status → `approved`), at which point the sheet row is
- * appended.
+ * Receipt/expense row. Two source flavours:
+ *
+ * - Paperless-document expenses (the common case): created in `pending_review`
+ *   state from the post-consume webhook with OCR-extracted fields, user edits +
+ *   approves in the admin UI, sheet row is appended on approval+bank-tx-match.
+ * - Bank-fee expenses (e.g. SNS klantonderzoek 21% BTW): auto-created in
+ *   `approved` state by the bank-tx matcher when a recurring-fee rule matches
+ *   AND the BTW amount can be parsed from the bank-tx description. There is
+ *   no Paperless document — the bank statement line itself is the
+ *   *vereenvoudigde factuur* per Art. 35a Wet OB.
+ *
+ * Exactly one of `paperlessDocId` / `sourceBankTxId` is set (CHECK constraint
+ * enforces non-null on at least one; in practice they're mutually exclusive
+ * by source).
  */
 @Table('expense')
 @Index({ name: 'expense_paperlessDocId_idx', columns: ['paperlessDocId'] })
+@Index({ name: 'expense_sourceBankTxId_idx', columns: ['sourceBankTxId'] })
 @Index({ name: 'expense_status_idx', columns: ['status'] })
 @Index({ name: 'expense_expenseDate_idx', columns: ['expenseDate'] })
 export class ExpenseTable {
   @PrimaryGeneratedColumn()
   id!: Generated<string>;
 
-  /** Paperless-ngx document id. */
-  @Column({ type: 'text', unique: true })
-  paperlessDocId!: string;
+  /** Paperless-ngx document id. Null for bank-fee expenses. */
+  @Column({ type: 'text', unique: true, nullable: true })
+  paperlessDocId!: string | null;
+
+  /**
+   * Source bank-tx id for auto-created fee expenses (SNS klantonderzoek etc.).
+   * Null for Paperless-document expenses. One fee-expense per bank-tx by
+   * construction — uniqueness is enforced at the DB level.
+   */
+  @ForeignKeyColumn(() => BankTransactionTable, { nullable: true, unique: true, onDelete: 'SET NULL' })
+  sourceBankTxId!: string | null;
 
   @Column({ type: 'text' })
   vendor!: string;

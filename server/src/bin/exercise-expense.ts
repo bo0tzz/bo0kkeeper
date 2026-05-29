@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     const clientRepo = new ClientRepository(db);
     const eventRepo = new EventRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
-    const matcher = new BankMatcherService(db, bankRepo, clientRepo, sheetWriter, eventRepo);
+    const matcher = new BankMatcherService(db, bankRepo, clientRepo, expenseRepo, sheetWriter, eventRepo);
     const stubPaperless = {} as unknown as PaperlessRepository;
     const stubSettings = {} as unknown as SettingsService;
     const stubWebhook = {} as unknown as WebhookService;

@@ -92,7 +92,7 @@ describe('SheetWriterService', () => {
   it('writes a Domestic expense row with VAT and SNS Account as the payer', async () => {
     await writer.writeExpenseRow({
       date: new Date('2099-02-20T00:00:00Z'),
-      paperlessDocId: '4242',
+      id: '4242',
       vendor: 'Daily Groceries NL',
       eurAmountMinor: 1599n,
       locationClass: ExpenseLocationClass.Domestic,
@@ -126,7 +126,7 @@ describe('SheetWriterService', () => {
   it('writes a Non-EU expense row with blank VAT and a custom "From"', async () => {
     await writer.writeExpenseRow({
       date: new Date('2099-04-10T00:00:00Z'),
-      paperlessDocId: '7777',
+      id: '7777',
       vendor: 'AWS',
       eurAmountMinor: 12_345n,
       locationClass: ExpenseLocationClass.NonEu,
@@ -151,7 +151,7 @@ describe('SheetWriterService', () => {
   it('expense write fits columns to data after appending', async () => {
     await writer.writeExpenseRow({
       date: new Date('2099-01-15T00:00:00Z'),
-      paperlessDocId: 'x',
+      id: 'x',
       vendor: 'Y',
       eurAmountMinor: 100n,
       locationClass: ExpenseLocationClass.Domestic,

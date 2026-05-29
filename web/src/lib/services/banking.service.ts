@@ -151,5 +151,8 @@ export const setBankTxMatch = (
 export const clearBankTxMatch = (bankTxId: string, fetchFn?: typeof fetch) =>
   apiDelete<BankTransaction>(`/api/banking/transactions/${bankTxId}/match`, { fetch: fetchFn });
 
+export const reprocessBankTx = (bankTxId: string, fetchFn?: typeof fetch) =>
+  apiPost<BankTransaction>(`/api/banking/transactions/${bankTxId}/reprocess`, {}, { fetch: fetchFn });
+
 export const setBankTxCategory = (bankTxId: string, category: BankTxCategory | null, fetchFn?: typeof fetch) =>
   apiPut<BankTransaction>(`/api/banking/transactions/${bankTxId}/category`, { category }, { fetch: fetchFn });
