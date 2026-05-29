@@ -545,16 +545,21 @@ describe('BankMatcherService', () => {
     it('matches case-insensitively across the SNS fee patterns', async () => {
       const a = await ingestSnsFeeRow(bankRepo, 'fee:rekening', 'KOSTEN REKENING April');
       const b = await ingestSnsFeeRow(bankRepo, 'fee:betaalverzoek', 'Kosten betaalverzoek');
+      const c = await ingestSnsFeeRow(bankRepo, 'fee:gebruik', 'Kosten gebruik betaalrekening April');
 
       const aResult = await matcher.tryAutoCategorize(a);
       const bResult = await matcher.tryAutoCategorize(b);
+      const cResult = await matcher.tryAutoCategorize(c);
       expect(aResult.categorized).toBe(true);
       expect(bResult.categorized).toBe(true);
+      expect(cResult.categorized).toBe(true);
 
       const ar = await bankRepo.findById(a.id);
       const br = await bankRepo.findById(b.id);
+      const cr = await bankRepo.findById(c.id);
       expect(ar?.category).toBe('fee');
       expect(br?.category).toBe('fee');
+      expect(cr?.category).toBe('fee');
     });
 
     it('leaves rows alone when no pattern matches', async () => {

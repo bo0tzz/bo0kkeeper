@@ -41,6 +41,11 @@ const AUTO_CATEGORY_RULES: readonly AutoCategoryRule[] = [
     reason: 'SNS account maintenance fee',
   },
   {
+    descriptionContains: 'kosten gebruik betaalrekening',
+    category: BankTxCategory.Fee,
+    reason: 'SNS payment-account usage fee',
+  },
+  {
     descriptionContains: 'kosten betaalverzoek',
     category: BankTxCategory.Fee,
     reason: 'SNS payment-request fee',
