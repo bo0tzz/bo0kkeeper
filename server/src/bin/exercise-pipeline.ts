@@ -25,6 +25,7 @@ import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyConfig } from 'src/utils/database';
 
@@ -85,7 +86,8 @@ async function main(): Promise<void> {
     const expenseRepo = new ExpenseRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
     const eventRepo = new EventRepository(db);
-    const matcher = new BankMatcherService(db, bankRepo, clientRepo, expenseRepo, sheetWriter, eventRepo);
+    const sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, eventRepo);
+    const matcher = new BankMatcherService(db, bankRepo, expenseRepo, sheetSync, eventRepo);
 
     const externalId = `demo-${randomUUID().slice(0, 8)}`;
     console.log(`Using tx-date ${txDate.toISOString().slice(0, 10)} (→ quarter tab will reflect this date)`);

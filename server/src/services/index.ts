@@ -6,6 +6,7 @@ import { ExpensePipelineService } from 'src/services/expense-pipeline.service';
 import { InvoiceComposerService } from 'src/services/invoice-composer.service';
 import { QuarterlyAggregatorService } from 'src/services/quarterly-aggregator.service';
 import { SettingsService } from 'src/services/settings.service';
+import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { SystemHealthService } from 'src/services/system-health.service';
 import { WebhookService } from 'src/services/webhook.service';
@@ -22,6 +23,7 @@ export const services = [
   InvoiceComposerService,
   QuarterlyAggregatorService,
   SettingsService,
+  SheetSyncService,
   SheetWriterService,
   SystemHealthService,
   WebhookService,

@@ -19,6 +19,7 @@ import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyConfig } from 'src/utils/database';
 import { parseSnsCsv } from 'src/utils/sns-csv';
@@ -43,7 +44,8 @@ async function main() {
     const expenseRepo = new ExpenseRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
     const eventRepo = new EventRepository(db);
-    const matcher = new BankMatcherService(db, bankRepo, clientRepo, expenseRepo, sheetWriter, eventRepo);
+    const sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, eventRepo);
+    const matcher = new BankMatcherService(db, bankRepo, expenseRepo, sheetSync, eventRepo);
 
     let ingested = 0;
     let duplicates = 0;

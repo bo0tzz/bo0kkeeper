@@ -18,6 +18,7 @@ import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -58,6 +59,7 @@ describe('BankMatcherService', () => {
     writeExpenseRow: ReturnType<typeof vi.fn>;
   };
   let matcher: BankMatcherService;
+  let sheetSync: SheetSyncService;
 
   beforeEach(async () => {
     db = await getKyselyDB();
@@ -72,14 +74,8 @@ describe('BankMatcherService', () => {
       writeIncomeRow: ReturnType<typeof vi.fn>;
       writeExpenseRow: ReturnType<typeof vi.fn>;
     };
-    matcher = new BankMatcherService(
-      db,
-      bankRepo,
-      clientRepo,
-      new ExpenseRepository(db),
-      sheetWriter,
-      new EventRepository(db),
-    );
+    sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, new EventRepository(db));
+    matcher = new BankMatcherService(db, bankRepo, new ExpenseRepository(db), sheetSync, new EventRepository(db));
   });
 
   afterEach(async () => {
@@ -287,7 +283,7 @@ describe('BankMatcherService', () => {
     // Recover: stop rejecting, run the retry job. It should pick up the
     // bank_tx, re-invoke the write, and mark sheetRowAt.
     sheetWriter.writeIncomeRow.mockResolvedValue(void 0);
-    const retryResult = await matcher.retryFailedSheetWrites({});
+    const retryResult = await sheetSync.retryFailedSheetWrites({});
     expect(retryResult.attempted).toBe(1);
     expect(retryResult.succeeded).toBe(1);
     const recovered = await bankRepo.findById(ingest.row.id);

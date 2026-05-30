@@ -28,6 +28,7 @@ import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyConfig } from 'src/utils/database';
 
@@ -41,7 +42,8 @@ async function main(): Promise<void> {
     const expenseRepo = new ExpenseRepository(db);
     const transferRepo = new WiseTransferRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
-    const matcher = new BankMatcherService(db, bankRepo, clientRepo, expenseRepo, sheetWriter, eventRepo);
+    const sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, eventRepo);
+    const matcher = new BankMatcherService(db, bankRepo, expenseRepo, sheetSync, eventRepo);
 
     console.log('=== Wise transfers (varied states) ===');
     await ensureWiseTransfer(transferRepo, {

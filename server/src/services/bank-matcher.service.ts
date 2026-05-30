@@ -1,24 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { OnJob } from 'src/decorators';
-import {
-  BankTxCategory,
-  ClientClass,
-  EventSource,
-  ExpenseLocationClass,
-  ExpenseStatus,
-  JobName,
-  MatchConfidence,
-  QueueName,
-} from 'src/enum';
+import { BankTxCategory, EventSource, ExpenseLocationClass, ExpenseStatus, MatchConfidence } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
-import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { Expense, ExpenseRepository } from 'src/repositories/expense.repository';
 import { DB } from 'src/schema';
-import { expenseToSheetRow, SheetWriterService } from 'src/services/sheet-writer.service';
-import { JobOf } from 'src/types';
+import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { parseBtwFromDescription } from 'src/utils/btw-description';
 
 const TXN_REF_PATTERN = /\bTXN-\d{4,}\b/;
@@ -166,9 +154,8 @@ export class BankMatcherService {
   constructor(
     @InjectKysely() private readonly db: Kysely<DB>,
     private readonly bankTransactionRepository: BankTransactionRepository,
-    private readonly clientRepository: ClientRepository,
     private readonly expenseRepository: ExpenseRepository,
-    private readonly sheetWriter: SheetWriterService,
+    private readonly sheetSync: SheetSyncService,
     private readonly eventRepository: EventRepository,
   ) {}
 
@@ -203,7 +190,7 @@ export class BankMatcherService {
       if (transfer) {
         await this.persistTransferMatch(bankTx.id, transfer.id, MatchConfidence.AutoHigh);
         this.logger.log(`bank_tx ${bankTx.id} → wise_transfer ${transfer.id} via ${txnRef}`);
-        await this.appendWiseIncomeRow(bankTx, transfer);
+        await this.sheetSync.appendWiseIncomeRow(bankTx, transfer);
         return { matched: true, type: 'wise_transfer', transferId: transfer.id, confidence: MatchConfidence.AutoHigh };
       }
     }
@@ -218,7 +205,7 @@ export class BankMatcherService {
       if (invoice) {
         await this.persistInvoiceMatch(bankTx.id, invoice.id, MatchConfidence.AutoHigh);
         this.logger.log(`bank_tx ${bankTx.id} → invoice ${invoice.id} via ${invoiceNumber}`);
-        await this.appendIncomeRow(bankTx, invoice);
+        await this.sheetSync.appendInvoiceIncomeRow(bankTx, invoice);
         return { matched: true, type: 'invoice', invoiceId: invoice.id, confidence: MatchConfidence.AutoHigh };
       }
     }
@@ -281,19 +268,7 @@ export class BankMatcherService {
         `bank_tx ${bankTx.id} → fee expense ${expense.id} (${rule.reason}, BTW ${btw.rateBps / 100}% €${(Number(btw.amountMinor) / 100).toFixed(2)})`,
       );
       const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
-      try {
-        await this.sheetWriter.writeExpenseRow(expenseToSheetRow(expense, txDate));
-        await this.markExpenseSheetRowAt(expense.id);
-      } catch (error) {
-        const message = (error as Error).message;
-        this.logger.error(`Sheet write failed for fee expense ${expense.id}: ${message}`);
-        await this.recordSheetWriteFailure({
-          kind: 'expense',
-          bankTxId: bankTx.id,
-          identifier: expense.id,
-          message,
-        });
-      }
+      await this.sheetSync.writeExpenseRowSafely(expense, txDate, bankTx.id);
       return {
         matched: true,
         type: 'expense',
@@ -447,240 +422,6 @@ export class BankMatcherService {
   }
 
   /**
-   * Append a sheet income row for the matched invoice. Best-effort: a sheets
-   * outage or a missing service-account config must not block the match itself
-   * (the row is still persisted and visible in the admin UI).
-   *
-   * Date convention: the bank tx date is the kasstelsel "payment received"
-   * date, which is what the sheet is keyed on.
-   */
-  private async appendIncomeRow(
-    bankTx: BankTransaction,
-    invoice: {
-      clientId: string;
-      number: string;
-      btwRateBps: number | null;
-      btwMinor: bigint | string | null;
-    },
-  ) {
-    try {
-      const client = await this.clientRepository.findById(invoice.clientId);
-      if (!client) {
-        this.logger.warn(`Skipping sheet write for invoice ${invoice.number}: client ${invoice.clientId} not found`);
-        return;
-      }
-      const rawMinor = BigInt(bankTx.amountMinor as bigint | number | string);
-      const eurAmountMinor = rawMinor < 0n ? -rawMinor : rawMinor;
-      const vatPercent = invoice.btwRateBps == null ? undefined : `${invoice.btwRateBps / 100}%`;
-      const vatMinor = invoice.btwMinor == null ? undefined : BigInt(invoice.btwMinor);
-      await this.sheetWriter.writeIncomeRow({
-        date: bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate),
-        invoiceNumber: invoice.number,
-        eurAmountMinor,
-        client: { name: client.name, class: client.class as ClientClass },
-        from: bankTx.counterpartyName ?? client.name,
-        vatPercent,
-        vatMinor,
-        source: `bank_tx/${bankTx.id}`,
-      });
-      await this.markBankTxSheetRowAt(bankTx.id);
-    } catch (error) {
-      const message = (error as Error).message;
-      this.logger.error(`Sheet write failed for invoice ${invoice.number}: ${message}`);
-      await this.recordSheetWriteFailure({
-        kind: 'invoice',
-        bankTxId: bankTx.id,
-        identifier: invoice.number,
-        message,
-      });
-    }
-  }
-
-  /**
-   * Append a sheet income row for a Wise-routed inbound payment (Non-EU). The
-   * Wise transfer doesn't carry the originating client directly, so we look
-   * up the unique Non-EU client; when there's exactly one we use it. Otherwise
-   * the row is written with a placeholder name ("Wise") and the user fills in
-   * the client manually in the sheet.
-   */
-  private async appendWiseIncomeRow(
-    bankTx: BankTransaction,
-    transfer: { id: string; ourReference: string | null; targetCurrency: string },
-  ) {
-    try {
-      const reference = transfer.ourReference ?? '(no ref)';
-      const rawMinor = BigInt(bankTx.amountMinor as bigint | number | string);
-      const eurAmountMinor = rawMinor < 0n ? -rawMinor : rawMinor;
-      const allClients = await this.clientRepository.findAll();
-      const nonEuClients = allClients.filter((c) => c.class === ClientClass.NonEu);
-      const nonEuClient = nonEuClients.length === 1 ? nonEuClients[0] : null;
-      await this.sheetWriter.writeIncomeRow({
-        date: bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate),
-        invoiceNumber: reference,
-        eurAmountMinor,
-        client: { name: nonEuClient?.name ?? 'Wise', class: ClientClass.NonEu },
-        // Omit `from` — writeIncomeRow falls back to client.name, which is the
-        // originating Non-EU client. The bank-tx counterparty on the SNS side
-        // is always "Wise" (the routing service), which is the wrong
-        // bookkeeping party.
-        source: `wise_transfer/${transfer.id}`,
-      });
-      await this.markBankTxSheetRowAt(bankTx.id);
-    } catch (error) {
-      const message = (error as Error).message;
-      this.logger.error(`Sheet write failed for wise_transfer ${transfer.id}: ${message}`);
-      await this.recordSheetWriteFailure({
-        kind: 'wise_transfer',
-        bankTxId: bankTx.id,
-        identifier: transfer.ourReference ?? transfer.id,
-        message,
-      });
-    }
-  }
-
-  /**
-   * Retry any sheet writes that failed earlier. Identifies missing rows by
-   * scanning entities that should have a sheet row (matched bank_tx,
-   * approved + bank-tx-matched expense) but whose `sheetRowAt` is still null.
-   *
-   * Cron-scheduled hourly and on-demand-triggerable from /banking. The
-   * existing append paths set `sheetRowAt` on success and write a
-   * `sheet.write_failed` audit event on failure, so this is genuinely
-   * idempotent — a retry that succeeds closes the loop; a retry that fails
-   * just records another audit event without double-writing.
-   */
-  @OnJob({ name: JobName.SheetWriteRetry, queue: QueueName.Default })
-  async retryFailedSheetWrites(_data: JobOf<JobName.SheetWriteRetry>): Promise<{
-    attempted: number;
-    succeeded: number;
-  }> {
-    let attempted = 0;
-    let succeeded = 0;
-
-    // Income side: matched bank_txs (auto_high or manual) missing their row.
-    const incomeRows = await this.db
-      .selectFrom('bank_transaction')
-      .selectAll()
-      .where('matchedAt', 'is not', null)
-      .where('matchConfidence', 'in', [MatchConfidence.AutoHigh, MatchConfidence.Manual])
-      .where('sheetRowAt', 'is', null)
-      .where((eb) => eb.or([eb('matchedInvoiceId', 'is not', null), eb('matchedTransferId', 'is not', null)]))
-      .execute();
-
-    for (const bankTx of incomeRows as BankTransaction[]) {
-      attempted += 1;
-      const before = bankTx.sheetRowAt;
-      if (bankTx.matchedInvoiceId) {
-        const invoice = await this.db
-          .selectFrom('invoice')
-          .selectAll()
-          .where('id', '=', bankTx.matchedInvoiceId)
-          .executeTakeFirst();
-        if (invoice) {
-          await this.appendIncomeRow(bankTx, invoice);
-        }
-      } else if (bankTx.matchedTransferId) {
-        const transfer = await this.db
-          .selectFrom('wise_transfer')
-          .selectAll()
-          .where('id', '=', bankTx.matchedTransferId)
-          .executeTakeFirst();
-        if (transfer) {
-          await this.appendWiseIncomeRow(bankTx, transfer);
-        }
-      }
-      const after = await this.db
-        .selectFrom('bank_transaction')
-        .select('sheetRowAt')
-        .where('id', '=', bankTx.id)
-        .executeTakeFirst();
-      if (after?.sheetRowAt && !before) {
-        succeeded += 1;
-      }
-    }
-
-    // Expense side: approved expenses with a manual-confidence bank_tx link,
-    // missing their sheet row.
-    const expenseRows = await this.db
-      .selectFrom('expense')
-      .innerJoin('bank_transaction', 'bank_transaction.matchedExpenseId', 'expense.id')
-      .where('expense.status', '=', ExpenseStatus.Approved)
-      .where('expense.sheetRowAt', 'is', null)
-      .where('bank_transaction.matchConfidence', '=', MatchConfidence.Manual)
-      .selectAll('expense')
-      .select(['bank_transaction.id as bankTxId', 'bank_transaction.txDate as bankTxDate'])
-      .execute();
-
-    for (const row of expenseRows) {
-      attempted += 1;
-      const txDate = row.bankTxDate instanceof Date ? row.bankTxDate : new Date(row.bankTxDate);
-      try {
-        await this.sheetWriter.writeExpenseRow(expenseToSheetRow(row, txDate));
-        await this.markExpenseSheetRowAt(row.id);
-        succeeded += 1;
-      } catch (error) {
-        const message = (error as Error).message;
-        this.logger.error(`Sheet write retry failed for expense ${row.id}: ${message}`);
-        await this.recordSheetWriteFailure({
-          kind: 'expense',
-          bankTxId: row.bankTxId,
-          identifier: row.paperlessDocId ?? row.id,
-          message,
-        });
-      }
-    }
-
-    if (attempted > 0) {
-      this.logger.log(`Sheet write retry: ${succeeded}/${attempted} succeeded`);
-    }
-    return { attempted, succeeded };
-  }
-
-  /**
-   * Mark a bank_tx as having its sheet income row successfully written.
-   * The retry job uses `sheetRowAt IS NULL` to find writes to retry; setting
-   * it here closes the loop.
-   */
-  private async markBankTxSheetRowAt(bankTxId: string): Promise<void> {
-    await this.db
-      .updateTable('bank_transaction')
-      .set({ sheetRowAt: new Date(), updatedAt: new Date() })
-      .where('id', '=', bankTxId)
-      .execute();
-  }
-
-  /** Same as markBankTxSheetRowAt but for the expense row. */
-  private async markExpenseSheetRowAt(expenseId: string): Promise<void> {
-    await this.db
-      .updateTable('expense')
-      .set({ sheetRowAt: new Date(), updatedAt: new Date() })
-      .where('id', '=', expenseId)
-      .execute();
-  }
-
-  /**
-   * Append a `sheet.write_failed` audit event so the operator can see and
-   * resolve sheet outages from the Events page. Best-effort itself — if the
-   * event write fails, we don't recurse (we'd just have logged the message).
-   */
-  private async recordSheetWriteFailure(input: {
-    kind: 'invoice' | 'wise_transfer' | 'expense';
-    bankTxId: string;
-    identifier: string;
-    message: string;
-  }): Promise<void> {
-    try {
-      await this.eventRepository.recordAction({
-        source: EventSource.System,
-        eventType: 'sheet.write_failed',
-        payload: input,
-      });
-    } catch (error) {
-      this.logger.error(`Failed to record sheet.write_failed event: ${(error as Error).message}`);
-    }
-  }
-
-  /**
    * Operator-driven match. Sets exactly one of the matched* FKs (clearing the
    * others), marks confidence=manual, and runs the same sheet-append we'd run
    * on an auto-match — manual matches earn the same sheet row treatment.
@@ -821,7 +562,7 @@ export class BankMatcherService {
       }
       await this.persistTransferMatch(bankTxId, transfer.id, MatchConfidence.Manual);
       this.logger.log(`bank_tx ${bankTxId} → wise_transfer ${transfer.id} (manual)`);
-      await this.appendWiseIncomeRow(bankTx, transfer);
+      await this.sheetSync.appendWiseIncomeRow(bankTx, transfer);
     } else if (target.type === 'invoice') {
       const invoice = await this.db
         .selectFrom('invoice')
@@ -833,7 +574,7 @@ export class BankMatcherService {
       }
       await this.persistInvoiceMatch(bankTxId, invoice.id, MatchConfidence.Manual);
       this.logger.log(`bank_tx ${bankTxId} → invoice ${invoice.id} (manual)`);
-      await this.appendIncomeRow(bankTx, invoice);
+      await this.sheetSync.appendInvoiceIncomeRow(bankTx, invoice);
     } else {
       const expense = await this.db
         .selectFrom('expense')
@@ -861,19 +602,7 @@ export class BankMatcherService {
             .execute();
         }
         const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
-        try {
-          await this.sheetWriter.writeExpenseRow(expenseToSheetRow(expense, txDate));
-          await this.markExpenseSheetRowAt(expense.id);
-        } catch (error) {
-          const message = (error as Error).message;
-          this.logger.error(`Sheet write failed for expense ${expense.id}: ${message}`);
-          await this.recordSheetWriteFailure({
-            kind: 'expense',
-            bankTxId: bankTx.id,
-            identifier: expense.paperlessDocId ?? expense.id,
-            message,
-          });
-        }
+        await this.sheetSync.writeExpenseRowSafely(expense, txDate, bankTx.id);
       }
     }
 

@@ -23,6 +23,7 @@ import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { SettingsService } from 'src/services/settings.service';
+import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { WebhookService } from 'src/services/webhook.service';
 import { getKyselyConfig } from 'src/utils/database';
@@ -59,7 +60,8 @@ async function main(): Promise<void> {
     const clientRepo = new ClientRepository(db);
     const eventRepo = new EventRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
-    const matcher = new BankMatcherService(db, bankRepo, clientRepo, expenseRepo, sheetWriter, eventRepo);
+    const sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, eventRepo);
+    const matcher = new BankMatcherService(db, bankRepo, expenseRepo, sheetSync, eventRepo);
     const stubPaperless = {} as unknown as PaperlessRepository;
     const stubSettings = {} as unknown as SettingsService;
     const stubWebhook = {} as unknown as WebhookService;
