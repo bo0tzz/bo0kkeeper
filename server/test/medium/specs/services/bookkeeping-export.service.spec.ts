@@ -126,6 +126,76 @@ describe('BookkeepingExportService', () => {
     expect(cells).toContain('Immich development');
   });
 
+  it('writes total / excl-VAT / VAT money columns with excl-VAT = total - BTW', async () => {
+    // Pins the accountant's money columns: stored amount is gross (BTW-inclusive),
+    // VAT is the component, and the excl-VAT base is gross - VAT. The same
+    // gross/net relationship the invoice composer must produce.
+    const domestic = await clientRepo.create({
+      name: 'F. ColumnCheck',
+      class: ClientClass.Domestic,
+      tradeName: TradeName.ThreeD,
+      address: { line1: 'X', city: 'Y' },
+    });
+    await invoiceRepo.issue({
+      year: 2099,
+      invoice: {
+        clientId: domestic.id,
+        issuedAt: new Date('2099-02-15'),
+        currency: 'EUR',
+        totalMinor: 23_898n, // gross €238,98
+        btwRateBps: 2100,
+        btwMinor: 4148n, // VAT €41,48 → excl-VAT €197,50
+        sourceEventId: null,
+      },
+      lines: [{ ordinal: 0, description: 'Design work', lineTotalMinor: 23_898n, unitLabel: null, quantity: null }],
+    });
+    const ingested = await expenseRepo.ingest({
+      paperlessDocId: 'pp-cols',
+      vendor: 'ColCheckCo',
+      expenseDate: new Date('2099-02-10'),
+      amountMinor: 2985n, // gross €29,85
+      currency: 'EUR',
+      btwRateBps: 2100,
+      btwMinor: 518n, // VAT €5,18 → excl-VAT €24,67
+      locationClass: ExpenseLocationClass.Domestic,
+      category: '',
+      notes: 'materials',
+      sourceEventId: null,
+    });
+    if (ingested.ingested) {
+      await expenseRepo.approve(ingested.row.id);
+    }
+
+    const { buffer } = await service.exportQuarter(2099, 1);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+    const sheet = wb.worksheets[0];
+
+    const moneyRowFor = (counterparty: string): { total: number; excl: number; vat: number } => {
+      for (let r = 1; r <= sheet.rowCount; r += 1) {
+        if (String(sheet.getCell(r, 3).value ?? '') === counterparty) {
+          return {
+            total: Number(sheet.getCell(r, 6).value),
+            excl: Number(sheet.getCell(r, 7).value),
+            vat: Number(sheet.getCell(r, 8).value),
+          };
+        }
+      }
+      throw new Error(`row for ${counterparty} not found`);
+    };
+
+    const invoice = moneyRowFor('F. ColumnCheck');
+    expect(invoice.total).toBeCloseTo(238.98, 2);
+    expect(invoice.vat).toBeCloseTo(41.48, 2);
+    expect(invoice.excl).toBeCloseTo(197.5, 2);
+    expect(invoice.total - invoice.vat).toBeCloseTo(invoice.excl, 2);
+
+    const expense = moneyRowFor('ColCheckCo');
+    expect(expense.total).toBeCloseTo(29.85, 2);
+    expect(expense.vat).toBeCloseTo(5.18, 2);
+    expect(expense.excl).toBeCloseTo(24.67, 2);
+  });
+
   it('only includes approved expenses in the inbound section', async () => {
     await expenseRepo.ingest({
       paperlessDocId: 'pp-1',

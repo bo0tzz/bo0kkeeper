@@ -129,8 +129,16 @@ export class InvoiceComposerService {
     // charged on top and the grand total is subtotal + BTW — the gross amount
     // the client pays and the figure the bank-matcher reconciles against the
     // deposit. (`totalMinor` is the invoice's primary money = gross.)
+    //
+    // Only domestic + standard-EU clients carry BTW. Non-EU (out of scope) and
+    // EU reverse-charge invoices must never record BTW even if a rate is passed
+    // — the compose form's BTW field defaults to 21 and isn't class-aware, so
+    // guard server-side. The rendered PDF already omits BTW for these classes;
+    // recording it anyway would inflate the aggregator's collected-BTW total.
+    const chargesBtw = client.class === ClientClass.Domestic || client.class === ClientClass.Eu;
+    const btwRateBps = chargesBtw ? (input.btwRateBps ?? null) : null;
     const subtotalMinor = input.lines.reduce((sum, line) => sum + line.lineTotalMinor, 0n);
-    const btwMinor = input.btwRateBps ? btwOnNet(subtotalMinor, input.btwRateBps) : null;
+    const btwMinor = btwRateBps ? btwOnNet(subtotalMinor, btwRateBps) : null;
     const totalMinor = subtotalMinor + (btwMinor ?? 0n);
 
     const issued = await this.invoiceRepository.issue({
@@ -144,7 +152,7 @@ export class InvoiceComposerService {
         totalMinor,
         eurTotalMinor: input.eurTotalMinor ?? null,
         fxRate: input.fxRate ?? null,
-        btwRateBps: input.btwRateBps ?? null,
+        btwRateBps,
         btwMinor,
         sourceEventId: input.sourceEventId ?? null,
         paymentLink: input.paymentLink ?? null,

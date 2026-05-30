@@ -189,4 +189,22 @@ describe('InvoiceComposerService', () => {
     expect(Number(result.invoice.btwMinor)).toBe(21_000);
     expect(Number(result.invoice.totalMinor)).toBe(121_000);
   });
+
+  it('never records BTW for a non-EU client even if a rate is passed', async () => {
+    // The compose form's BTW field defaults to 21 and isn't class-aware. A
+    // non-EU client is out of scope for BTW, so the composer must ignore the
+    // rate: no btwMinor, no rate stored, total = subtotal (no BTW on top).
+    // (The default `clientId` client is already class non_eu.)
+    const result = await composer.composeAndIssue({
+      clientId,
+      issuedAt: new Date('2099-07-15T00:00:00Z'),
+      currency: 'USD',
+      btwRateBps: 2100,
+      lines: [{ description: 'Services', lineTotalMinor: 100_000n }],
+    });
+
+    expect(result.invoice.btwMinor).toBeNull();
+    expect(result.invoice.btwRateBps).toBeNull();
+    expect(Number(result.invoice.totalMinor)).toBe(100_000);
+  });
 });
