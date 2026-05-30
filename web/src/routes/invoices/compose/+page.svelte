@@ -72,6 +72,15 @@
     ...clients.map((c) => ({ value: c.id, label: `${c.name} (${c.class})` })),
   ]);
 
+  const selectedClient = $derived(clients.find((c) => c.id === clientId) ?? null);
+  /**
+   * Only domestic + standard-EU clients are in scope for Dutch BTW. Non-EU
+   * (out of scope) and EU reverse-charge invoices never carry BTW — the server
+   * enforces this too, but the form shouldn't offer a rate that gets ignored.
+   * Default to true until a client is picked so the field starts enabled.
+   */
+  const chargesBtw = $derived(!selectedClient || selectedClient.class === 'domestic' || selectedClient.class === 'eu');
+
   function downloadPdf(invoiceId: string) {
     // Programmatic anchor click bypasses SvelteKit's typed-routing — these
     // are server endpoints, not SvelteKit pages, so the typed router doesn't
@@ -99,7 +108,7 @@
         periodStart: periodStart || undefined,
         periodEnd: periodEnd || undefined,
         currency,
-        btwRateBps: btwRatePercent.trim() === '' ? undefined : Math.round(Number(btwRatePercent) * 100),
+        btwRateBps: chargesBtw && btwRatePercent.trim() !== '' ? Math.round(Number(btwRatePercent) * 100) : undefined,
         lines: lines
           .filter((l) => l.description.trim() && l.amount.trim())
           .map((l) => ({
@@ -156,7 +165,11 @@
           <Input bind:value={currency} placeholder="EUR" />
         </Field>
         <Field label="BTW rate (%)" invalid={hasIssue('btwRateBps')}>
-          <Input bind:value={btwRatePercent} placeholder="21" />
+          {#if chargesBtw}
+            <Input bind:value={btwRatePercent} placeholder="21" />
+          {:else}
+            <Input value="" placeholder="n/a — out of scope" disabled />
+          {/if}
         </Field>
       </HStack>
 
