@@ -19,6 +19,7 @@ import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { RecurringFeeService } from 'src/services/recurring-fee.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyConfig } from 'src/utils/database';
@@ -45,7 +46,8 @@ async function main() {
     const sheetWriter = new SheetWriterService(new SheetsRepository());
     const eventRepo = new EventRepository(db);
     const sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, eventRepo);
-    const matcher = new BankMatcherService(db, bankRepo, expenseRepo, sheetSync, eventRepo);
+    const recurringFee = new RecurringFeeService(bankRepo, expenseRepo, eventRepo, sheetSync);
+    const matcher = new BankMatcherService(db, bankRepo, sheetSync, eventRepo, recurringFee);
 
     let ingested = 0;
     let duplicates = 0;

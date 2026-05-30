@@ -22,6 +22,7 @@ import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { RecurringFeeService } from 'src/services/recurring-fee.service';
 import { SettingsService } from 'src/services/settings.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
@@ -61,7 +62,8 @@ async function main(): Promise<void> {
     const eventRepo = new EventRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
     const sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, eventRepo);
-    const matcher = new BankMatcherService(db, bankRepo, expenseRepo, sheetSync, eventRepo);
+    const recurringFee = new RecurringFeeService(bankRepo, expenseRepo, eventRepo, sheetSync);
+    const matcher = new BankMatcherService(db, bankRepo, sheetSync, eventRepo, recurringFee);
     const stubPaperless = {} as unknown as PaperlessRepository;
     const stubSettings = {} as unknown as SettingsService;
     const stubWebhook = {} as unknown as WebhookService;

@@ -16,6 +16,7 @@ import { WiseTransferRepository } from 'src/repositories/wise-transfer.repositor
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { BankingSyncService, mapTransaction } from 'src/services/banking-sync.service';
+import { RecurringFeeService } from 'src/services/recurring-fee.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyDB } from 'test/utils';
@@ -117,7 +118,8 @@ describe('BankingSyncService', () => {
     const expenseRepo = new ExpenseRepository(db);
     const sheetWriter = { append: vi.fn().mockResolvedValue(void 0) } as unknown as SheetWriterService;
     const sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, new EventRepository(db));
-    matcher = new BankMatcherService(db, bankRepo, expenseRepo, sheetSync, new EventRepository(db));
+    const recurringFee = new RecurringFeeService(bankRepo, expenseRepo, new EventRepository(db), sheetSync);
+    matcher = new BankMatcherService(db, bankRepo, sheetSync, new EventRepository(db), recurringFee);
     api = fakeApi([]);
     service = new BankingSyncService(sessionRepo, bankRepo, api, matcher, new EventRepository(db));
   });

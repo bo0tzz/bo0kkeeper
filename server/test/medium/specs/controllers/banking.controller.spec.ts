@@ -20,6 +20,7 @@ import { JobRepository } from 'src/repositories/job.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { BankingSessionService } from 'src/services/banking-session.service';
+import { RecurringFeeService } from 'src/services/recurring-fee.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyDB } from 'test/utils';
@@ -67,7 +68,8 @@ describe('BankingController', () => {
     const expenseRepo = new ExpenseRepository(db);
     const sheetWriter = { writeIncomeRow: vi.fn().mockResolvedValue(void 0) } as unknown as SheetWriterService;
     const sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, new EventRepository(db));
-    const matcher = new BankMatcherService(db, bankTxRepo, expenseRepo, sheetSync, new EventRepository(db));
+    const recurringFee = new RecurringFeeService(bankTxRepo, expenseRepo, new EventRepository(db), sheetSync);
+    const matcher = new BankMatcherService(db, bankTxRepo, sheetSync, new EventRepository(db), recurringFee);
     const enableBankingStub = { listAspsps: vi.fn().mockResolvedValue([]) } as unknown as EnableBankingRepository;
     controller = new BankingController(
       service,

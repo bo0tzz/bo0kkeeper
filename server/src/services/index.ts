@@ -5,6 +5,7 @@ import { BookkeepingExportService } from 'src/services/bookkeeping-export.servic
 import { ExpensePipelineService } from 'src/services/expense-pipeline.service';
 import { InvoiceComposerService } from 'src/services/invoice-composer.service';
 import { QuarterlyAggregatorService } from 'src/services/quarterly-aggregator.service';
+import { RecurringFeeService } from 'src/services/recurring-fee.service';
 import { SettingsService } from 'src/services/settings.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
@@ -22,6 +23,7 @@ export const services = [
   ExpensePipelineService,
   InvoiceComposerService,
   QuarterlyAggregatorService,
+  RecurringFeeService,
   SettingsService,
   SheetSyncService,
   SheetWriterService,

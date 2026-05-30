@@ -1,83 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { BankTxCategory, EventSource, ExpenseLocationClass, ExpenseStatus, MatchConfidence } from 'src/enum';
+import { EventSource, ExpenseStatus, MatchConfidence } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { EventRepository } from 'src/repositories/event.repository';
-import { Expense, ExpenseRepository } from 'src/repositories/expense.repository';
 import { DB } from 'src/schema';
+import { RecurringFeeService } from 'src/services/recurring-fee.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
-import { parseBtwFromDescription } from 'src/utils/btw-description';
 
 const TXN_REF_PATTERN = /\bTXN-\d{4,}\b/;
 const INVOICE_NUMBER_PATTERN = /\b\d{4}\/\d{3}\b/;
-
-/**
- * Description-substring rules for recurring bank-fee rows. Two outcomes per
- * rule, depending on whether the bank-tx description carries a parseable BTW
- * breakdown ("21% BTW BTW bedrag: 0,32"):
- *
- * - With BTW (e.g. SNS klantonderzoek): an Approved Expense is auto-created
- *   with `sourceBankTxId` set, the bank-tx is matched to it, the sheet row
- *   fires through the normal expense path, and the BTW lands in the
- *   quarterly aggregator's deductible total. The bank statement line is the
- *   *vereenvoudigde factuur* (Art. 35a Wet OB) — no separate document needed.
- * - Without BTW: the bank-tx is categorized to `fallbackCategory`, which
- *   excludes it from matching + sheet writes (the row has no further
- *   bookkeeping side-effect).
- *
- * Code constant rather than a DB table because the set is small, stable, and
- * reviewed in PR. All current rules target SNS service fees from Volksbank
- * (the legal entity SNS/ASN/RegioBank trade under, per the BTW number on the
- * bank statement).
- */
-type RecurringFeeRule = {
-  /** Substring match against bank description, case-insensitive. */
-  descriptionContains: string;
-  /** Operator-readable explanation that lands in the audit event. */
-  reason: string;
-  /** Vendor field on the auto-created Expense when BTW parses. */
-  vendor: string;
-  /** Location class on the auto-created Expense when BTW parses. */
-  locationClass: ExpenseLocationClass;
-  /** Category applied to the bank-tx when no BTW parses. */
-  fallbackCategory: BankTxCategory;
-};
-
-const SNS_VENDOR = 'Volksbank';
-
-const RECURRING_FEE_RULES: readonly RecurringFeeRule[] = [
-  {
-    descriptionContains: 'klantonderzoek',
-    reason: 'SNS Klantonderzoek monthly fee',
-    vendor: SNS_VENDOR,
-    locationClass: ExpenseLocationClass.Domestic,
-    fallbackCategory: BankTxCategory.Fee,
-  },
-  {
-    descriptionContains: 'kosten rekening',
-    reason: 'SNS account maintenance fee',
-    vendor: SNS_VENDOR,
-    locationClass: ExpenseLocationClass.Domestic,
-    fallbackCategory: BankTxCategory.Fee,
-  },
-  {
-    descriptionContains: 'kosten gebruik betaalrekening',
-    reason: 'SNS payment-account usage fee',
-    vendor: SNS_VENDOR,
-    locationClass: ExpenseLocationClass.Domestic,
-    fallbackCategory: BankTxCategory.Fee,
-  },
-  {
-    descriptionContains: 'kosten betaalverzoek',
-    reason: 'SNS payment-request fee',
-    vendor: SNS_VENDOR,
-    locationClass: ExpenseLocationClass.Domestic,
-    fallbackCategory: BankTxCategory.Fee,
-  },
-];
-
-const FEE_EXPENSE_NOTE = 'Auto-created from bank-tx; statement line is vereenvoudigde factuur (Art. 35a Wet OB).';
 
 export type MatchResult =
   | { matched: true; type: 'wise_transfer'; transferId: string; confidence: MatchConfidence }
@@ -154,9 +86,9 @@ export class BankMatcherService {
   constructor(
     @InjectKysely() private readonly db: Kysely<DB>,
     private readonly bankTransactionRepository: BankTransactionRepository,
-    private readonly expenseRepository: ExpenseRepository,
     private readonly sheetSync: SheetSyncService,
     private readonly eventRepository: EventRepository,
+    private readonly recurringFee: RecurringFeeService,
   ) {}
 
   async tryMatch(bankTx: BankTransaction): Promise<MatchResult> {
@@ -173,7 +105,7 @@ export class BankMatcherService {
     // Two outcomes: BTW-parseable fees become an auto-created Approved
     // Expense (and a real match); BTW-less fees get categorised to skip the
     // matcher entirely. Either way, the caller is done with this row.
-    const feeOutcome = await this.tryHandleRecurringFee(bankTx);
+    const feeOutcome = await this.recurringFee.tryHandleRecurringFee(bankTx);
     if (feeOutcome) {
       return feeOutcome;
     }
@@ -188,7 +120,11 @@ export class BankMatcherService {
         .where('ourReference', '=', txnRef)
         .executeTakeFirst();
       if (transfer) {
-        await this.persistTransferMatch(bankTx.id, transfer.id, MatchConfidence.AutoHigh);
+        await this.bankTransactionRepository.setMatch(
+          bankTx.id,
+          { type: 'wise_transfer', id: transfer.id },
+          MatchConfidence.AutoHigh,
+        );
         this.logger.log(`bank_tx ${bankTx.id} → wise_transfer ${transfer.id} via ${txnRef}`);
         await this.sheetSync.appendWiseIncomeRow(bankTx, transfer);
         return { matched: true, type: 'wise_transfer', transferId: transfer.id, confidence: MatchConfidence.AutoHigh };
@@ -203,7 +139,11 @@ export class BankMatcherService {
         .where('number', '=', invoiceNumber)
         .executeTakeFirst();
       if (invoice) {
-        await this.persistInvoiceMatch(bankTx.id, invoice.id, MatchConfidence.AutoHigh);
+        await this.bankTransactionRepository.setMatch(
+          bankTx.id,
+          { type: 'invoice', id: invoice.id },
+          MatchConfidence.AutoHigh,
+        );
         this.logger.log(`bank_tx ${bankTx.id} → invoice ${invoice.id} via ${invoiceNumber}`);
         await this.sheetSync.appendInvoiceIncomeRow(bankTx, invoice);
         return { matched: true, type: 'invoice', invoiceId: invoice.id, confidence: MatchConfidence.AutoHigh };
@@ -220,113 +160,6 @@ export class BankMatcherService {
     }
 
     return { matched: false, reason: 'no high-confidence signal' };
-  }
-
-  /**
-   * Handle a bank-tx that matches a known recurring-fee rule. Returns the
-   * resulting MatchResult (which the caller threads through) or null when no
-   * rule applies / the row is already handled.
-   *
-   * Two outcomes when a rule matches:
-   * - description has a parseable BTW breakdown → auto-create an Approved
-   *   Expense, link the bank-tx, write the sheet row, return matched=true
-   * - description has no BTW → categorise the bank-tx, audit-event it,
-   *   return matched=false (the row is dealt with — it's just outside the
-   *   bookkeeping flow)
-   *
-   * Idempotent on repeat invocation: a second call against the same bank-tx
-   * after a previous match was cleared finds the existing fee-Expense by
-   * `sourceBankTxId` and re-links rather than creating a duplicate.
-   */
-  async tryHandleRecurringFee(bankTx: BankTransaction): Promise<MatchResult | null> {
-    if (bankTx.matchedAt || bankTx.category) {
-      return null;
-    }
-    const description = bankTx.description ?? '';
-    const lower = description.toLowerCase();
-    const rule = RECURRING_FEE_RULES.find((r) => lower.includes(r.descriptionContains));
-    if (!rule) {
-      return null;
-    }
-
-    const btw = parseBtwFromDescription(description);
-    if (btw) {
-      const expense = await this.createOrFindFeeExpense(bankTx, rule, btw);
-      await this.persistExpenseMatch(bankTx.id, expense.id, MatchConfidence.AutoHigh);
-      await this.eventRepository.recordAction({
-        source: EventSource.System,
-        eventType: 'banking.tx.auto_fee_expense_matched',
-        payload: {
-          bankTxId: bankTx.id,
-          expenseId: expense.id,
-          rule: rule.reason,
-          btwRateBps: btw.rateBps,
-          btwMinor: String(btw.amountMinor),
-        },
-      });
-      this.logger.log(
-        `bank_tx ${bankTx.id} → fee expense ${expense.id} (${rule.reason}, BTW ${btw.rateBps / 100}% €${(Number(btw.amountMinor) / 100).toFixed(2)})`,
-      );
-      const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
-      await this.sheetSync.writeExpenseRowSafely(expense, txDate, bankTx.id);
-      return {
-        matched: true,
-        type: 'expense',
-        expenseId: expense.id,
-        confidence: MatchConfidence.AutoHigh,
-      };
-    }
-
-    await this.bankTransactionRepository.setCategory(bankTx.id, rule.fallbackCategory);
-    await this.eventRepository.recordAction({
-      source: EventSource.System,
-      eventType: 'banking.tx.auto_categorized',
-      payload: { bankTxId: bankTx.id, category: rule.fallbackCategory, reason: rule.reason },
-    });
-    this.logger.log(`bank_tx ${bankTx.id} auto-categorized as ${rule.fallbackCategory} (${rule.reason})`);
-    return { matched: false, reason: `auto-categorized as ${rule.fallbackCategory}` };
-  }
-
-  /**
-   * Idempotent: looks up an existing fee-Expense by `sourceBankTxId`, or
-   * creates a new Approved one if none exists. Reprocessing the same bank-tx
-   * does NOT create duplicates.
-   */
-  private async createOrFindFeeExpense(
-    bankTx: BankTransaction,
-    rule: RecurringFeeRule,
-    btw: { rateBps: number; amountMinor: bigint },
-  ): Promise<Expense> {
-    const existing = await this.expenseRepository.findBySourceBankTxId(bankTx.id);
-    if (existing) {
-      return existing;
-    }
-    const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
-    const now = new Date();
-    const grossMinor = absBigInt(BigInt(bankTx.amountMinor as bigint | number | string));
-    const result = await this.expenseRepository.ingestFromBankFee({
-      sourceBankTxId: bankTx.id,
-      paperlessDocId: null,
-      vendor: rule.vendor,
-      expenseDate: txDate,
-      amountMinor: grossMinor,
-      currency: bankTx.currency,
-      btwRateBps: btw.rateBps,
-      btwMinor: btw.amountMinor,
-      locationClass: rule.locationClass,
-      status: ExpenseStatus.Approved,
-      reviewedAt: now,
-      notes: FEE_EXPENSE_NOTE,
-    });
-    if (result.ingested) {
-      return result.row;
-    }
-    // Lost the race: another caller inserted in between our find and create.
-    const row = await this.expenseRepository.findById(result.existingId);
-    if (!row) {
-      throw new Error(`expense ${result.existingId} disappeared after race`);
-    }
-    return row;
   }
 
   private async tryExpenseHeuristic(bankTx: BankTransaction): Promise<MatchResult | null> {
@@ -362,7 +195,11 @@ export class BankMatcherService {
       return null;
     }
     const expense = matches[0];
-    await this.persistExpenseMatch(bankTx.id, expense.id, MatchConfidence.AutoLow);
+    await this.bankTransactionRepository.setMatch(
+      bankTx.id,
+      { type: 'expense', id: expense.id },
+      MatchConfidence.AutoLow,
+    );
     this.logger.log(
       `bank_tx ${bankTx.id} → expense ${expense.id} via heuristic (vendor "${expense.vendor}", amount ${absMinor})`,
     );
@@ -414,7 +251,11 @@ export class BankMatcherService {
       return null;
     }
     const invoice = matches[0];
-    await this.persistInvoiceMatch(bankTx.id, invoice.invoiceId, MatchConfidence.AutoLow);
+    await this.bankTransactionRepository.setMatch(
+      bankTx.id,
+      { type: 'invoice', id: invoice.invoiceId },
+      MatchConfidence.AutoLow,
+    );
     this.logger.log(
       `bank_tx ${bankTx.id} → invoice ${invoice.number} via heuristic (client "${invoice.clientName}", amount ${absMinor})`,
     );
@@ -560,7 +401,11 @@ export class BankMatcherService {
       if (!transfer) {
         throw new Error(`wise_transfer ${target.targetId} not found`);
       }
-      await this.persistTransferMatch(bankTxId, transfer.id, MatchConfidence.Manual);
+      await this.bankTransactionRepository.setMatch(
+        bankTxId,
+        { type: 'wise_transfer', id: transfer.id },
+        MatchConfidence.Manual,
+      );
       this.logger.log(`bank_tx ${bankTxId} → wise_transfer ${transfer.id} (manual)`);
       await this.sheetSync.appendWiseIncomeRow(bankTx, transfer);
     } else if (target.type === 'invoice') {
@@ -572,7 +417,11 @@ export class BankMatcherService {
       if (!invoice) {
         throw new Error(`invoice ${target.targetId} not found`);
       }
-      await this.persistInvoiceMatch(bankTxId, invoice.id, MatchConfidence.Manual);
+      await this.bankTransactionRepository.setMatch(
+        bankTxId,
+        { type: 'invoice', id: invoice.id },
+        MatchConfidence.Manual,
+      );
       this.logger.log(`bank_tx ${bankTxId} → invoice ${invoice.id} (manual)`);
       await this.sheetSync.appendInvoiceIncomeRow(bankTx, invoice);
     } else {
@@ -584,7 +433,11 @@ export class BankMatcherService {
       if (!expense) {
         throw new Error(`expense ${target.targetId} not found`);
       }
-      await this.persistExpenseMatch(bankTxId, expense.id, MatchConfidence.Manual);
+      await this.bankTransactionRepository.setMatch(
+        bankTxId,
+        { type: 'expense', id: expense.id },
+        MatchConfidence.Manual,
+      );
       this.logger.log(`bank_tx ${bankTxId} → expense ${expense.id} (manual)`);
       // Bank-tx match is the canonical kasstelsel money-out signal — this
       // is where the sheet row fires for expenses. Approval (in the admin
@@ -673,19 +526,7 @@ export class BankMatcherService {
 
   /** Operator unlink: clears all match fields. Sheet rows aren't rewound. */
   async clearMatch(bankTxId: string): Promise<BankTransaction> {
-    await this.db
-      .updateTable('bank_transaction')
-      .set({
-        matchedInvoiceId: null,
-        matchedTransferId: null,
-        matchedExpenseId: null,
-        matchedAt: null,
-        matchConfidence: null,
-        updatedAt: new Date(),
-      })
-      .where('id', '=', bankTxId)
-      .execute();
-    const refreshed = await this.bankTransactionRepository.findById(bankTxId);
+    const refreshed = await this.bankTransactionRepository.clearMatch(bankTxId);
     if (!refreshed) {
       throw new Error(`bank_transaction ${bankTxId} not found`);
     }
@@ -712,54 +553,6 @@ export class BankMatcherService {
       }
     }
     return { matched, unmatched };
-  }
-
-  private async persistTransferMatch(bankTxId: string, transferId: string, confidence: MatchConfidence) {
-    await this.db
-      .updateTable('bank_transaction')
-      .set({
-        matchedInvoiceId: null,
-        matchedExpenseId: null,
-        matchedTransferId: transferId,
-        matchedAt: new Date(),
-        matchConfidence: confidence,
-        category: null,
-        updatedAt: new Date(),
-      })
-      .where('id', '=', bankTxId)
-      .execute();
-  }
-
-  private async persistInvoiceMatch(bankTxId: string, invoiceId: string, confidence: MatchConfidence) {
-    await this.db
-      .updateTable('bank_transaction')
-      .set({
-        matchedTransferId: null,
-        matchedExpenseId: null,
-        matchedInvoiceId: invoiceId,
-        matchedAt: new Date(),
-        matchConfidence: confidence,
-        category: null,
-        updatedAt: new Date(),
-      })
-      .where('id', '=', bankTxId)
-      .execute();
-  }
-
-  private async persistExpenseMatch(bankTxId: string, expenseId: string, confidence: MatchConfidence) {
-    await this.db
-      .updateTable('bank_transaction')
-      .set({
-        matchedTransferId: null,
-        matchedInvoiceId: null,
-        matchedExpenseId: expenseId,
-        matchedAt: new Date(),
-        matchConfidence: confidence,
-        category: null,
-        updatedAt: new Date(),
-      })
-      .where('id', '=', bankTxId)
-      .execute();
   }
 }
 

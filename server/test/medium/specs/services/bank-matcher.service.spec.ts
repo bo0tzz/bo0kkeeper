@@ -18,6 +18,7 @@ import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
+import { RecurringFeeService } from 'src/services/recurring-fee.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyDB } from 'test/utils';
@@ -60,6 +61,7 @@ describe('BankMatcherService', () => {
   };
   let matcher: BankMatcherService;
   let sheetSync: SheetSyncService;
+  let recurringFee: RecurringFeeService;
 
   beforeEach(async () => {
     db = await getKyselyDB();
@@ -75,7 +77,8 @@ describe('BankMatcherService', () => {
       writeExpenseRow: ReturnType<typeof vi.fn>;
     };
     sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, new EventRepository(db));
-    matcher = new BankMatcherService(db, bankRepo, new ExpenseRepository(db), sheetSync, new EventRepository(db));
+    recurringFee = new RecurringFeeService(bankRepo, new ExpenseRepository(db), new EventRepository(db), sheetSync);
+    matcher = new BankMatcherService(db, bankRepo, sheetSync, new EventRepository(db), recurringFee);
   });
 
   afterEach(async () => {
@@ -535,7 +538,7 @@ describe('BankMatcherService', () => {
       it('sets fee category for known SNS patterns and returns matched=false', async () => {
         const row = await ingestSnsFeeRow(bankRepo, 'fee:klantonderzoek', 'Kosten Klantonderzoek');
 
-        const result = await matcher.tryHandleRecurringFee(row);
+        const result = await recurringFee.tryHandleRecurringFee(row);
         expect(result).toEqual({ matched: false, reason: 'auto-categorized as fee' });
 
         const refetched = await bankRepo.findById(row.id);
@@ -548,9 +551,9 @@ describe('BankMatcherService', () => {
         const b = await ingestSnsFeeRow(bankRepo, 'fee:betaalverzoek', 'Kosten betaalverzoek');
         const c = await ingestSnsFeeRow(bankRepo, 'fee:gebruik', 'Kosten gebruik betaalrekening April');
 
-        const ra = await matcher.tryHandleRecurringFee(a);
-        const rb = await matcher.tryHandleRecurringFee(b);
-        const rc = await matcher.tryHandleRecurringFee(c);
+        const ra = await recurringFee.tryHandleRecurringFee(a);
+        const rb = await recurringFee.tryHandleRecurringFee(b);
+        const rc = await recurringFee.tryHandleRecurringFee(c);
         expect(ra?.matched).toBe(false);
         expect(rb?.matched).toBe(false);
         expect(rc?.matched).toBe(false);
@@ -565,7 +568,7 @@ describe('BankMatcherService', () => {
 
       it('returns null when no pattern matches', async () => {
         const row = await ingestSnsFeeRow(bankRepo, 'fee:none', 'Just a normal payment');
-        const result = await matcher.tryHandleRecurringFee(row);
+        const result = await recurringFee.tryHandleRecurringFee(row);
         expect(result).toBeNull();
         const refetched = await bankRepo.findById(row.id);
         expect(refetched?.category).toBeNull();
@@ -573,9 +576,9 @@ describe('BankMatcherService', () => {
 
       it('returns null on already-categorized rows (idempotent)', async () => {
         const row = await ingestSnsFeeRow(bankRepo, 'fee:already', 'Kosten rekening');
-        await matcher.tryHandleRecurringFee(row);
+        await recurringFee.tryHandleRecurringFee(row);
         const refetched = await bankRepo.findById(row.id);
-        const result = await matcher.tryHandleRecurringFee(refetched!);
+        const result = await recurringFee.tryHandleRecurringFee(refetched!);
         expect(result).toBeNull();
       });
 
@@ -591,7 +594,7 @@ describe('BankMatcherService', () => {
           .where('id', '=', row.id)
           .execute();
         const refetched = await bankRepo.findById(row.id);
-        const result = await matcher.tryHandleRecurringFee(refetched!);
+        const result = await recurringFee.tryHandleRecurringFee(refetched!);
         expect(result).toBeNull();
       });
 
@@ -614,7 +617,7 @@ describe('BankMatcherService', () => {
       it('auto-creates an Approved Expense, links the bank-tx, writes the sheet row', async () => {
         const row = await ingestSnsFeeRow(bankRepo, 'fee:btw:1', KLANTONDERZOEK_DESC);
 
-        const result = await matcher.tryHandleRecurringFee(row);
+        const result = await recurringFee.tryHandleRecurringFee(row);
         expect(result?.matched).toBe(true);
         if (!result || !result.matched) {
           throw new Error('expected matched=true');
@@ -650,7 +653,7 @@ describe('BankMatcherService', () => {
         const row = await ingestSnsFeeRow(bankRepo, 'fee:btw:idempotent', KLANTONDERZOEK_DESC);
         const expenseRepo = new ExpenseRepository(db);
 
-        const first = await matcher.tryHandleRecurringFee(row);
+        const first = await recurringFee.tryHandleRecurringFee(row);
         if (!first || !first.matched || first.type !== 'expense') {
           throw new Error('expected matched expense outcome');
         }
@@ -662,7 +665,7 @@ describe('BankMatcherService', () => {
           .where('id', '=', row.id)
           .execute();
         const cleared = await bankRepo.findById(row.id);
-        const second = await matcher.tryHandleRecurringFee(cleared!);
+        const second = await recurringFee.tryHandleRecurringFee(cleared!);
         if (!second || !second.matched || second.type !== 'expense') {
           throw new Error('expected matched expense outcome on second run');
         }
@@ -676,7 +679,7 @@ describe('BankMatcherService', () => {
 
       it('records an audit event for the BTW expense match', async () => {
         const row = await ingestSnsFeeRow(bankRepo, 'fee:btw:event', KLANTONDERZOEK_DESC);
-        await matcher.tryHandleRecurringFee(row);
+        await recurringFee.tryHandleRecurringFee(row);
 
         const events = await db
           .selectFrom('event')

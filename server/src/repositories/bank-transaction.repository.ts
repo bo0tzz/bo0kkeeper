@@ -81,6 +81,50 @@ export class BankTransactionRepository {
   }
 
   /**
+   * Link a row to exactly one counterpart (wise_transfer / invoice / expense),
+   * clearing the other two match FKs and any category — match and category are
+   * mutually exclusive resolution paths (the mirror of setCategory). Stamps
+   * matchedAt + confidence. Returns the refreshed row.
+   */
+  async setMatch(
+    id: string,
+    target: { type: 'wise_transfer' | 'invoice' | 'expense'; id: string },
+    confidence: MatchConfidence,
+  ): Promise<BankTransaction | undefined> {
+    return this.db
+      .updateTable('bank_transaction')
+      .set({
+        matchedTransferId: target.type === 'wise_transfer' ? target.id : null,
+        matchedInvoiceId: target.type === 'invoice' ? target.id : null,
+        matchedExpenseId: target.type === 'expense' ? target.id : null,
+        matchedAt: new Date(),
+        matchConfidence: confidence,
+        category: null,
+        updatedAt: new Date(),
+      })
+      .where('id', '=', id)
+      .returningAll()
+      .executeTakeFirst() as Promise<BankTransaction | undefined>;
+  }
+
+  /** Operator unlink: clears all match fields. Sheet rows aren't rewound. */
+  async clearMatch(id: string): Promise<BankTransaction | undefined> {
+    return this.db
+      .updateTable('bank_transaction')
+      .set({
+        matchedInvoiceId: null,
+        matchedTransferId: null,
+        matchedExpenseId: null,
+        matchedAt: null,
+        matchConfidence: null,
+        updatedAt: new Date(),
+      })
+      .where('id', '=', id)
+      .returningAll()
+      .executeTakeFirst() as Promise<BankTransaction | undefined>;
+  }
+
+  /**
    * Signed sum of every Enable-Banking-sourced row dated on or after `since`.
    * Used to derive expected-balance from a baseline. Returns 0n if no rows
    * match. V1 assumes a single bank account on the session; multi-account
