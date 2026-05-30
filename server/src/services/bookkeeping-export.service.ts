@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { ClientClass, ExpenseLocationClass, ExpenseStatus } from 'src/enum';
 import { DB } from 'src/schema';
 import { Quarter } from 'src/services/quarterly-aggregator.service';
+import { minorToMajor } from 'src/utils/money';
 
 /**
  * Renders the accountant's "Bookkeeping list" XLSX for a quarter — the same
@@ -361,10 +362,6 @@ function asString(value: ExcelJS.CellValue): string {
     return (value as { text: string }).text;
   }
   return String(value);
-}
-
-function minorToMajor(minor: bigint): number {
-  return Number(minor) / 100;
 }
 
 function formatDate(d: Date): string {

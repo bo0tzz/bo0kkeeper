@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { createSign } from 'node:crypto';
 import { Config, loadConfig } from 'src/config';
+import { majorToMinor } from 'src/utils/money';
 
 /**
  * Wraps the Enable Banking PSD2 API for outbound calls (start auth, create
@@ -216,7 +217,7 @@ export class EnableBankingRepository {
     const preferred =
       balances.find((b) => b.balance_type === 'ITAV') ?? balances.find((b) => b.balance_type === 'CLBD') ?? balances[0];
     return {
-      amountMinor: BigInt(Math.round(Number.parseFloat(preferred.balance_amount.amount) * 100)),
+      amountMinor: majorToMinor(preferred.balance_amount.amount),
       currency: preferred.balance_amount.currency,
       type: preferred.balance_type,
       referenceDate: preferred.reference_date,

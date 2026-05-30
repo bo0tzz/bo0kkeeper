@@ -4,6 +4,7 @@ import { EventSource, WiseTransferDirection, WiseTransferState } from 'src/enum'
 import { EventRepository } from 'src/repositories/event.repository';
 import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { NewWiseTransfer, WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
+import { majorToMinor } from 'src/utils/money';
 
 const TARGET_CURRENCY = 'EUR';
 
@@ -132,7 +133,7 @@ function parseBalanceCreditPayload(payload: Record<string, unknown>): ParsedCred
   return {
     currency,
     amount,
-    amountMinor: BigInt(Math.round(amount * 100)),
+    amountMinor: majorToMinor(amount),
   };
 }
 

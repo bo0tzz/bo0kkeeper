@@ -1,5 +1,6 @@
 import { BankSource } from 'src/enum';
 import { NewBankTransaction } from 'src/repositories/bank-transaction.repository';
+import { majorToMinor } from 'src/utils/money';
 
 /**
  * Parse the SNS bank export CSV (semicolon-separated for some banks; SNS
@@ -131,10 +132,6 @@ function parseDutchDate(s: string): Date {
 
 function parseAmountMinor(s: string): bigint {
   // SNS amounts are decimal with period or comma; signed (negative for debit).
-  const cleaned = s.trim().replaceAll(',', '.');
-  const num = Number.parseFloat(cleaned);
-  if (!Number.isFinite(num)) {
-    throw new TypeError(`Invalid amount in SNS CSV: ${s}`);
-  }
-  return BigInt(Math.round(num * 100));
+  // Normalise the Dutch comma decimal, then centralise the rounding.
+  return majorToMinor(s.trim().replaceAll(',', '.'));
 }

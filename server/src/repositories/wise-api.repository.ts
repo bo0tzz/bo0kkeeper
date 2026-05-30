@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { Config, loadConfig } from 'src/config';
+import { majorToMinor, minorToMajor } from 'src/utils/money';
 
 /**
  * Wraps the Wise REST API for outbound calls (quotes, transfers, lookups).
@@ -164,15 +165,12 @@ function safeJson(text: string): unknown {
 
 function toMajor(minor: bigint): number {
   // Wise expects amounts as decimal numbers in major units (e.g. 4791.00 USD).
-  return Number(minor) / 100;
+  return minorToMajor(minor);
 }
 
 function toMinor(major: unknown): bigint {
-  if (typeof major === 'number') {
-    return BigInt(Math.round(major * 100));
-  }
-  if (typeof major === 'string') {
-    return BigInt(Math.round(Number.parseFloat(major) * 100));
+  if (typeof major === 'number' || typeof major === 'string') {
+    return majorToMinor(major);
   }
   throw new Error(`Unable to coerce ${typeof major} to minor units`);
 }

@@ -12,6 +12,8 @@
  *
  * Returns null when no parseable rate+amount pair is present.
  */
+import { majorToMinor } from 'src/utils/money';
+
 export type ParsedBtw = {
   /** BTW rate in basis points (2100 = 21.00%). */
   rateBps: number;
@@ -42,6 +44,6 @@ export function parseBtwFromDescription(description: string | null | undefined):
   }
   return {
     rateBps: ratePercent * 100,
-    amountMinor: BigInt(Math.round(amount * 100)),
+    amountMinor: majorToMinor(amount),
   };
 }

@@ -13,6 +13,7 @@ import { EventRepository } from 'src/repositories/event.repository';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { JobOf } from 'src/types';
 import { checkCutover } from 'src/utils/cutover';
+import { majorToMinor } from 'src/utils/money';
 
 /**
  * Account row as we stash it in `banking_session.accountsJson` — the API
@@ -273,7 +274,7 @@ export function mapTransaction(
     return null;
   }
   const sign = tx.credit_debit_indicator === 'CRDT' ? 1n : -1n;
-  const amountMinor = sign * BigInt(Math.round(Number.parseFloat(tx.transaction_amount.amount) * 100));
+  const amountMinor = sign * majorToMinor(tx.transaction_amount.amount);
 
   // CRDT (money in)  → counterparty is the *debtor* (the payer).
   // DBIT (money out) → counterparty is the *creditor* (the payee).
