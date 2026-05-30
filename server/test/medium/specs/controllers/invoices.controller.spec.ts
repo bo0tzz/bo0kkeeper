@@ -88,8 +88,10 @@ describe('InvoicesController', () => {
 
     expect(result.invoice.number).toBe('2099/001');
     expect(result.invoice.lines).toHaveLength(2);
-    expect(result.invoice.totalMinor).toBe('23000');
+    // Lines are net: subtotal €230,00 + 21% BTW €48,30 = €278,30 gross total.
     expect(result.invoice.btwRateBps).toBe(2100);
+    expect(result.invoice.btwMinor).toBe('4830');
+    expect(result.invoice.totalMinor).toBe('27830');
   });
 
   it('getInvoice returns the persisted invoice with lines', async () => {

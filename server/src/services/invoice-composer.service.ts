@@ -125,7 +125,13 @@ export class InvoiceComposerService {
       throw new Error(`Client not found: ${input.clientId}`);
     }
 
-    const totalMinor = input.lines.reduce((sum, line) => sum + line.lineTotalMinor, 0n);
+    // Line amounts are net (excl-BTW); they sum to the subtotal. BTW is then
+    // charged on top and the grand total is subtotal + BTW — the gross amount
+    // the client pays and the figure the bank-matcher reconciles against the
+    // deposit. (`totalMinor` is the invoice's primary money = gross.)
+    const subtotalMinor = input.lines.reduce((sum, line) => sum + line.lineTotalMinor, 0n);
+    const btwMinor = input.btwRateBps ? btwOnNet(subtotalMinor, input.btwRateBps) : null;
+    const totalMinor = subtotalMinor + (btwMinor ?? 0n);
 
     const issued = await this.invoiceRepository.issue({
       year: input.issuedAt.getUTCFullYear(),
@@ -139,7 +145,7 @@ export class InvoiceComposerService {
         eurTotalMinor: input.eurTotalMinor ?? null,
         fxRate: input.fxRate ?? null,
         btwRateBps: input.btwRateBps ?? null,
-        btwMinor: input.btwRateBps ? (totalMinor * BigInt(input.btwRateBps)) / 10_000n : null,
+        btwMinor,
         sourceEventId: input.sourceEventId ?? null,
         paymentLink: input.paymentLink ?? null,
       },
@@ -305,6 +311,17 @@ function formatDateDutch(date: Date | string): string {
  *     amount / total) and a 3-line summary (subtotal, BTW, total). IBAN
  *     payment block.
  */
+/**
+ * BTW (Dutch VAT) charged on top of a net subtotal, in minor units.
+ *
+ * Composer line amounts are net (excl-BTW); they sum to the subtotal, and BTW
+ * is `subtotal × rate` added on top (Total = subtotal + BTW). Rounded half-up
+ * to the nearest cent.
+ */
+function btwOnNet(netMinor: bigint, rateBps: number): bigint {
+  return (netMinor * BigInt(rateBps) + 5000n) / 10_000n;
+}
+
 function buildInvoiceData(client: Client, invoice: InvoiceWithLines, issuer: IssuerInfo): Record<string, unknown> {
   const totalMinor = BigInt(invoice.totalMinor as unknown as string);
   const isNonEu = client.class === ClientClass.NonEu;

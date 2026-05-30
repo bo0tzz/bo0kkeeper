@@ -165,4 +165,28 @@ describe('InvoiceComposerService', () => {
     expect(Number(result.invoice.totalMinor)).toBe(2_106_100);
     expect(result.invoice.lines).toHaveLength(3);
   });
+
+  it('charges BTW on top of the net line subtotal (Total = subtotal + BTW)', async () => {
+    // Domestic client: line amounts are net (excl-BTW). They sum to the
+    // subtotal; BTW = subtotal × rate is charged on top; the stored total is
+    // the gross the client pays and the bank-matcher reconciles against.
+    const domestic = await clientRepo.create({
+      name: 'DUTCHCO',
+      class: ClientClass.Domestic,
+      tradeName: TradeName.ItServices,
+      address: { line1: 'Dorpsstraat 1', city: 'Amsterdam' },
+    });
+
+    const result = await composer.composeAndIssue({
+      clientId: domestic.id,
+      issuedAt: new Date('2099-06-15T00:00:00Z'),
+      currency: 'EUR',
+      btwRateBps: 2100,
+      lines: [{ description: 'Consulting', lineTotalMinor: 100_000n }],
+    });
+
+    // €1000,00 net @ 21% → BTW €210,00, total €1210,00.
+    expect(Number(result.invoice.btwMinor)).toBe(21_000);
+    expect(Number(result.invoice.totalMinor)).toBe(121_000);
+  });
 });
