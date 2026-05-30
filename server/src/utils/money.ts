@@ -27,3 +27,8 @@ export function majorToMinor(major: string | number): bigint {
 export function minorToMajor(minor: bigint): number {
   return Number(minor) / 100;
 }
+
+/** Absolute value of a minor-unit (cents) amount. */
+export function absMinor(minor: bigint): bigint {
+  return minor < 0n ? -minor : minor;
+}

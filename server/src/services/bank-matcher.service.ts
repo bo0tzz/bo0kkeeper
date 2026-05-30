@@ -7,6 +7,8 @@ import { EventRepository } from 'src/repositories/event.repository';
 import { DB } from 'src/schema';
 import { RecurringFeeService } from 'src/services/recurring-fee.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
+import { toDate } from 'src/utils/date';
+import { absMinor } from 'src/utils/money';
 
 const TXN_REF_PATTERN = /\bTXN-\d{4,}\b/;
 const INVOICE_NUMBER_PATTERN = /\b\d{4}\/\d{3}\b/;
@@ -167,7 +169,7 @@ export class BankMatcherService {
     if (!counterparty || counterparty.length < FUZZY_MIN_LENGTH) {
       return null;
     }
-    const absMinor = absBigInt(BigInt(bankTx.amountMinor as bigint | number | string));
+    const absAmount = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
     const txDate = toDate(bankTx.txDate);
     const dateLow = addDays(txDate, -EXPENSE_DATE_TOLERANCE_DAYS);
     const dateHigh = addDays(txDate, EXPENSE_DATE_TOLERANCE_DAYS);
@@ -175,7 +177,7 @@ export class BankMatcherService {
     const candidates = await this.db
       .selectFrom('expense')
       .selectAll()
-      .where('amountMinor', '=', absMinor)
+      .where('amountMinor', '=', absAmount)
       .where('currency', '=', bankTx.currency)
       .where('expenseDate', '>=', dateLow)
       .where('expenseDate', '<=', dateHigh)
@@ -201,7 +203,7 @@ export class BankMatcherService {
       MatchConfidence.AutoLow,
     );
     this.logger.log(
-      `bank_tx ${bankTx.id} → expense ${expense.id} via heuristic (vendor "${expense.vendor}", amount ${absMinor})`,
+      `bank_tx ${bankTx.id} → expense ${expense.id} via heuristic (vendor "${expense.vendor}", amount ${absAmount})`,
     );
     return { matched: true, type: 'expense', expenseId: expense.id, confidence: MatchConfidence.AutoLow };
   }
@@ -211,7 +213,7 @@ export class BankMatcherService {
     if (!counterparty || counterparty.length < FUZZY_MIN_LENGTH) {
       return null;
     }
-    const absMinor = absBigInt(BigInt(bankTx.amountMinor as bigint | number | string));
+    const absAmount = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
     const txDate = toDate(bankTx.txDate);
     const issuedAfter = addDays(txDate, -INVOICE_PAYMENT_WINDOW_DAYS);
     const issuedBefore = addDays(txDate, 1);
@@ -231,7 +233,7 @@ export class BankMatcherService {
         'invoice.issuedAt',
         'client.name as clientName',
       ])
-      .where('invoice.totalMinor', '=', absMinor)
+      .where('invoice.totalMinor', '=', absAmount)
       .where('invoice.currency', '=', bankTx.currency)
       .where('invoice.issuedAt', '>=', issuedAfter)
       .where('invoice.issuedAt', '<', issuedBefore)
@@ -257,7 +259,7 @@ export class BankMatcherService {
       MatchConfidence.AutoLow,
     );
     this.logger.log(
-      `bank_tx ${bankTx.id} → invoice ${invoice.number} via heuristic (client "${invoice.clientName}", amount ${absMinor})`,
+      `bank_tx ${bankTx.id} → invoice ${invoice.number} via heuristic (client "${invoice.clientName}", amount ${absAmount})`,
     );
     return { matched: true, type: 'invoice', invoiceId: invoice.invoiceId, confidence: MatchConfidence.AutoLow };
   }
@@ -454,7 +456,7 @@ export class BankMatcherService {
             .where('id', '=', expense.id)
             .execute();
         }
-        const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
+        const txDate = toDate(bankTx.txDate);
         await this.sheetSync.writeExpenseRowSafely(expense, txDate, bankTx.id);
       }
     }
@@ -573,14 +575,6 @@ function fuzzyContains(a: string, b: string): boolean {
     return false;
   }
   return al.includes(bl) || bl.includes(al);
-}
-
-function absBigInt(value: bigint): bigint {
-  return value < 0n ? -value : value;
-}
-
-function toDate(value: Date | string | number): Date {
-  return value instanceof Date ? value : new Date(value);
 }
 
 function addDays(d: Date, days: number): Date {

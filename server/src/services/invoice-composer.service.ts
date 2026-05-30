@@ -9,6 +9,7 @@ import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { TypstRepository } from 'src/repositories/typst.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { JobOf } from 'src/types';
+import { toDate } from 'src/utils/date';
 
 export type InvoiceLineInput = {
   description: string;
@@ -106,7 +107,7 @@ export class InvoiceComposerService {
     const tagIds =
       outgoingInvoiceTags.length === 0 ? undefined : await this.paperlessService.resolveTagIds(outgoingInvoiceTags);
 
-    const issuedAt = invoice.issuedAt instanceof Date ? invoice.issuedAt : new Date(invoice.issuedAt);
+    const issuedAt = toDate(invoice.issuedAt);
     const upload = await this.paperlessService.uploadDocument({
       file: pdf,
       filename: `${invoice.number.replaceAll('/', '-')}.pdf`,
@@ -294,7 +295,7 @@ function buildClientBlock(client: Client): Record<string, string> {
  * Format a date as "March 15, 2026" — month name in English, US convention.
  */
 function formatDateLong(date: Date | string): string {
-  const d = date instanceof Date ? date : new Date(date);
+  const d = toDate(date);
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
@@ -302,7 +303,7 @@ function formatDateLong(date: Date | string): string {
  * Format a date as "5 March 2026" — day-month-year, no comma.
  */
 function formatDateDutch(date: Date | string): string {
-  const d = date instanceof Date ? date : new Date(date);
+  const d = toDate(date);
   return d.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 

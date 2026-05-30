@@ -1,4 +1,4 @@
-import { majorToMinor, minorToMajor } from 'src/utils/money';
+import { absMinor, majorToMinor, minorToMajor } from 'src/utils/money';
 import { describe, expect, it } from 'vitest';
 
 describe('majorToMinor', () => {
@@ -34,5 +34,13 @@ describe('minorToMajor', () => {
     expect(minorToMajor(0n)).toBe(0);
     expect(minorToMajor(-2985n)).toBe(-29.85);
     expect(minorToMajor(479_100n)).toBe(4791);
+  });
+});
+
+describe('absMinor', () => {
+  it('returns the magnitude of a cents amount', () => {
+    expect(absMinor(-2985n)).toBe(2985n);
+    expect(absMinor(2985n)).toBe(2985n);
+    expect(absMinor(0n)).toBe(0n);
   });
 });

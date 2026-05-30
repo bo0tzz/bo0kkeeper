@@ -10,6 +10,8 @@ import { Expense } from 'src/repositories/expense.repository';
 import { DB } from 'src/schema';
 import { expenseToSheetRow, SheetWriterService } from 'src/services/sheet-writer.service';
 import { JobOf } from 'src/types';
+import { toDate } from 'src/utils/date';
+import { absMinor } from 'src/utils/money';
 
 /**
  * Owns the accountant-sheet side of bank matching: composing + appending the
@@ -55,12 +57,11 @@ export class SheetSyncService {
         this.logger.warn(`Skipping sheet write for invoice ${invoice.number}: client ${invoice.clientId} not found`);
         return;
       }
-      const rawMinor = BigInt(bankTx.amountMinor as bigint | number | string);
-      const eurAmountMinor = rawMinor < 0n ? -rawMinor : rawMinor;
+      const eurAmountMinor = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
       const vatPercent = invoice.btwRateBps == null ? undefined : `${invoice.btwRateBps / 100}%`;
       const vatMinor = invoice.btwMinor == null ? undefined : BigInt(invoice.btwMinor);
       await this.sheetWriter.writeIncomeRow({
-        date: bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate),
+        date: toDate(bankTx.txDate),
         invoiceNumber: invoice.number,
         eurAmountMinor,
         client: { name: client.name, class: client.class as ClientClass },
@@ -95,13 +96,12 @@ export class SheetSyncService {
   ): Promise<void> {
     try {
       const reference = transfer.ourReference ?? '(no ref)';
-      const rawMinor = BigInt(bankTx.amountMinor as bigint | number | string);
-      const eurAmountMinor = rawMinor < 0n ? -rawMinor : rawMinor;
+      const eurAmountMinor = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
       const allClients = await this.clientRepository.findAll();
       const nonEuClients = allClients.filter((c) => c.class === ClientClass.NonEu);
       const nonEuClient = nonEuClients.length === 1 ? nonEuClients[0] : null;
       await this.sheetWriter.writeIncomeRow({
-        date: bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate),
+        date: toDate(bankTx.txDate),
         invoiceNumber: reference,
         eurAmountMinor,
         client: { name: nonEuClient?.name ?? 'Wise', class: ClientClass.NonEu },
@@ -224,7 +224,7 @@ export class SheetSyncService {
 
     for (const row of expenseRows) {
       attempted += 1;
-      const txDate = row.bankTxDate instanceof Date ? row.bankTxDate : new Date(row.bankTxDate);
+      const txDate = toDate(row.bankTxDate);
       if (await this.writeExpenseRowSafely(row, txDate, row.bankTxId)) {
         succeeded += 1;
       }

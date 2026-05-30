@@ -6,6 +6,8 @@ import { Expense, ExpenseRepository } from 'src/repositories/expense.repository'
 import type { MatchResult } from 'src/services/bank-matcher.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { parseBtwFromDescription } from 'src/utils/btw-description';
+import { toDate } from 'src/utils/date';
+import { absMinor } from 'src/utils/money';
 
 /**
  * Description-substring rules for recurring bank-fee rows. Two outcomes per
@@ -143,7 +145,7 @@ export class RecurringFeeService {
       this.logger.log(
         `bank_tx ${bankTx.id} → fee expense ${expense.id} (${rule.reason}, BTW ${btw.rateBps / 100}% €${(Number(btw.amountMinor) / 100).toFixed(2)})`,
       );
-      const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
+      const txDate = toDate(bankTx.txDate);
       await this.sheetSync.writeExpenseRowSafely(expense, txDate, bankTx.id);
       return {
         matched: true,
@@ -177,10 +179,9 @@ export class RecurringFeeService {
     if (existing) {
       return existing;
     }
-    const txDate = bankTx.txDate instanceof Date ? bankTx.txDate : new Date(bankTx.txDate);
+    const txDate = toDate(bankTx.txDate);
     const now = new Date();
-    const rawMinor = BigInt(bankTx.amountMinor as bigint | number | string);
-    const grossMinor = rawMinor < 0n ? -rawMinor : rawMinor;
+    const grossMinor = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
     const result = await this.expenseRepository.ingestFromBankFee({
       sourceBankTxId: bankTx.id,
       paperlessDocId: null,
