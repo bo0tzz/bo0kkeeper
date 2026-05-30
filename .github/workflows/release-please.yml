@@ -1,0 +1,22 @@
+name: release-please
+
+# Opens/maintains a release PR that bumps the version + CHANGELOG from the
+# conventional-commit history, and tags a GitHub release (vX.Y.Z) when merged.
+# Single repo-wide version — the app ships as one Docker image.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
