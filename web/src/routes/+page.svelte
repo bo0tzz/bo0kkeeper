@@ -1,6 +1,7 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { formatDateTime } from '$lib/format';
+  import { formatEur as eur } from '$lib/money';
   import { getQuarterlyAggregate, type QuarterlyAggregateResponse } from '$lib/services/aggregator.service';
   import { getLatestBankingSession, listBankTransactions, type BankingSession } from '$lib/services/banking.service';
   import { listEvents, type ListEventsResponse } from '$lib/services/events.service';
@@ -165,15 +166,6 @@
   $effect(() => {
     void load();
   });
-
-  function eur(minor: string): string {
-    const cents = BigInt(minor);
-    const negative = cents < 0n;
-    const abs = negative ? -cents : cents;
-    const major = abs / 100n;
-    const tail = (abs % 100n).toString().padStart(2, '0');
-    return `${negative ? '-' : ''}€${major}.${tail}`;
-  }
 
   function bankingExpiryDays(session: BankingSession | null): number | null {
     if (!session?.expiresAt || session.status !== 'active') {

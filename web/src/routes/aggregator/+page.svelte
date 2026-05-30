@@ -1,5 +1,6 @@
 <script lang="ts">
   import { formatDate } from '$lib/format';
+  import { formatEur as eur } from '$lib/money';
   import {
     closePeriod,
     getQuarterlyAggregate,
@@ -69,16 +70,6 @@
     return { value, label: value };
   });
   const quarterOptions = [1, 2, 3, 4].map((value) => ({ value: String(value), label: `Q${value}` }));
-
-  function eur(minor: string): string {
-    const cents = BigInt(minor);
-    const negative = cents < 0n;
-    const abs = negative ? -cents : cents;
-    const major = abs / 100n;
-    const tail = (abs % 100n).toString().padStart(2, '0');
-    const formatted = `${negative ? '-' : ''}€${major}.${tail}`;
-    return formatted;
-  }
 
   function warningTitle(w: AggregatorWarning): string {
     switch (w.kind) {

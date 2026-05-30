@@ -15,6 +15,7 @@
     type ListExpensesResponse,
     type RescanPaperlessResponse,
   } from '$lib/services/expenses.service';
+  import { majorToMinor, minorToMajor } from '$lib/money';
   import {
     Alert,
     Badge,
@@ -132,28 +133,6 @@
       category: expense.category,
       notes: expense.notes ?? '',
     };
-  }
-
-  function minorToMajor(minor: string): string {
-    const cents = BigInt(minor);
-    const negative = cents < 0n;
-    const abs = negative ? -cents : cents;
-    const major = abs / 100n;
-    const tail = (abs % 100n).toString().padStart(2, '0');
-    return `${negative ? '-' : ''}${major}.${tail}`;
-  }
-
-  function majorToMinor(major: string): string {
-    const trimmed = major.trim();
-    if (!trimmed) {
-      return '0';
-    }
-    const negative = trimmed.startsWith('-');
-    const body = negative ? trimmed.slice(1) : trimmed;
-    const [whole, frac = ''] = body.split('.');
-    const cents = (frac + '00').slice(0, 2);
-    const total = BigInt(whole || '0') * 100n + BigInt(cents || '0');
-    return (negative ? -total : total).toString();
   }
 
   /**

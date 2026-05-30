@@ -3,6 +3,7 @@
   import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
   import { listClients, type ClientResponse } from '$lib/services/clients.service';
   import { composeInvoice, type InvoiceComposeResponse } from '$lib/services/invoices.service';
+  import { majorToMinor } from '$lib/money';
   import { Alert, Button, Field, Heading, HStack, Input, Select, Stack, Text } from '@immich/ui';
 
   type LineDraft = {
@@ -52,19 +53,6 @@
 
   function removeLine(index: number) {
     lines = lines.filter((_, i) => i !== index);
-  }
-
-  function majorToMinor(major: string): string {
-    const trimmed = major.trim();
-    if (!trimmed) {
-      return '0';
-    }
-    const negative = trimmed.startsWith('-');
-    const body = negative ? trimmed.slice(1) : trimmed;
-    const [whole, frac = ''] = body.split('.');
-    const cents = (frac + '00').slice(0, 2);
-    const total = BigInt(whole || '0') * 100n + BigInt(cents || '0');
-    return (negative ? -total : total).toString();
   }
 
   const clientOptions = $derived([
