@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.2.0...v0.2.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* **wise:** mark balances#credit event as processed after drafting ([44bf9ba](https://github.com/bo0tzz/bo0kkeeper/commit/44bf9ba9daafa8cb2ff1613c39d0ed80e4a09dd7))
+* **wise:** pass preferredPayIn=BALANCE on quote requests ([2009cbf](https://github.com/bo0tzz/bo0kkeeper/commit/2009cbfa0c2557390972c5e2883e0d9600f538a0))
+
 ## [0.2.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.1.0...v0.2.0) (2026-05-30)
 
 
