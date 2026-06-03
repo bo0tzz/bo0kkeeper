@@ -79,6 +79,7 @@ describe('WiseApiRepository', () => {
       targetCurrency: 'EUR',
       sourceAmount: 4791,
       payOut: 'BANK_TRANSFER',
+      preferredPayIn: 'BALANCE',
     });
 
     expect(quote.id).toBe('quote-uuid-1');

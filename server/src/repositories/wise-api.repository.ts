@@ -83,6 +83,13 @@ export class WiseApiRepository {
       sourceAmount: input.sourceAmountMinor === undefined ? undefined : toMajor(input.sourceAmountMinor),
       targetAmount: input.targetAmountMinor === undefined ? undefined : toMajor(input.targetAmountMinor),
       payOut: 'BANK_TRANSFER',
+      // We always fund from the Wise USD balance after inbound credits arrive
+      // there. Wise's docs are explicit: without `preferredPayIn: BALANCE`,
+      // the quote prices with BANK_TRANSFER fees, then the actual BALANCE-
+      // funded transfer applies different fees — leaving the recorded quote
+      // out of step with what really happens. Also biases the Wise UI to
+      // default the funding source to "Your account" at confirm time.
+      preferredPayIn: 'BALANCE',
     };
 
     const response = await this.request(`/v3/profiles/${profileId}/quotes`, { method: 'POST', body });
