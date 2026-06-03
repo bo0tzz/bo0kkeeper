@@ -109,6 +109,10 @@ describe('WiseDraftService', () => {
     expect(row.sourceCurrency).toBe('USD');
     expect(row.targetCurrency).toBe('EUR');
     expect(row.fxRate).toBe('0.846991');
+
+    // Source credit event drops out of the `pending` inbox once drafted.
+    const refetched = await eventRepo.findById(ingest.event.id);
+    expect(refetched?.status).toBe('processed');
   });
 
   it('rejects events that are not Wise balance credits', async () => {

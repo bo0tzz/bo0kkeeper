@@ -93,6 +93,10 @@ export class WiseDraftService {
       correlationId: event.correlationId,
     };
     const created = await this.wiseTransferRepository.create(row);
+    // Drop the source credit event out of the `pending` inbox — we've now
+    // turned it into a wise_transfer, so it's no longer awaiting action.
+    // Without this the /wise drafts list keeps showing it forever.
+    await this.eventRepository.markProcessed(event.id);
     await this.eventRepository.recordAction({
       source: EventSource.Manual,
       eventType: 'wise.drafted',
