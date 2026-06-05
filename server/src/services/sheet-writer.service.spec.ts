@@ -26,9 +26,12 @@ describe('SheetWriterService', () => {
     ensureTab = vi.fn().mockResolvedValue(777);
     appendRow = vi.fn().mockResolvedValue(null);
     autoResizeColumns = vi.fn().mockResolvedValue(null);
-    sheets.ensureTab = ensureTab;
-    sheets.appendRow = appendRow;
-    sheets.autoResizeColumns = autoResizeColumns;
+    // vitest 4's `vi.fn()` widens to Mock<Procedure | Constructable>, which
+    // no longer satisfies our concrete method signatures without an assertion.
+    // The variables keep their mock-API types for `expect(...).toHaveBeenCalled`.
+    sheets.ensureTab = ensureTab as never;
+    sheets.appendRow = appendRow as never;
+    sheets.autoResizeColumns = autoResizeColumns as never;
     writer = new SheetWriterService(sheets);
   });
 

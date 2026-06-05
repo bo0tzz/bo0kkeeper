@@ -32,14 +32,16 @@ function makeWiseTransfer(id: number, state: WiseTransfer['state'], rate: WiseTr
 describe('WiseReconcileService', () => {
   let db: Kysely<DB>;
   let repo: WiseTransferRepository;
-  let api: WiseApiRepository & { getTransfer: ReturnType<typeof vi.fn> };
+  let api: WiseApiRepository & {
+    getTransfer: ReturnType<typeof vi.fn<WiseApiRepository['getTransfer']>>;
+  };
   let service: WiseReconcileService;
 
   beforeEach(async () => {
     db = await getKyselyDB();
     repo = new WiseTransferRepository(db);
-    api = { getTransfer: vi.fn() } as unknown as WiseApiRepository & {
-      getTransfer: ReturnType<typeof vi.fn>;
+    api = { getTransfer: vi.fn<WiseApiRepository['getTransfer']>() } as unknown as WiseApiRepository & {
+      getTransfer: ReturnType<typeof vi.fn<WiseApiRepository['getTransfer']>>;
     };
     service = new WiseReconcileService(repo, api, new EventRepository(db));
   });

@@ -65,8 +65,10 @@ describe('WiseDraftService', () => {
     });
 
     wiseApi = new WiseApiRepository();
-    wiseApi.createQuote = createQuoteMock;
-    wiseApi.createTransfer = createTransferMock;
+    // vitest 4's vi.fn() returns Mock<Procedure | Constructable> which doesn't
+    // satisfy concrete method signatures without an assertion.
+    wiseApi.createQuote = createQuoteMock as never;
+    wiseApi.createTransfer = createTransferMock as never;
 
     service = new WiseDraftService(eventRepo, transferRepo, wiseApi);
   });
