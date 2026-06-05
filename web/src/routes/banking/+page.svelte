@@ -469,8 +469,11 @@
                     </Text>
                     {#if account.balanceDiscrepancyMinor && account.balanceDiscrepancyMinor !== '0'}
                       <Text size="small" color="warning">
-                        Drift: bank says {formatAmount(account.balance!.amountMinor, account.balance!.currency)},
-                        expected {formatAmount(account.expectedBalanceMinor!, account.currency)}
+                        Drift: bank says {formatAmount(account.balance!.amountMinor, account.balance!.currency)}
+                        (as of {formatDateTime(new Date(account.balance!.asOf))}), expected {formatAmount(
+                          account.expectedBalanceMinor!,
+                          account.currency,
+                        )}
                         (diff {formatAmount(account.balanceDiscrepancyMinor, account.currency)}). A sync may catch up;
                         if persistent, an ingest is missing.
                       </Text>
