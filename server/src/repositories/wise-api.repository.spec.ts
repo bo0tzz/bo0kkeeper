@@ -100,6 +100,7 @@ describe('WiseApiRepository', () => {
         sourceValue: 4791,
         targetCurrency: 'EUR',
         targetValue: 4045.72,
+        created: '2026-06-03T15:47:16Z',
       }),
     );
 
@@ -124,6 +125,7 @@ describe('WiseApiRepository', () => {
     expect(transfer.id).toBe(9_999_999);
     expect(transfer.state).toBe('incoming_payment_waiting');
     expect(transfer.reference).toBe('TXN-0044');
+    expect(transfer.created).toBe('2026-06-03T15:47:16Z');
   });
 
   it('getTransfer GETs by id and maps the response', async () => {

@@ -79,6 +79,13 @@ export class WiseReconcileService {
     this.logger.warn(
       `wise transfer ${row.wiseTransferId}: local=${row.state} upstream=${upstream.state} (likely missed webhook)`,
     );
+    // Honest caveat: Wise's GET /v1/transfers/{id} response exposes only
+    // `created` (original transfer creation moment) — no `lastUpdated`, no
+    // state-change history. We can't recover the real moment the state
+    // changed, only the moment we observed it. `stateUpdatedAt` here means
+    // "state last verified at" for reconciled rows; for webhook-driven
+    // updates it's still the true state-change moment (`occurred_at` from
+    // the payload).
     await this.wiseTransferRepository.updateState(row.wiseTransferId, upstream.state as WiseTransferState, new Date());
     return 'updated';
   }

@@ -25,6 +25,7 @@ function makeWiseTransfer(id: number, state: WiseTransfer['state'], rate: WiseTr
     sourceValue: 1000,
     targetCurrency: 'EUR',
     targetValue: 850,
+    created: '2099-01-01T00:00:00Z',
   };
 }
 

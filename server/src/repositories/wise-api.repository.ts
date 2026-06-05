@@ -50,6 +50,17 @@ export type WiseTransfer = {
   sourceValue: number | null;
   targetCurrency: string;
   targetValue: number | null;
+  /**
+   * Wise-side timestamp of when the transfer was created. The only timestamp
+   * the v1/transfers response exposes — there is no `lastUpdated` or
+   * state-change history field. For freshly-drafted transfers this is the
+   * truthful "stateUpdatedAt" value (creation time = state became
+   * `incoming_payment_waiting`). For older transfers polled via getTransfer
+   * it remains the original creation moment, NOT the current-state moment.
+   * Null when the API response omits it (defensive — every observed
+   * response includes it).
+   */
+  created: string | null;
 };
 
 export class WiseApiError extends Error {
@@ -257,6 +268,7 @@ type TransferResponse = {
   sourceValue?: number | null;
   targetCurrency: string;
   targetValue?: number | null;
+  created?: string | null;
 };
 
 function mapTransfer(data: unknown): WiseTransfer {
@@ -270,5 +282,6 @@ function mapTransfer(data: unknown): WiseTransfer {
     sourceValue: t.sourceValue ?? null,
     targetCurrency: t.targetCurrency,
     targetValue: t.targetValue ?? null,
+    created: t.created ?? null,
   };
 }

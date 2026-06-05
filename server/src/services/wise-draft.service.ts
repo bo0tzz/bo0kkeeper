@@ -87,7 +87,11 @@ export class WiseDraftService {
       feeMinor: quote.feeMinor,
       feeCurrency: quote.feeCurrency,
       state: mapTransferState(transfer.state),
-      stateUpdatedAt: new Date(),
+      // Prefer Wise's `created` (their server-side creation moment, which IS
+      // when this state became valid) over our wall-clock time. Same shape
+      // as the `asOf` fix in BankingSyncService — don't substitute local
+      // clock when the upstream source-of-truth value is available.
+      stateUpdatedAt: transfer.created ? new Date(transfer.created) : new Date(),
       ourReference,
       counterpartyName: null,
       correlationId: event.correlationId,

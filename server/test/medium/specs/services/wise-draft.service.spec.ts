@@ -61,6 +61,7 @@ describe('WiseDraftService', () => {
       sourceValue: 4791,
       targetCurrency: 'EUR',
       targetValue: 4045.72,
+      created: '2099-01-15T13:30:00Z',
     });
 
     wiseApi = new WiseApiRepository();
@@ -109,6 +110,10 @@ describe('WiseDraftService', () => {
     expect(row.sourceCurrency).toBe('USD');
     expect(row.targetCurrency).toBe('EUR');
     expect(row.fxRate).toBe('0.846991');
+
+    // stateUpdatedAt uses Wise's `created` timestamp (not local call-time)
+    // so the wise_transfer reflects Wise's server-side truth, not ours.
+    expect(row.stateUpdatedAt.toISOString()).toBe('2099-01-15T13:30:00.000Z');
 
     // Source credit event drops out of the `pending` inbox once drafted.
     const refetched = await eventRepo.findById(ingest.event.id);
