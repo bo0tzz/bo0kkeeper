@@ -1,9 +1,9 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 
 # ---- Stage: typst --------------------------------------------------------
 # Pulls the typst CLI binary by version. We use it to compile invoice
 # templates to PDFs at runtime, so the runtime image needs `typst` on PATH.
-FROM debian:12-slim AS typst
+FROM debian:12-slim@sha256:0104b334637a5f19aa9c983a91b54c89887c0984081f2068983107a6f6c21eeb AS typst
 ARG TYPST_VERSION=0.13.1
 ARG TARGETARCH
 RUN set -eux; \
@@ -23,7 +23,7 @@ RUN set -eux; \
 # ---- Stage: deps ---------------------------------------------------------
 # Install ALL workspace dependencies (server + web + open-api sdk). Cached
 # on the lockfile alone — code edits don't bust this layer.
-FROM node:24-bookworm-slim AS deps
+FROM node:24-bookworm-slim@sha256:242549cd46785b480c832479a730f4f2a20865d61ea2e404fdb2a5c3d3b73ecf AS deps
 WORKDIR /app
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -37,7 +37,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 # Compile the SvelteKit static site + nest build the server. Output:
 #   /app/web/build/        — static SPA bundle (precompressed)
 #   /app/server/dist/      — compiled server JS
-FROM node:24-bookworm-slim AS build
+FROM node:24-bookworm-slim@sha256:242549cd46785b480c832479a730f4f2a20865d61ea2e404fdb2a5c3d3b73ecf AS build
 WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
@@ -52,7 +52,7 @@ RUN pnpm --filter web build \
 # Re-resolve a production-only node_modules graph for the server. Drops
 # devDependencies (vitest, eslint, prettier, etc.) so the runtime image
 # stays smaller.
-FROM node:24-bookworm-slim AS prod-deps
+FROM node:24-bookworm-slim@sha256:242549cd46785b480c832479a730f4f2a20865d61ea2e404fdb2a5c3d3b73ecf AS prod-deps
 WORKDIR /app
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -63,7 +63,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --prod --filter bo0kkeeper
 
 # ---- Stage: runtime ------------------------------------------------------
-FROM node:24-bookworm-slim AS runtime
+FROM node:24-bookworm-slim@sha256:242549cd46785b480c832479a730f4f2a20865d61ea2e404fdb2a5c3d3b73ecf AS runtime
 ENV NODE_ENV=production \
     WEB_DIST_DIR=/app/web \
     PORT=2283 \
