@@ -1,0 +1,105 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:recommended",
+    ":semanticCommits",
+  ],
+  // bo0kkeeper uses release-please, which cuts versions from conventional
+  // commit types. Project cadence is long lulls between feature work
+  // punctuated by dep maintenance — we WANT those dep bumps to cut
+  // releases so deployed images don't lag behind shipped fixes.
+  // `fix(deps): ...` → patch release; release-please handles the rest.
+  semanticCommitType: "fix",
+  // Pin Docker FROM images + GitHub Actions to immutable SHA digests.
+  // Tags are mutable; SHAs aren't. We already pin Actions manually with
+  // `@SHA # vX.Y.Z` comments — this keeps them in sync automatically.
+  pinDigests: true,
+  // Only rebase open PRs when they actually conflict with the base.
+  // Default ("auto") rebases on every base change, which is noisy.
+  rebaseWhen: "conflicted",
+  packageRules: [
+    // Group the Svelte ecosystem — these libraries release in lockstep
+    // and bumping one without the others usually means a broken peer-dep
+    // graph for an afternoon. @immich/ui is grouped here because it
+    // tracks Svelte versions.
+    {
+      description: "Svelte ecosystem",
+      groupName: "svelte",
+      matchPackageNames: [
+        "svelte",
+        "svelte-check",
+        "svelte-eslint-parser",
+        "/^@sveltejs//",
+        "prettier-plugin-svelte",
+        "eslint-plugin-svelte",
+        "@immich/ui",
+      ],
+    },
+    // Vitest ships its sub-packages on a synchronized version cadence.
+    {
+      description: "Vitest ecosystem",
+      groupName: "vitest",
+      matchPackageNames: [
+        "vitest",
+        "/^@vitest//",
+      ],
+    },
+    // ESLint + every plugin & config we use. Plugin majors often track
+    // ESLint majors; grouping avoids piecemeal breakage.
+    {
+      description: "ESLint ecosystem",
+      groupName: "eslint",
+      matchPackageNames: [
+        "eslint",
+        "/^eslint-config-/",
+        "/^eslint-plugin-/",
+        "/^@typescript-eslint//",
+        "typescript-eslint",
+      ],
+    },
+    // NestJS ecosystem moves as one — @nestjs/core, @nestjs/common,
+    // @nestjs/swagger etc. all pin to the same major.
+    {
+      description: "NestJS ecosystem",
+      groupName: "nestjs",
+      matchPackageNames: ["/^@nestjs//"],
+    },
+    // mise tool bumps (node, pnpm, etc.) get their own commit scope so
+    // they're obvious in the changelog and easy to skim.
+    {
+      matchManagers: ["mise"],
+      semanticCommitScope: "mise",
+      commitMessageTopic: "tool {{depName}}",
+    },
+    // Labels by update type — useful for filtering the PR list.
+    {
+      matchUpdateTypes: ["major"],
+      labels: ["type/major"],
+    },
+    {
+      matchUpdateTypes: ["minor"],
+      labels: ["type/minor"],
+    },
+    {
+      matchUpdateTypes: ["patch"],
+      labels: ["type/patch"],
+    },
+    {
+      matchUpdateTypes: ["digest"],
+      labels: ["type/digest"],
+    },
+    // Labels by source — useful for triage.
+    {
+      matchManagers: ["github-actions"],
+      addLabels: ["renovate/github-action"],
+    },
+    {
+      matchManagers: ["dockerfile"],
+      addLabels: ["renovate/container"],
+    },
+    {
+      matchManagers: ["mise"],
+      addLabels: ["renovate/mise"],
+    },
+  ],
+}
