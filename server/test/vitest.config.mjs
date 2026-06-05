@@ -24,6 +24,13 @@ export default defineConfig({
     },
     env: {
       TZ: 'UTC',
+      // Vitest 4 isolates workers more strictly than v3 — per-spec env vars
+      // no longer leak across files. Set the loadConfig() required defaults
+      // once here so every unit spec inherits them.
+      OIDC_ISSUER: 'http://idp.test',
+      OIDC_CLIENT_ID: 'test',
+      OIDC_REDIRECT_URI: 'http://localhost/callback',
+      CUTOVER_DATE: '2000-01-01',
     },
   },
   plugins: [swc.vite(), tsconfigPaths()],

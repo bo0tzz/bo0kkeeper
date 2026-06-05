@@ -25,6 +25,14 @@ export default defineConfig({
     },
     env: {
       TZ: 'UTC',
+      // Config defaults so loadConfig() doesn't blow up on tests that don't
+      // bring their own env. Per-spec `process.env.X ??= ...` blocks still
+      // work — these are just the fallback. Vitest 4 isolates workers more
+      // strictly than v3, so per-spec env no longer leaks across files.
+      OIDC_ISSUER: 'http://idp.test',
+      OIDC_CLIENT_ID: 'test',
+      OIDC_REDIRECT_URI: 'http://localhost/callback',
+      CUTOVER_DATE: '2000-01-01',
     },
   },
   plugins: [swc.vite(), tsconfigPaths()],
