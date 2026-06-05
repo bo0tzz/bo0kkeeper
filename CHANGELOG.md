@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.2.1...v0.3.0) (2026-06-05)
+
+
+### Features
+
+* **banking:** show balance asOf timestamp in drift line ([2bb87d0](https://github.com/bo0tzz/bo0kkeeper/commit/2bb87d09a64fd6e9e44c80815859264924bde9e8))
+
+
+### Bug Fixes
+
+* **banking:** use Enable Banking reference_date as balance asOf, not call-time ([b3de53e](https://github.com/bo0tzz/bo0kkeeper/commit/b3de53e1a616113ede56017aed22eb9ddaf9081b))
+* **test:** set config defaults via vitest env, not leaking from sibling specs ([792079c](https://github.com/bo0tzz/bo0kkeeper/commit/792079c33a457d6720fb3fc0867e79e6fa983c10))
+* **wise:** use Wise server-side 'created' as draft stateUpdatedAt; note honesty limit on reconcile ([bb6f15f](https://github.com/bo0tzz/bo0kkeeper/commit/bb6f15f248a2a751af23fe7e635022bb3283558c))
+
 ## [0.2.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.2.0...v0.2.1) (2026-06-03)
 
 
