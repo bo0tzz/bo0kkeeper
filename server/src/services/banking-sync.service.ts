@@ -234,7 +234,13 @@ export class BankingSyncService {
       return {
         amountMinor: balance.amountMinor,
         currency: balance.currency,
-        asOf: new Date().toISOString(),
+        // Prefer the bank-side reference_date when present — that's when the
+        // balance was actually true at the ASPSP. Falling back to call-time
+        // when missing would mask EB freshness lag (a stale balance returned
+        // with a fresh "now" timestamp), so the previous behaviour silently
+        // defeated drift diagnostics. Fall back only when EB literally
+        // didn't supply a reference_date (some balance types omit it).
+        asOf: balance.referenceDate ?? new Date().toISOString(),
       };
     } catch (error) {
       this.logger.warn(`balance refresh skipped for ${account.uid}: ${(error as Error).message}`);
