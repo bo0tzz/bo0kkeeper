@@ -9,9 +9,11 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
+    "knip": "knip"
   },
   "devDependencies": {
+    "knip": "^6.16.0",
     "playwright": "^1.60.0"
   }
 }
