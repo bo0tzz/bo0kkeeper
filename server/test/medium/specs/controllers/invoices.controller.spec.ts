@@ -10,6 +10,7 @@ import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { TypstRepository } from 'src/repositories/typst.repository';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { InvoiceComposerService } from 'src/services/invoice-composer.service';
 import { SettingsService } from 'src/services/settings.service';
@@ -53,6 +54,7 @@ describe('InvoicesController', () => {
     composer = new InvoiceComposerService(
       clientRepo,
       invoiceRepo,
+      new WiseTransferRepository(db),
       render,
       paperless,
       jobs,

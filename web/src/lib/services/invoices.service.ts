@@ -87,6 +87,39 @@ export type ListInvoicesResponse = {
 export const composeInvoice = (input: InvoiceComposeInput, fetchFn?: typeof fetch) =>
   apiPost<InvoiceComposeResponse>('/api/invoices/compose', input, { fetch: fetchFn });
 
+export type WiseInvoicePrefill = {
+  wiseTransferId: string;
+  currency: string;
+  /** Source currency total in minor units (e.g. USD cents). */
+  totalMinor: string;
+  /** EUR amount that actually arrived at SNS — net of Wise fees/spread. */
+  eurTotalMinor: string;
+  /** Our TXN-NNNN reference; useful as the default line description. */
+  ourReference: string | null;
+  /** Sole Non-EU client id if exactly one exists; null when operator must pick. */
+  suggestedClientId: string | null;
+};
+
+export type InvoiceComposeFromWiseInput = {
+  clientId: string;
+  /** YYYY-MM-DD */
+  issuedAt: string;
+  /** YYYY-MM-DD */
+  periodStart?: string;
+  /** YYYY-MM-DD */
+  periodEnd?: string;
+  lines: InvoiceLineInput[];
+};
+
+export const getWiseInvoicePrefill = (wiseTransferId: string, fetchFn?: typeof fetch) =>
+  apiGet<WiseInvoicePrefill>(`/api/invoices/wise-prefill/${wiseTransferId}`, { fetch: fetchFn });
+
+export const composeInvoiceFromWise = (
+  wiseTransferId: string,
+  input: InvoiceComposeFromWiseInput,
+  fetchFn?: typeof fetch,
+) => apiPost<InvoiceComposeResponse>(`/api/invoices/compose-from-wise/${wiseTransferId}`, input, { fetch: fetchFn });
+
 export const listInvoices = (params: ListInvoicesParams = {}, fetchFn?: typeof fetch) =>
   apiGet<ListInvoicesResponse>('/api/invoices', {
     fetch: fetchFn,

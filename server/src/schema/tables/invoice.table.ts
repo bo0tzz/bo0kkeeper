@@ -12,6 +12,7 @@ import {
 import { ColumnType } from 'kysely';
 import { ClientTable } from 'src/schema/tables/client.table';
 import { EventTable } from 'src/schema/tables/event.table';
+import { WiseTransferTable } from 'src/schema/tables/wise-transfer.table';
 
 /**
  * One row per issued invoice. Multi-line invoices have rows in `invoice_line`
@@ -27,6 +28,7 @@ import { EventTable } from 'src/schema/tables/event.table';
 @Table('invoice')
 @Index({ name: 'invoice_clientId_idx', columns: ['clientId'] })
 @Index({ name: 'invoice_issuedAt_idx', columns: ['issuedAt'] })
+@Index({ name: 'invoice_wiseTransferId_idx', columns: ['wiseTransferId'] })
 export class InvoiceTable {
   @PrimaryGeneratedColumn()
   id!: Generated<string>;
@@ -81,6 +83,15 @@ export class InvoiceTable {
   /** Wise transfer event that triggered this invoice (for Wise income flow). */
   @ForeignKeyColumn(() => EventTable, { nullable: true, onDelete: 'SET NULL' })
   sourceEventId!: string | null;
+
+  /**
+   * Outbound Wise transfer (USD→EUR send to SNS) this invoice was composed
+   * from. Drives the "auto-invoice from incoming Wise payment" flow. Null
+   * for invoices composed via the Domestic path. Unique — one invoice per
+   * Wise transfer in MVP.
+   */
+  @ForeignKeyColumn(() => WiseTransferTable, { nullable: true, unique: true, onDelete: 'SET NULL' })
+  wiseTransferId!: string | null;
 
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;

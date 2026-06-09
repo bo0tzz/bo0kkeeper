@@ -30,8 +30,14 @@ export type ListWiseTransfersParams = {
   limit?: number;
 };
 
+/** List-row variant: response shape + the linked-invoice fields joined from the invoice table. */
+export type WiseTransferListItem = WiseTransferResponse & {
+  linkedInvoiceId: string | null;
+  linkedInvoiceNumber: string | null;
+};
+
 export type ListWiseTransfersResponse = {
-  items: WiseTransferResponse[];
+  items: WiseTransferListItem[];
   total: number;
 };
 

@@ -1,9 +1,19 @@
 import { Kysely } from 'kysely';
-import { BankSource, ClientClass, ExpenseLocationClass, ExpenseStatus, TradeName } from 'src/enum';
+import {
+  BankSource,
+  ClientClass,
+  ExpenseLocationClass,
+  ExpenseStatus,
+  TradeName,
+  WiseTransferDirection,
+  WiseTransferState,
+} from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { Expense, ExpenseRepository } from 'src/repositories/expense.repository';
+import { InvoiceRepository } from 'src/repositories/invoice.repository';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
@@ -16,6 +26,41 @@ beforeEach(() => {
   process.env.OIDC_REDIRECT_URI ??= 'http://localhost/callback';
   process.env.CUTOVER_DATE ??= '2000-01-01';
 });
+
+async function seedWiseTransfer(db: Kysely<DB>, opts: { wiseId: string; ref: string }) {
+  return await new WiseTransferRepository(db).create({
+    wiseTransferId: opts.wiseId,
+    direction: WiseTransferDirection.Out,
+    sourceAmountMinor: 479_100n,
+    sourceCurrency: 'USD',
+    targetAmountMinor: 404_572n,
+    targetCurrency: 'EUR',
+    fxRate: '0.846991',
+    feeMinor: 1442n,
+    feeCurrency: 'USD',
+    state: WiseTransferState.OutgoingPaymentSent,
+    stateUpdatedAt: new Date(),
+    ourReference: opts.ref,
+  });
+}
+
+async function seedBankTx(bankRepo: BankTransactionRepository, externalId: string) {
+  const result = await bankRepo.ingest({
+    source: BankSource.SnsCsv,
+    externalId,
+    txDate: new Date('2099-01-15'),
+    amountMinor: 404_572n,
+    currency: 'EUR',
+    counterpartyName: 'Wise',
+    counterpartyIban: 'NL00WISE0000000000',
+    description: 'Wise EUR payout',
+    rawPayload: {},
+  });
+  if (!result.ingested) {
+    throw new Error('precondition');
+  }
+  return result.row;
+}
 
 describe('SheetSyncService', () => {
   let db: Kysely<DB>;
@@ -40,7 +85,7 @@ describe('SheetSyncService', () => {
       writeIncomeRow: ReturnType<typeof vi.fn>;
       writeExpenseRow: ReturnType<typeof vi.fn>;
     };
-    sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, new EventRepository(db));
+    sheetSync = new SheetSyncService(db, clientRepo, new InvoiceRepository(db), sheetWriter, new EventRepository(db));
   });
 
   afterEach(async () => {
@@ -139,6 +184,58 @@ describe('SheetSyncService', () => {
       });
       const refetched = await bankRepo.findById(ingest.row.id);
       expect(refetched?.sheetRowAt).toBeInstanceOf(Date);
+    });
+  });
+
+  describe('appendWiseIncomeRow', () => {
+    it('uses TXN-NNNN ref when no invoice is linked to the wise_transfer', async () => {
+      const client = await clientRepo.create({
+        name: 'OverseasClientCo',
+        class: ClientClass.NonEu,
+        tradeName: TradeName.ItServices,
+        address: { line1: '1 Fake Park Dr', city: 'Nullstate' },
+      });
+      const transfer = await seedWiseTransfer(db, { wiseId: 'WISE-NOINV', ref: 'TXN-0044' });
+      const bankTx = await seedBankTx(bankRepo, 'wise-no-invoice');
+
+      await sheetSync.appendWiseIncomeRow(bankTx, transfer);
+
+      expect(sheetWriter.writeIncomeRow.mock.calls[0][0]).toMatchObject({
+        invoiceNumber: 'TXN-0044',
+        client: { name: client.name, class: ClientClass.NonEu },
+      });
+    });
+
+    it('uses the linked invoice number + that invoice s client when one exists', async () => {
+      const client = await clientRepo.create({
+        name: 'FUTO',
+        class: ClientClass.NonEu,
+        tradeName: TradeName.ItServices,
+        address: { line1: '1 Fake Park Dr', city: 'Nullstate' },
+      });
+      const transfer = await seedWiseTransfer(db, { wiseId: 'WISE-WITHINV', ref: 'TXN-0099' });
+      const invoiceRepo = new InvoiceRepository(db);
+      await invoiceRepo.issue({
+        year: 2099,
+        invoice: {
+          clientId: client.id,
+          issuedAt: new Date('2099-01-15'),
+          currency: 'USD',
+          totalMinor: 479_100n,
+          eurTotalMinor: 404_572n,
+          wiseTransferId: transfer.id,
+        },
+        lines: [{ ordinal: 0, description: 'Services', lineTotalMinor: 479_100n, unitLabel: null, quantity: null }],
+      });
+      const bankTx = await seedBankTx(bankRepo, 'wise-with-invoice');
+
+      await sheetSync.appendWiseIncomeRow(bankTx, transfer);
+
+      const row = sheetWriter.writeIncomeRow.mock.calls[0][0] as { invoiceNumber: string; client: { name: string } };
+      // Invoice number, not TXN ref. Means the sheet row is keyed to the
+      // actual composed invoice and the operator + accountant can trace it.
+      expect(row.invoiceNumber).toBe('2099/001');
+      expect(row.client.name).toBe('FUTO');
     });
   });
 });

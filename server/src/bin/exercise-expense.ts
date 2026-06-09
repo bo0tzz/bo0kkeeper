@@ -18,6 +18,7 @@ import { BankTransactionRepository } from 'src/repositories/bank-transaction.rep
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
+import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { DB } from 'src/schema';
@@ -59,9 +60,10 @@ async function main(): Promise<void> {
     const expenseRepo = new ExpenseRepository(db);
     const bankRepo = new BankTransactionRepository(db);
     const clientRepo = new ClientRepository(db);
+    const invoiceRepo = new InvoiceRepository(db);
     const eventRepo = new EventRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
-    const sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, eventRepo);
+    const sheetSync = new SheetSyncService(db, clientRepo, invoiceRepo, sheetWriter, eventRepo);
     const recurringFee = new RecurringFeeService(bankRepo, expenseRepo, eventRepo, sheetSync);
     const matcher = new BankMatcherService(db, bankRepo, sheetSync, eventRepo, recurringFee);
     const stubPaperless = {} as unknown as PaperlessRepository;

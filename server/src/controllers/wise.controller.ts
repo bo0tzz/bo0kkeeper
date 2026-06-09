@@ -31,7 +31,14 @@ export class WiseController {
       offset: (query.page - 1) * query.limit,
       limit: query.limit,
     });
-    return { items: items.map((row) => mapWiseTransfer(row)), total };
+    return {
+      items: items.map((row) => ({
+        ...mapWiseTransfer(row),
+        linkedInvoiceId: row.linkedInvoiceId,
+        linkedInvoiceNumber: row.linkedInvoiceNumber,
+      })),
+      total,
+    };
   }
 
   /**

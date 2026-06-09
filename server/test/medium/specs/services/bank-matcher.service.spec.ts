@@ -76,7 +76,7 @@ describe('BankMatcherService', () => {
       writeIncomeRow: ReturnType<typeof vi.fn>;
       writeExpenseRow: ReturnType<typeof vi.fn>;
     };
-    sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, new EventRepository(db));
+    sheetSync = new SheetSyncService(db, clientRepo, new InvoiceRepository(db), sheetWriter, new EventRepository(db));
     recurringFee = new RecurringFeeService(bankRepo, new ExpenseRepository(db), new EventRepository(db), sheetSync);
     matcher = new BankMatcherService(db, bankRepo, sheetSync, new EventRepository(db), recurringFee);
   });

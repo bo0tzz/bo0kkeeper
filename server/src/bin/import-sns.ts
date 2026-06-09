@@ -16,6 +16,7 @@ import { BankTransactionRepository } from 'src/repositories/bank-transaction.rep
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
+import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { SheetsRepository } from 'src/repositories/sheets.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
@@ -42,10 +43,11 @@ async function main() {
 
     const bankRepo = new BankTransactionRepository(db);
     const clientRepo = new ClientRepository(db);
+    const invoiceRepo = new InvoiceRepository(db);
     const expenseRepo = new ExpenseRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
     const eventRepo = new EventRepository(db);
-    const sheetSync = new SheetSyncService(db, clientRepo, sheetWriter, eventRepo);
+    const sheetSync = new SheetSyncService(db, clientRepo, invoiceRepo, sheetWriter, eventRepo);
     const recurringFee = new RecurringFeeService(bankRepo, expenseRepo, eventRepo, sheetSync);
     const matcher = new BankMatcherService(db, bankRepo, sheetSync, eventRepo, recurringFee);
 

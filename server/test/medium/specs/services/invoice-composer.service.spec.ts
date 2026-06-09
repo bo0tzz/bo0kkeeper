@@ -7,6 +7,7 @@ import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { TypstRepository } from 'src/repositories/typst.repository';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { InvoiceComposerService } from 'src/services/invoice-composer.service';
 import { SettingsService } from 'src/services/settings.service';
@@ -23,6 +24,35 @@ beforeEach(() => {
 function fakeJobRepo() {
   const queue = vi.fn().mockResolvedValue('fake-job-id');
   return { queue, queueAll: vi.fn(), setup: vi.fn() } as unknown as JobRepository & { queue: ReturnType<typeof vi.fn> };
+}
+
+async function seedOutgoingTransfer(
+  db: Kysely<DB>,
+  overrides?: {
+    state?:
+      | 'incoming_payment_waiting'
+      | 'processing'
+      | 'funds_converted'
+      | 'outgoing_payment_sent'
+      | 'cancelled'
+      | 'failed';
+    direction?: 'in' | 'out';
+  },
+) {
+  return await new WiseTransferRepository(db).create({
+    wiseTransferId: `WISE-${Math.floor(Math.random() * 1e9)}`,
+    direction: (overrides?.direction ?? 'out') as never,
+    sourceAmountMinor: 479_100n,
+    sourceCurrency: 'USD',
+    targetAmountMinor: 404_572n,
+    targetCurrency: 'EUR',
+    fxRate: '0.846991',
+    feeMinor: 1442n,
+    feeCurrency: 'USD',
+    state: (overrides?.state ?? 'outgoing_payment_sent') as never,
+    stateUpdatedAt: new Date(),
+    ourReference: 'TXN-0044',
+  });
 }
 
 describe('InvoiceComposerService', () => {
@@ -57,6 +87,7 @@ describe('InvoiceComposerService', () => {
     composer = new InvoiceComposerService(
       clientRepo,
       invoiceRepo,
+      new WiseTransferRepository(db),
       render,
       paperless,
       jobs,
@@ -188,6 +219,62 @@ describe('InvoiceComposerService', () => {
     // €1000,00 net @ 21% → BTW €210,00, total €1210,00.
     expect(Number(result.invoice.btwMinor)).toBe(21_000);
     expect(Number(result.invoice.totalMinor)).toBe(121_000);
+  });
+
+  describe('composeFromWise', () => {
+    it('derives currency + amounts from the wise_transfer and persists the FK', async () => {
+      const transfer = await seedOutgoingTransfer(db);
+      const result = await composer.composeFromWise({
+        wiseTransferId: transfer.id,
+        clientId,
+        issuedAt: new Date('2099-01-15T00:00:00Z'),
+        lines: [{ description: 'Services Jan 1 – 15', lineTotalMinor: 479_100n }],
+      });
+      expect(result.invoice.currency).toBe('USD');
+      expect(String(result.invoice.totalMinor)).toBe('479100');
+      // Critical: eurTotalMinor = the ACTUAL EUR that landed at SNS
+      // (targetAmountMinor), not source × fxRate. Net of Wise's fee/spread.
+      expect(String(result.invoice.eurTotalMinor)).toBe('404572');
+      expect(result.invoice.wiseTransferId).toBe(transfer.id);
+    });
+
+    it('prefillFromWise returns the suggested client when there is exactly one Non-EU client', async () => {
+      const transfer = await seedOutgoingTransfer(db);
+      const prefill = await composer.prefillFromWise(transfer.id);
+      expect(prefill.currency).toBe('USD');
+      expect(String(prefill.totalMinor)).toBe('479100');
+      expect(String(prefill.eurTotalMinor)).toBe('404572');
+      expect(prefill.ourReference).toBe('TXN-0044');
+      expect(prefill.suggestedClientId).toBe(clientId);
+    });
+
+    it('rejects an inbound (direction=in) transfer', async () => {
+      const transfer = await seedOutgoingTransfer(db, { direction: 'in' });
+      await expect(composer.prefillFromWise(transfer.id)).rejects.toThrow(/direction=in/);
+    });
+
+    it('rejects a non-terminal state', async () => {
+      const transfer = await seedOutgoingTransfer(db, { state: 'processing' });
+      await expect(composer.prefillFromWise(transfer.id)).rejects.toThrow(/state=processing/);
+    });
+
+    it('rejects a transfer that already has an invoice (unique constraint)', async () => {
+      const transfer = await seedOutgoingTransfer(db);
+      await composer.composeFromWise({
+        wiseTransferId: transfer.id,
+        clientId,
+        issuedAt: new Date('2099-01-15T00:00:00Z'),
+        lines: [{ description: 'Services', lineTotalMinor: 479_100n }],
+      });
+      await expect(
+        composer.composeFromWise({
+          wiseTransferId: transfer.id,
+          clientId,
+          issuedAt: new Date('2099-01-16T00:00:00Z'),
+          lines: [{ description: 'Services again', lineTotalMinor: 479_100n }],
+        }),
+      ).rejects.toThrow(/already has invoice/);
+    });
   });
 
   it('never records BTW for a non-EU client even if a rate is passed', async () => {

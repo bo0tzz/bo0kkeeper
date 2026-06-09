@@ -47,9 +47,20 @@ const ListWiseTransfersQuerySchema = z
   .meta({ id: 'ListWiseTransfersQueryDto' });
 export class ListWiseTransfersQueryDto extends createZodDto(ListWiseTransfersQuerySchema) {}
 
+/**
+ * Per-row shape on the transfers list — extends the response shape with the
+ * linked invoice fields (joined from `invoice`). Lets the UI render
+ * "Compose invoice" vs "View invoice 2099/NNN" without a second round trip.
+ */
+const WiseTransferListItemSchema = WiseTransferResponseSchema.extend({
+  linkedInvoiceId: z.string().nullable(),
+  linkedInvoiceNumber: z.string().nullable(),
+}).meta({ id: 'WiseTransferListItemDto' });
+export class WiseTransferListItemDto extends createZodDto(WiseTransferListItemSchema) {}
+
 const ListWiseTransfersResponseSchema = z
   .object({
-    items: z.array(WiseTransferResponseSchema),
+    items: z.array(WiseTransferListItemSchema),
     total: z.number().int(),
   })
   .meta({ id: 'ListWiseTransfersResponseDto' });

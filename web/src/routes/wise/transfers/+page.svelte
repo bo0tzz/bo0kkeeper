@@ -4,7 +4,7 @@
     listWiseTransfers,
     reconcileWise,
     type ListWiseTransfersResponse,
-    type WiseTransferResponse,
+    type WiseTransferListItem,
     type WiseTransferState,
   } from '$lib/services/wise.service';
   import {
@@ -114,7 +114,7 @@
   }
 
   let totalPages = $derived(data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1);
-  let transfers = $derived<WiseTransferResponse[]>(data?.items ?? []);
+  let transfers = $derived<WiseTransferListItem[]>(data?.items ?? []);
 </script>
 
 <main class="mx-auto max-w-6xl px-6 py-10">
@@ -163,6 +163,7 @@
             <TableHeading class="text-right">Target</TableHeading>
             <TableHeading class="text-right">Rate</TableHeading>
             <TableHeading class="text-right">Fee</TableHeading>
+            <TableHeading>Invoice</TableHeading>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -179,6 +180,20 @@
               <TableCell class="text-right">{t.fxRate ?? '—'}</TableCell>
               <TableCell class="text-right">
                 {Number(t.feeMinor) === 0 ? '—' : formatAmount(t.feeMinor, t.feeCurrency)}
+              </TableCell>
+              <TableCell>
+                {#if t.linkedInvoiceNumber}
+                  <code>{t.linkedInvoiceNumber}</code>
+                {:else if t.direction === 'out' && t.state === 'outgoing_payment_sent'}
+                  <a
+                    href={resolve('/invoices/compose-from-wise/[wiseTransferId]', { wiseTransferId: t.id })}
+                    class="text-primary underline"
+                  >
+                    Compose
+                  </a>
+                {:else}
+                  —
+                {/if}
               </TableCell>
             </TableRow>
           {/each}

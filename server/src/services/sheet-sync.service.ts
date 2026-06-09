@@ -7,6 +7,7 @@ import { BankTransaction } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { Expense } from 'src/repositories/expense.repository';
+import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { DB } from 'src/schema';
 import { expenseToSheetRow, SheetWriterService } from 'src/services/sheet-writer.service';
 import { JobOf } from 'src/types';
@@ -32,6 +33,7 @@ export class SheetSyncService {
   constructor(
     @InjectKysely() private readonly db: Kysely<DB>,
     private readonly clientRepository: ClientRepository,
+    private readonly invoiceRepository: InvoiceRepository,
     private readonly sheetWriter: SheetWriterService,
     private readonly eventRepository: EventRepository,
   ) {}
@@ -84,27 +86,39 @@ export class SheetSyncService {
   }
 
   /**
-   * Append a sheet income row for a Wise-routed inbound payment (Non-EU). The
-   * Wise transfer doesn't carry the originating client directly, so we look
-   * up the unique Non-EU client; when there's exactly one we use it. Otherwise
-   * the row is written with a placeholder name ("Wise") and the user fills in
-   * the client manually in the sheet.
+   * Append a sheet income row for a Wise-routed inbound payment (Non-EU).
+   *
+   * If the wise_transfer already has a composed invoice linked, use the
+   * invoice number + that invoice's client — the proper bookkeeping path.
+   * Otherwise fall back to TXN-NNNN as the row id + the unique Non-EU
+   * client (or "Wise" placeholder), which keeps the kasstelsel row landing
+   * on time even when the operator hasn't composed the invoice yet.
    */
   async appendWiseIncomeRow(
     bankTx: BankTransaction,
     transfer: { id: string; ourReference: string | null; targetCurrency: string },
   ): Promise<void> {
     try {
-      const reference = transfer.ourReference ?? '(no ref)';
       const eurAmountMinor = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
-      const allClients = await this.clientRepository.findAll();
-      const nonEuClients = allClients.filter((c) => c.class === ClientClass.NonEu);
-      const nonEuClient = nonEuClients.length === 1 ? nonEuClients[0] : null;
+      const invoice = await this.invoiceRepository.findByWiseTransferId(transfer.id);
+      let invoiceNumber: string;
+      let client: { name: string; class: ClientClass };
+      if (invoice) {
+        const invoiceClient = await this.clientRepository.findById(invoice.clientId);
+        invoiceNumber = invoice.number;
+        client = { name: invoiceClient?.name ?? 'Wise', class: ClientClass.NonEu };
+      } else {
+        const allClients = await this.clientRepository.findAll();
+        const nonEuClients = allClients.filter((c) => c.class === ClientClass.NonEu);
+        const nonEuClient = nonEuClients.length === 1 ? nonEuClients[0] : null;
+        invoiceNumber = transfer.ourReference ?? '(no ref)';
+        client = { name: nonEuClient?.name ?? 'Wise', class: ClientClass.NonEu };
+      }
       await this.sheetWriter.writeIncomeRow({
         date: toDate(bankTx.txDate),
-        invoiceNumber: reference,
+        invoiceNumber,
         eurAmountMinor,
-        client: { name: nonEuClient?.name ?? 'Wise', class: ClientClass.NonEu },
+        client,
         // Omit `from` — writeIncomeRow falls back to client.name, which is the
         // originating Non-EU client. The bank-tx counterparty on the SNS side
         // is always "Wise" (the routing service), which is the wrong

@@ -1,12 +1,21 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { OnJob } from 'src/decorators';
-import { ClientClass, EventSource, JobName, QueueName, TradeName } from 'src/enum';
+import {
+  ClientClass,
+  EventSource,
+  JobName,
+  QueueName,
+  TradeName,
+  WiseTransferDirection,
+  WiseTransferState,
+} from 'src/enum';
 import { Client, ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { InvoiceRepository, InvoiceWithLines } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { TypstRepository } from 'src/repositories/typst.repository';
+import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { JobOf } from 'src/types';
 import { toDate } from 'src/utils/date';
@@ -37,6 +46,8 @@ export type InvoiceCompositionInput = {
   btwRateBps?: number;
   /** Optional source event id (Wise outgoing transfer that triggered the invoice). */
   sourceEventId?: string;
+  /** Optional outbound wise_transfer this invoice was composed from. Unique — one invoice per transfer. */
+  wiseTransferId?: string;
   /** Optional per-invoice payment link (e.g. SNS bank betaalverzoek URL). */
   paymentLink?: string;
   lines: InvoiceLineInput[];
@@ -45,6 +56,32 @@ export type InvoiceCompositionInput = {
 export type ComposeResult = {
   invoice: InvoiceWithLines;
   pdf: Buffer;
+};
+
+export type ComposeFromWiseInput = {
+  wiseTransferId: string;
+  clientId: string;
+  issuedAt: Date;
+  periodStart?: Date;
+  periodEnd?: Date;
+  lines: InvoiceLineInput[];
+};
+
+export type WiseInvoicePrefill = {
+  wiseTransferId: string;
+  currency: string;
+  /** Source amount (USD minor) — invoice's primary `totalMinor`. */
+  totalMinor: bigint;
+  /** Actual EUR that landed at SNS — net of Wise fee/spread. */
+  eurTotalMinor: bigint;
+  /** Our TXN-NNNN reference, useful as the default line description. */
+  ourReference: string | null;
+  /**
+   * Sole Non-EU client id if exactly one exists; null when the operator
+   * has to pick (zero clients or multiple — the latter is the multi-FUTO
+   * future case).
+   */
+  suggestedClientId: string | null;
 };
 
 /** Single template covers every client class; the data shape carries the variant. */
@@ -69,6 +106,7 @@ export class InvoiceComposerService {
   constructor(
     private readonly clientRepository: ClientRepository,
     private readonly invoiceRepository: InvoiceRepository,
+    private readonly wiseTransferRepository: WiseTransferRepository,
     private readonly renderService: TypstRepository,
     private readonly paperlessService: PaperlessRepository,
     private readonly jobRepository: JobRepository,
@@ -156,6 +194,7 @@ export class InvoiceComposerService {
         btwRateBps,
         btwMinor,
         sourceEventId: input.sourceEventId ?? null,
+        wiseTransferId: input.wiseTransferId ?? null,
         paymentLink: input.paymentLink ?? null,
       },
       lines: input.lines.map((line, index) => ({
@@ -190,6 +229,80 @@ export class InvoiceComposerService {
     });
 
     return { invoice: issued, pdf };
+  }
+
+  /**
+   * Resolve a wise_transfer + the prefill data the compose UI needs to
+   * hydrate its form. Throws when the transfer can't be invoiced from
+   * (wrong direction, non-terminal state, already invoiced).
+   *
+   * Caller (UI or composeFromWise) uses the returned `prefill` shape to
+   * pre-populate the standard composer form; the user fills in description,
+   * period, and any line splits.
+   */
+  async prefillFromWise(wiseTransferId: string): Promise<WiseInvoicePrefill> {
+    const transfer = await this.requireInvoiceableWiseTransfer(wiseTransferId);
+    const clients = await this.clientRepository.findAll();
+    const nonEuClients = clients.filter((c) => c.class === ClientClass.NonEu);
+    const suggestedClientId = nonEuClients.length === 1 ? nonEuClients[0].id : null;
+    return {
+      wiseTransferId: transfer.id,
+      currency: transfer.sourceCurrency,
+      totalMinor: BigInt(transfer.sourceAmountMinor as unknown as string),
+      // EUR amount as ACTUALLY arrived at SNS — net of Wise's fee + FX
+      // spread. We deliberately don't store/use Wise's quoted rate; per-line
+      // displays in the future should derive from target/source instead.
+      eurTotalMinor: BigInt(transfer.targetAmountMinor as unknown as string),
+      ourReference: transfer.ourReference,
+      suggestedClientId,
+    };
+  }
+
+  /**
+   * Compose an invoice from a completed outbound Wise transfer. Wraps
+   * composeAndIssue with wise-derived currency + amounts (caller doesn't
+   * need to know FX). User supplies the bookkeeping fields (client,
+   * period, line items / descriptions).
+   *
+   * Validates one-invoice-per-transfer at the service level (the DB unique
+   * index is the backstop).
+   */
+  async composeFromWise(input: ComposeFromWiseInput): Promise<ComposeResult> {
+    const transfer = await this.requireInvoiceableWiseTransfer(input.wiseTransferId);
+    return this.composeAndIssue({
+      clientId: input.clientId,
+      issuedAt: input.issuedAt,
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+      currency: transfer.sourceCurrency,
+      eurTotalMinor: BigInt(transfer.targetAmountMinor as unknown as string),
+      lines: input.lines,
+      wiseTransferId: transfer.id,
+    });
+  }
+
+  private async requireInvoiceableWiseTransfer(wiseTransferId: string): Promise<WiseTransferRow> {
+    const transfer = await this.wiseTransferRepository.findById(wiseTransferId);
+    if (!transfer) {
+      throw new NotFoundException(`wise_transfer not found: ${wiseTransferId}`);
+    }
+    if (transfer.direction !== WiseTransferDirection.Out) {
+      throw new BadRequestException(
+        `wise_transfer ${wiseTransferId} is direction=${transfer.direction}; only outgoing transfers are invoiceable`,
+      );
+    }
+    if (transfer.state !== WiseTransferState.OutgoingPaymentSent) {
+      throw new BadRequestException(
+        `wise_transfer ${wiseTransferId} is state=${transfer.state}; only outgoing_payment_sent transfers are invoiceable`,
+      );
+    }
+    const existing = await this.invoiceRepository.findByWiseTransferId(wiseTransferId);
+    if (existing) {
+      throw new BadRequestException(
+        `wise_transfer ${wiseTransferId} already has invoice ${existing.number} (${existing.id})`,
+      );
+    }
+    return transfer;
   }
 
   /**

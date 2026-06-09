@@ -9,6 +9,12 @@ export type WiseTransferRow = Selectable<WiseTransferTable>;
 export type NewWiseTransfer = Insertable<WiseTransferTable>;
 export type WiseTransferUpdate = Updateable<WiseTransferTable>;
 
+/** Paginated list row — wise_transfer + the linked invoice number when one exists. */
+export type WiseTransferListRow = WiseTransferRow & {
+  linkedInvoiceId: string | null;
+  linkedInvoiceNumber: string | null;
+};
+
 /**
  * States we treat as terminal — no more state transitions expected, no need
  * to poll Wise for updates. Anything else is fair game for the reconcile job.
@@ -34,6 +40,13 @@ export class WiseTransferRepository {
       .selectAll()
       .where('wiseTransferId', '=', wiseTransferId)
       .executeTakeFirst() as Promise<WiseTransferRow | undefined>;
+  }
+
+  /** Lookup by our internal UUID (FK target). */
+  findById(id: string): Promise<WiseTransferRow | undefined> {
+    return this.db.selectFrom('wise_transfer').selectAll().where('id', '=', id).executeTakeFirst() as Promise<
+      WiseTransferRow | undefined
+    >;
   }
 
   async updateState(wiseTransferId: string, state: WiseTransferUpdate['state'], stateUpdatedAt: Date): Promise<void> {
@@ -63,7 +76,7 @@ export class WiseTransferRepository {
     state?: WiseTransferState;
     offset: number;
     limit: number;
-  }): Promise<{ items: WiseTransferRow[]; total: number }> {
+  }): Promise<{ items: WiseTransferListRow[]; total: number }> {
     let query = this.db.selectFrom('wise_transfer');
     if (input.state) {
       query = query.where('state', '=', input.state);
@@ -74,12 +87,17 @@ export class WiseTransferRepository {
       | undefined;
     const total = Number(totalRow?.count ?? 0);
 
+    // Left-join the linked invoice (unique per wise_transfer) so the UI can
+    // show "Compose invoice" vs "View invoice 2099/NNN" without a per-row
+    // round trip.
     const items = (await query
-      .selectAll()
-      .orderBy('createdAt', 'desc')
+      .leftJoin('invoice', 'invoice.wiseTransferId', 'wise_transfer.id')
+      .selectAll('wise_transfer')
+      .select(['invoice.id as linkedInvoiceId', 'invoice.number as linkedInvoiceNumber'])
+      .orderBy('wise_transfer.createdAt', 'desc')
       .limit(input.limit)
       .offset(input.offset)
-      .execute()) as WiseTransferRow[];
+      .execute()) as WiseTransferListRow[];
 
     return { items, total };
   }

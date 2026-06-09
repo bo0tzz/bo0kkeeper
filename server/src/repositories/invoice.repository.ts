@@ -39,6 +39,19 @@ export class InvoiceRepository {
   }
 
   /**
+   * Lookup the invoice composed from a given outbound Wise transfer.
+   * Returns undefined when none has been composed yet — drives the
+   * "Compose invoice" UI affordance + idempotency on composeFromWise.
+   */
+  async findByWiseTransferId(wiseTransferId: string): Promise<Invoice | undefined> {
+    return (await this.db
+      .selectFrom('invoice')
+      .selectAll()
+      .where('wiseTransferId', '=', wiseTransferId)
+      .executeTakeFirst()) as Invoice | undefined;
+  }
+
+  /**
    * Issue a new invoice atomically: allocate the next number for the year,
    * persist the invoice + line rows, return the assembled aggregate.
    */

@@ -5,10 +5,12 @@ import { loadConfig } from 'src/config';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import {
   InvoiceComposeDto,
+  InvoiceComposeFromWiseDto,
   InvoiceComposeResponseDto,
   InvoiceResponseDto,
   ListInvoicesQueryDto,
   ListInvoicesResponseDto,
+  WiseInvoicePrefillDto,
   mapInvoice,
 } from 'src/dtos/invoice.dto';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
@@ -80,6 +82,56 @@ export class InvoicesController {
       fxRate: dto.fxRate,
       btwRateBps: dto.btwRateBps,
       sourceEventId: dto.sourceEventId,
+      lines: (dto.lines as InvoiceLineInput[]).map((line) => ({
+        description: line.description,
+        unitLabel: line.unitLabel,
+        quantity: line.quantity,
+        lineTotalMinor: line.lineTotalMinor,
+      })),
+    });
+    return {
+      invoice: mapInvoice(result.invoice),
+    } as InvoiceComposeResponseDto;
+  }
+
+  /**
+   * Prefill data for the "compose invoice from completed Wise transfer" form.
+   * UI calls this before opening the composer to hydrate currency, amounts,
+   * and a suggested client. Validates the transfer is invoiceable (outgoing,
+   * outgoing_payment_sent, not already invoiced) so the UI doesn't surface
+   * the action for transfers that wouldn't accept a compose.
+   */
+  @Get('wise-prefill/:wiseTransferId')
+  @Authenticated()
+  async getWisePrefill(@Param('wiseTransferId', ParseUUIDPipe) wiseTransferId: string): Promise<WiseInvoicePrefillDto> {
+    const prefill = await this.composer.prefillFromWise(wiseTransferId);
+    return {
+      wiseTransferId: prefill.wiseTransferId,
+      currency: prefill.currency,
+      totalMinor: String(prefill.totalMinor),
+      eurTotalMinor: String(prefill.eurTotalMinor),
+      ourReference: prefill.ourReference,
+      suggestedClientId: prefill.suggestedClientId,
+    };
+  }
+
+  /**
+   * Compose an invoice from a completed outbound Wise transfer. Currency +
+   * amounts come from the transfer (user doesn't enter FX); the body
+   * supplies client + period + line splits.
+   */
+  @Post('compose-from-wise/:wiseTransferId')
+  @Authenticated()
+  async composeInvoiceFromWise(
+    @Param('wiseTransferId', ParseUUIDPipe) wiseTransferId: string,
+    @Body() dto: InvoiceComposeFromWiseDto,
+  ): Promise<InvoiceComposeResponseDto> {
+    const result = await this.composer.composeFromWise({
+      wiseTransferId,
+      clientId: dto.clientId,
+      issuedAt: dto.issuedAt,
+      periodStart: dto.periodStart,
+      periodEnd: dto.periodEnd,
       lines: (dto.lines as InvoiceLineInput[]).map((line) => ({
         description: line.description,
         unitLabel: line.unitLabel,

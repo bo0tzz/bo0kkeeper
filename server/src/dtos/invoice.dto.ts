@@ -66,6 +66,29 @@ const InvoiceComposeResponseSchema = z
   .meta({ id: 'InvoiceComposeResponseDto' });
 export class InvoiceComposeResponseDto extends createZodDto(InvoiceComposeResponseSchema) {}
 
+const InvoiceComposeFromWiseSchema = z
+  .object({
+    clientId: z.uuid(),
+    issuedAt: isoDateToDate,
+    periodStart: isoDateToDate.optional(),
+    periodEnd: isoDateToDate.optional(),
+    lines: z.array(InvoiceLineInputSchema).min(1),
+  })
+  .meta({ id: 'InvoiceComposeFromWiseDto' });
+export class InvoiceComposeFromWiseDto extends createZodDto(InvoiceComposeFromWiseSchema) {}
+
+const WiseInvoicePrefillSchema = z
+  .object({
+    wiseTransferId: z.string(),
+    currency: z.string(),
+    totalMinor: z.string(),
+    eurTotalMinor: z.string(),
+    ourReference: z.string().nullable(),
+    suggestedClientId: z.string().nullable(),
+  })
+  .meta({ id: 'WiseInvoicePrefillDto' });
+export class WiseInvoicePrefillDto extends createZodDto(WiseInvoicePrefillSchema) {}
+
 const InvoiceListItemSchema = z
   .object({
     id: z.string(),
