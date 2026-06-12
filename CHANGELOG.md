@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.3.0...v0.4.0) (2026-06-12)
+
+
+### Features
+
+* **invoices:** compose invoice from completed Wise transfer ([1da16cf](https://github.com/bo0tzz/bo0kkeeper/commit/1da16cf22291a3a8719688c92045f434e478bebe))
+
 ## [0.3.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.2.1...v0.3.0) (2026-06-05)
 
 
