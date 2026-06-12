@@ -3,7 +3,7 @@
 # ---- Stage: typst --------------------------------------------------------
 # Pulls the typst CLI binary by version. We use it to compile invoice
 # templates to PDFs at runtime, so the runtime image needs `typst` on PATH.
-FROM debian:12-slim@sha256:0104b334637a5f19aa9c983a91b54c89887c0984081f2068983107a6f6c21eeb AS typst
+FROM debian:12-slim@sha256:96e378d7e6531ac9a15ad505478fcc2e69f371b10f5cdf87857c4b8188404716 AS typst
 ARG TYPST_VERSION=0.13.1
 ARG TARGETARCH
 RUN set -eux; \
