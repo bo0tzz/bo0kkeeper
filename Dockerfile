@@ -23,7 +23,7 @@ RUN set -eux; \
 # ---- Stage: deps ---------------------------------------------------------
 # Install ALL workspace dependencies (server + web + open-api sdk). Cached
 # on the lockfile alone — code edits don't bust this layer.
-FROM node:24-bookworm-slim@sha256:242549cd46785b480c832479a730f4f2a20865d61ea2e404fdb2a5c3d3b73ecf AS deps
+FROM node:24-bookworm-slim@sha256:c2d5ade763cacfb03fe9cb8e8af5d1be5041ff331921fa26a9b231ca3a4f780a AS deps
 WORKDIR /app
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -37,7 +37,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 # Compile the SvelteKit static site + nest build the server. Output:
 #   /app/web/build/        — static SPA bundle (precompressed)
 #   /app/server/dist/      — compiled server JS
-FROM node:24-bookworm-slim@sha256:242549cd46785b480c832479a730f4f2a20865d61ea2e404fdb2a5c3d3b73ecf AS build
+FROM node:24-bookworm-slim@sha256:c2d5ade763cacfb03fe9cb8e8af5d1be5041ff331921fa26a9b231ca3a4f780a AS build
 WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
@@ -52,7 +52,7 @@ RUN pnpm --filter web build \
 # Re-resolve a production-only node_modules graph for the server. Drops
 # devDependencies (vitest, eslint, prettier, etc.) so the runtime image
 # stays smaller.
-FROM node:24-bookworm-slim@sha256:242549cd46785b480c832479a730f4f2a20865d61ea2e404fdb2a5c3d3b73ecf AS prod-deps
+FROM node:24-bookworm-slim@sha256:c2d5ade763cacfb03fe9cb8e8af5d1be5041ff331921fa26a9b231ca3a4f780a AS prod-deps
 WORKDIR /app
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -63,7 +63,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --prod --filter bo0kkeeper
 
 # ---- Stage: runtime ------------------------------------------------------
-FROM node:24-bookworm-slim@sha256:242549cd46785b480c832479a730f4f2a20865d61ea2e404fdb2a5c3d3b73ecf AS runtime
+FROM node:24-bookworm-slim@sha256:c2d5ade763cacfb03fe9cb8e8af5d1be5041ff331921fa26a9b231ca3a4f780a AS runtime
 ENV NODE_ENV=production \
     WEB_DIST_DIR=/app/web \
     PORT=2283 \
