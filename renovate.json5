@@ -3,13 +3,20 @@
   extends: [
     "config:recommended",
     ":semanticCommits",
+    // bo0kkeeper uses release-please, which cuts versions from conventional
+    // commit types. Project cadence is long lulls between feature work
+    // punctuated by dep maintenance — we WANT every dep bump to cut a
+    // release so deployed images don't lag.
+    //
+    // Forcing `fix` here (and not just `semanticCommitType: "fix"` at the
+    // top level) because `config:recommended` extends
+    // `:semanticPrefixFixDepsChoreOthers`, which adds a packageRule
+    // `matchPackageNames: ['*'] → chore`. PackageRules override top-level
+    // config, so a top-level setting silently loses. This preset appends
+    // a `**/*` packageRule with `fix` which wins in the rule-evaluation
+    // order. (See renovate discussions #8440, #14702.)
+    ":semanticCommitTypeAll(fix)",
   ],
-  // bo0kkeeper uses release-please, which cuts versions from conventional
-  // commit types. Project cadence is long lulls between feature work
-  // punctuated by dep maintenance — we WANT those dep bumps to cut
-  // releases so deployed images don't lag behind shipped fixes.
-  // `fix(deps): ...` → patch release; release-please handles the rest.
-  semanticCommitType: "fix",
   // Pin Docker FROM images + GitHub Actions to immutable SHA digests.
   // Tags are mutable; SHAs aren't. We already pin Actions manually with
   // `@SHA # vX.Y.Z` comments — this keeps them in sync automatically.
