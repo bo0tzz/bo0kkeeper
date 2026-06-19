@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.4.0...v0.4.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* stop our outgoing invoices looping back; surface bank-tx link on /expenses; tidy Paperless inbox ([9e6aa06](https://github.com/bo0tzz/bo0kkeeper/commit/9e6aa06bf879e51f1e4bf95508b39a5d5a0da756))
+
 ## [0.4.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.3.0...v0.4.0) (2026-06-12)
 
 
