@@ -3,6 +3,7 @@ import { OnJob } from 'src/decorators';
 import { EventSource, ExpenseLocationClass, JobName, QueueName } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository, NewExpense } from 'src/repositories/expense.repository';
+import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { JobOf } from 'src/types';
@@ -21,6 +22,7 @@ export class ExpensePipelineService {
   constructor(
     private readonly eventRepository: EventRepository,
     private readonly expenseRepository: ExpenseRepository,
+    private readonly invoiceRepository: InvoiceRepository,
     private readonly paperlessService: PaperlessRepository,
     private readonly settingsService: SettingsService,
   ) {}
@@ -40,6 +42,21 @@ export class ExpensePipelineService {
     const parsed = parsePaperlessPayload(event.payload);
     if (!parsed) {
       this.logger.warn(`Paperless payload had no document_id; skipping event ${event.id}`);
+      await this.eventRepository.markProcessed(event.id);
+      return;
+    }
+
+    // Outgoing-invoice guard: if this paperless doc is one bo0kkeeper itself
+    // uploaded (the archive job persists paperlessDocId on the invoice row),
+    // it's an outbound invoice — never an inbound expense. Catches both the
+    // backfill path (rescan-paperless pulling our own docs in) and any
+    // misconfigured tag gate that lets our invoice tags match the expense
+    // gate. Robust regardless of how the user configures Settings tags.
+    const linkedInvoice = await this.invoiceRepository.findByPaperlessDocId(parsed.documentId);
+    if (linkedInvoice) {
+      this.logger.log(
+        `Skipping paperless ${parsed.documentId} — already linked to invoice ${linkedInvoice.number} (one of ours)`,
+      );
       await this.eventRepository.markProcessed(event.id);
       return;
     }

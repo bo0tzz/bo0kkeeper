@@ -343,6 +343,48 @@ describe('QuarterlyAggregatorService', () => {
     expect(result.warnings.find((w) => w.kind === 'invoice_unmatched')).toBeUndefined();
   });
 
+  it('does not flag Wise-flow invoices as awaiting payment', async () => {
+    // Wise-flow invoices link to the bank-tx via wise_transfer (not via
+    // bank_tx.matchedInvoiceId), AND only exist post-outgoing_payment_sent.
+    // The naive unmatched query would treat them as unpaid forever; this
+    // test guards against that regression.
+    const nonEu = await clientRepo.create({
+      name: 'FUTO',
+      class: ClientClass.NonEu,
+      tradeName: TradeName.ItServices,
+      address: { line1: 'X', city: 'Y' },
+    });
+    const transfer = await transferRepo.create({
+      wiseTransferId: 'WISE-AGG-1',
+      direction: WiseTransferDirection.Out,
+      sourceAmountMinor: 479_100n,
+      sourceCurrency: 'USD',
+      targetAmountMinor: 404_572n,
+      targetCurrency: 'EUR',
+      fxRate: '0.846991',
+      feeMinor: 1442n,
+      feeCurrency: 'USD',
+      state: WiseTransferState.OutgoingPaymentSent,
+      stateUpdatedAt: new Date('2099-02-10'),
+      ourReference: 'TXN-AGG-1',
+    });
+    await invoiceRepo.issue({
+      year: 2099,
+      invoice: {
+        clientId: nonEu.id,
+        issuedAt: new Date('2099-02-15'),
+        currency: 'USD',
+        totalMinor: 479_100n,
+        eurTotalMinor: 404_572n,
+        wiseTransferId: transfer.id,
+      },
+      lines: [{ ordinal: 0, description: 'X', lineTotalMinor: 479_100n, unitLabel: null, quantity: null }],
+    });
+
+    const result = await aggregator.aggregate(2099, 1);
+    expect(result.warnings.find((w) => w.kind === 'invoice_unmatched')).toBeUndefined();
+  });
+
   it('returns zeroed buckets when the quarter has no activity', async () => {
     const result = await aggregator.aggregate(2099, 3);
     expect(result.income.totalGrossEurMinor).toBe(0n);

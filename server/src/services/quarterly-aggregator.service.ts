@@ -124,11 +124,19 @@ export class QuarterlyAggregatorService {
         .execute(),
       // Invoices issued before period-end that are not yet matched. Cross-quarter
       // unpaid invoices show up here too — useful prompt for the user to chase.
+      //
+      // Wise-flow invoices (wiseTransferId IS NOT NULL) are excluded: they're
+      // paid-by-definition because the composer only runs after the outgoing
+      // Wise transfer hit `outgoing_payment_sent`. The matching bank-tx links
+      // to the wise_transfer (not the invoice directly), so a naive "no
+      // bank_tx.matchedInvoiceId" check would treat every Wise-paid invoice
+      // as awaiting payment forever.
       this.db
         .selectFrom('invoice')
         .leftJoin('bank_transaction', 'bank_transaction.matchedInvoiceId', 'invoice.id')
         .select(['invoice.number'])
         .where('invoice.issuedAt', '<', periodEnd)
+        .where('invoice.wiseTransferId', 'is', null)
         .where('bank_transaction.id', 'is', null)
         .limit(5)
         .execute(),
@@ -212,6 +220,7 @@ export class QuarterlyAggregatorService {
         .leftJoin('bank_transaction', 'bank_transaction.matchedInvoiceId', 'invoice.id')
         .select((eb) => eb.fn.countAll().as('total'))
         .where('invoice.issuedAt', '<', periodEnd)
+        .where('invoice.wiseTransferId', 'is', null)
         .where('bank_transaction.id', 'is', null)
         .executeTakeFirstOrThrow();
       warnings.push({

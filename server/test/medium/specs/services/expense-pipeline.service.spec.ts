@@ -1,7 +1,9 @@
 import { Kysely } from 'kysely';
-import { EventSource, EventStatus, ExpenseLocationClass, ExpenseStatus } from 'src/enum';
+import { ClientClass, EventSource, EventStatus, ExpenseLocationClass, ExpenseStatus, TradeName } from 'src/enum';
+import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
+import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { DB } from 'src/schema';
 import { ExpensePipelineService } from 'src/services/expense-pipeline.service';
@@ -57,7 +59,13 @@ describe('ExpensePipelineService', () => {
     eventRepo = new EventRepository(db);
     expenseRepo = new ExpenseRepository(db);
     paperless = fakePaperless();
-    service = new ExpensePipelineService(eventRepo, expenseRepo, paperless, fakeSettings([]));
+    service = new ExpensePipelineService(
+      eventRepo,
+      expenseRepo,
+      new InvoiceRepository(db),
+      paperless,
+      fakeSettings([]),
+    );
   });
 
   afterEach(async () => {
@@ -164,7 +172,13 @@ describe('ExpensePipelineService', () => {
           ['Bills', 4],
         ]),
       });
-      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless, fakeSettings(['Business', 'Bills']));
+      service = new ExpensePipelineService(
+        eventRepo,
+        expenseRepo,
+        new InvoiceRepository(db),
+        paperless,
+        fakeSettings(['Business', 'Bills']),
+      );
       const ingest = await eventRepo.ingest({
         source: EventSource.Paperless,
         eventType: 'document.consumed',
@@ -188,7 +202,13 @@ describe('ExpensePipelineService', () => {
           ['Bills', 4],
         ]),
       });
-      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless, fakeSettings(['Business', 'Bills']));
+      service = new ExpensePipelineService(
+        eventRepo,
+        expenseRepo,
+        new InvoiceRepository(db),
+        paperless,
+        fakeSettings(['Business', 'Bills']),
+      );
       const ingest = await eventRepo.ingest({
         source: EventSource.Paperless,
         eventType: 'document.consumed',
@@ -206,12 +226,76 @@ describe('ExpensePipelineService', () => {
       expect(eventAfter?.status).toBe(EventStatus.Processed);
     });
 
+    it('skips a doc already linked to a bo0kkeeper-issued invoice (our own outgoing)', async () => {
+      // Seed a client + an invoice with paperlessDocId matching the incoming
+      // doc. Mirrors the real case: invoice composer uploads our PDF, gets
+      // back the doc id, persists it on the invoice. If the user later runs
+      // the paperless backfill and the doc carries the expense gate tags by
+      // accident, the pipeline should refuse to round-trip our own invoice
+      // back in as an inbound expense.
+      const clientRepo = new ClientRepository(db);
+      const invoiceRepo = new InvoiceRepository(db);
+      const client = await clientRepo.create({
+        name: 'DutchCo',
+        class: ClientClass.Domestic,
+        tradeName: TradeName.ItServices,
+        address: { line1: 'X', city: 'Y' },
+      });
+      await invoiceRepo.issue({
+        year: 2099,
+        invoice: {
+          clientId: client.id,
+          issuedAt: new Date('2099-04-01'),
+          currency: 'EUR',
+          totalMinor: 12_100n,
+          paperlessDocId: '5050',
+        },
+        lines: [{ ordinal: 0, description: 'svc', lineTotalMinor: 12_100n, unitLabel: null, quantity: null }],
+      });
+
+      paperless = fakePaperless({
+        docTags: [1, 4],
+        tagIds: new Map([
+          ['Business', 1],
+          ['Bills', 4],
+        ]),
+      });
+      service = new ExpensePipelineService(
+        eventRepo,
+        expenseRepo,
+        invoiceRepo,
+        paperless,
+        fakeSettings(['Business', 'Bills']),
+      );
+      const ingest = await eventRepo.ingest({
+        source: EventSource.Paperless,
+        eventType: 'document.consumed',
+        externalId: 'paperless-our-own',
+        occurredAt: new Date('2099-04-05'),
+        payload: { document_id: 5050, correspondent: 'Anything', created: '2099-04-05' },
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+      await service.handleProcessPaperlessDocument({ eventId: ingest.event.id });
+      const pending = await expenseRepo.findPendingReview();
+      expect(pending).toHaveLength(0);
+      const eventAfter = await eventRepo.findById(ingest.event.id);
+      expect(eventAfter?.status).toBe(EventStatus.Processed);
+    });
+
     it('falls through to ingest when tag resolution errors (over-ingest > silent drop)', async () => {
       paperless = {
         getDocument: vi.fn().mockRejectedValue(new Error('paperless down')),
         resolveTagIds: vi.fn().mockRejectedValue(new Error('paperless down')),
       } as unknown as PaperlessRepository;
-      service = new ExpensePipelineService(eventRepo, expenseRepo, paperless, fakeSettings(['Business', 'Bills']));
+      service = new ExpensePipelineService(
+        eventRepo,
+        expenseRepo,
+        new InvoiceRepository(db),
+        paperless,
+        fakeSettings(['Business', 'Bills']),
+      );
       const ingest = await eventRepo.ingest({
         source: EventSource.Paperless,
         eventType: 'document.consumed',

@@ -149,6 +149,61 @@ export class PaperlessRepository {
   }
 
   /**
+   * Return tag ids the user has marked as inbox tags in Paperless. Drives
+   * the "strip inbox tags from docs bo0kkeeper uploaded" path: those docs
+   * shouldn't sit in the operator's triage queue because we KNOW what
+   * they are.
+   */
+  async listInboxTagIds(): Promise<number[]> {
+    const baseUrl = this.requireBaseUrl();
+    const token = this.requireToken();
+    const ids: number[] = [];
+    let url: string | null = `${baseUrl}/api/tags/?is_inbox_tag=true&page_size=100`;
+    while (url) {
+      const response = await this.fetchFn(url, {
+        method: 'GET',
+        headers: { Authorization: `Token ${token}` },
+      });
+      const text = await response.text();
+      if (!response.ok) {
+        throw new PaperlessApiError(
+          response.status,
+          safeJson(text),
+          `Paperless inbox-tag list failed: ${response.status}`,
+        );
+      }
+      const page = safeJson(text) as { results: Array<{ id: number }>; next: string | null };
+      for (const tag of page.results) {
+        ids.push(tag.id);
+      }
+      url = page.next;
+    }
+    return ids;
+  }
+
+  /**
+   * Replace a document's tag list with `tagIds`. PATCH (not PUT) so other
+   * fields stay as paperless set them; the `tags` array is fully replaced
+   * by Paperless when present in the body.
+   */
+  async setDocumentTags(id: number | string, tagIds: number[]): Promise<void> {
+    const baseUrl = this.requireBaseUrl();
+    const token = this.requireToken();
+    const response = await this.fetchFn(`${baseUrl}/api/documents/${encodeURIComponent(String(id))}/`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ tags: tagIds }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new PaperlessApiError(response.status, safeJson(text), `Paperless tag update failed: ${response.status}`);
+    }
+  }
+
+  /**
    * Fetch a single document by id. Used to read tags after a workflow webhook
    * fires (the webhook payload is templated and unreliable; the API is the
    * source of truth).

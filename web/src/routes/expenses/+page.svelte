@@ -2,6 +2,7 @@
   import { page } from '$app/state';
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
   import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
+  import { listBankTransactions, setBankTxMatch, type BankTransaction } from '$lib/services/banking.service';
   import {
     approveExpense,
     listExpenses,
@@ -24,6 +25,8 @@
     Heading,
     HStack,
     Input,
+    Modal,
+    ModalBody,
     Select,
     Stack,
     Table,
@@ -195,6 +198,59 @@
     if (!drafts[expense.id]) {
       drafts[expense.id] = toDraft(expense);
     }
+  }
+
+  // ── Bank-tx link picker ───────────────────────────────────────────────
+  // The bank-tx → expense link is the same DB write either way, but the
+  // operator's mental model after approving an expense is "now point this
+  // at the bank tx that paid for it" — not "switch to /banking and find
+  // the matching row." Mirror the link affordance on this side too.
+  let linkingExpense = $state<ExpenseResponse | null>(null);
+  let candidates = $state<BankTransaction[]>([]);
+  let candidatesLoading = $state(false);
+  let linking = $state(false);
+
+  async function openLinkModal(expense: ExpenseResponse) {
+    linkingExpense = expense;
+    candidates = [];
+    candidatesLoading = true;
+    try {
+      const result = await listBankTransactions({ status: 'unmatched', limit: 100 });
+      candidates = result.items;
+    } catch (error_) {
+      error = (error_ as Error).message;
+    } finally {
+      candidatesLoading = false;
+    }
+  }
+
+  function closeLinkModal() {
+    linkingExpense = null;
+    candidates = [];
+  }
+
+  async function linkBankTx(bankTxId: string) {
+    if (!linkingExpense) {
+      return;
+    }
+    linking = true;
+    try {
+      await setBankTxMatch(bankTxId, { type: 'expense', targetId: linkingExpense.id });
+      closeLinkModal();
+      await load();
+    } catch (error_) {
+      error = (error_ as Error).message;
+    } finally {
+      linking = false;
+    }
+  }
+
+  function formatBankAmount(minor: string, currency: string): string {
+    const sign = minor.startsWith('-') ? '-' : '';
+    const abs = minor.replace(/^-/, '').padStart(3, '0');
+    const major = abs.slice(0, -2);
+    const cents = abs.slice(-2);
+    return `${sign}${major}.${cents} ${currency}`;
   }
 
   function collapse() {
@@ -374,13 +430,18 @@
                 </Button>
               </TableCell>
               <TableCell>
-                <Button
-                  variant={expense.status === 'pending_review' ? 'outline' : 'ghost'}
-                  size="small"
-                  onclick={() => expand(expense)}
-                >
-                  {expense.status === 'pending_review' ? 'Review' : 'Edit'}
-                </Button>
+                <HStack gap={1}>
+                  <Button
+                    variant={expense.status === 'pending_review' ? 'outline' : 'ghost'}
+                    size="small"
+                    onclick={() => expand(expense)}
+                  >
+                    {expense.status === 'pending_review' ? 'Review' : 'Edit'}
+                  </Button>
+                  {#if expense.status === 'approved'}
+                    <Button size="small" variant="ghost" onclick={() => openLinkModal(expense)}>Link bank tx</Button>
+                  {/if}
+                </HStack>
               </TableCell>
             </TableRow>
           {/each}
@@ -487,4 +548,53 @@
       </div>
     {/if}
   </Stack>
+
+  {#if linkingExpense}
+    <Modal title="Link bank transaction to expense" onClose={closeLinkModal} size="medium" closeOnBackdropClick>
+      <ModalBody>
+        <Stack gap={4}>
+          <div class="rounded border p-3 text-sm">
+            <div>
+              <strong>{linkingExpense.vendor || linkingExpense.paperlessDocId}</strong> ·
+              {linkingExpense.expenseDate}
+            </div>
+            <div class="text-muted-foreground">
+              {minorToMajor(linkingExpense.amountMinor)}
+              {linkingExpense.currency}
+            </div>
+          </div>
+
+          <Text size="small" color="muted">
+            Pick the bank tx that paid this. Only unmatched transactions are shown.
+          </Text>
+
+          {#if candidatesLoading}
+            <Text color="muted">Loading…</Text>
+          {:else if candidates.length === 0}
+            <Text color="muted">No unmatched bank transactions.</Text>
+          {:else}
+            <Stack gap={2}>
+              {#each candidates as tx (tx.id)}
+                <HStack class="justify-between rounded border px-3 py-2">
+                  <div class="text-sm">
+                    <div>
+                      <strong>{tx.txDate}</strong> · {formatBankAmount(tx.amountMinor, tx.currency)}
+                    </div>
+                    {#if tx.counterpartyName || tx.description}
+                      <div class="text-muted-foreground">
+                        {tx.counterpartyName ?? ''}{tx.counterpartyName && tx.description
+                          ? ' · '
+                          : ''}{tx.description ?? ''}
+                      </div>
+                    {/if}
+                  </div>
+                  <Button size="small" disabled={linking} onclick={() => linkBankTx(tx.id)}>Link</Button>
+                </HStack>
+              {/each}
+            </Stack>
+          {/if}
+        </Stack>
+      </ModalBody>
+    </Modal>
+  {/if}
 </main>

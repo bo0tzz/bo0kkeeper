@@ -80,6 +80,12 @@ describe('InvoiceComposerService', () => {
     // the paperless REST API (works locally with PAPERLESS_BASE_URL set,
     // fails in CI without it).
     paperless.resolveTagIds = vi.fn().mockResolvedValue([1, 2, 3]);
+    // Inbox-tag strip path: default to "no inbox tags configured" so existing
+    // tests don't accidentally exercise the patch. Tests that DO exercise it
+    // override these mocks per-case.
+    paperless.listInboxTagIds = vi.fn().mockResolvedValue([]);
+    paperless.getDocument = vi.fn().mockResolvedValue({ id: 42, tags: [1, 2, 3] });
+    paperless.setDocumentTags = vi.fn().mockResolvedValue(void 0);
 
     jobs = fakeJobRepo();
     const settingsService = new SettingsService(new AppSettingsRepository(db));
@@ -158,6 +164,48 @@ describe('InvoiceComposerService', () => {
     await composer.handleArchiveInvoiceToPaperless({ invoiceId: composed.invoice.id });
 
     expect(paperless.uploadDocument).toHaveBeenCalledOnce();
+  });
+
+  it('archive job strips any inbox tags Paperless auto-applied to our upload', async () => {
+    // Pretend Paperless added inbox tag id 99 alongside our intended tags.
+    paperless.listInboxTagIds = vi.fn().mockResolvedValue([99]);
+    paperless.getDocument = vi.fn().mockResolvedValue({ id: 42, tags: [1, 2, 3, 99] });
+    const setTagsMock = vi.fn().mockResolvedValue(void 0);
+    paperless.setDocumentTags = setTagsMock;
+
+    const composed = await composer.composeAndIssue({
+      clientId,
+      issuedAt: new Date('2099-03-15T00:00:00Z'),
+      currency: 'USD',
+      eurTotalMinor: 100_000n,
+      fxRate: '0.85',
+      lines: [{ description: 'X', lineTotalMinor: 100_000n }],
+    });
+
+    await composer.handleArchiveInvoiceToPaperless({ invoiceId: composed.invoice.id });
+
+    expect(setTagsMock).toHaveBeenCalledOnce();
+    // Final tag list: our three intended ones, inbox tag 99 dropped.
+    expect(setTagsMock.mock.calls[0]).toEqual(['paperless-doc-42', [1, 2, 3]]);
+  });
+
+  it('archive job skips the inbox-tag patch when no inbox tags are configured', async () => {
+    paperless.listInboxTagIds = vi.fn().mockResolvedValue([]);
+    const setTagsMock = vi.fn();
+    paperless.setDocumentTags = setTagsMock;
+
+    const composed = await composer.composeAndIssue({
+      clientId,
+      issuedAt: new Date('2099-06-15T00:00:00Z'),
+      currency: 'USD',
+      eurTotalMinor: 100_000n,
+      fxRate: '0.85',
+      lines: [{ description: 'X', lineTotalMinor: 100_000n }],
+    });
+
+    await composer.handleArchiveInvoiceToPaperless({ invoiceId: composed.invoice.id });
+
+    expect(setTagsMock).not.toHaveBeenCalled();
   });
 
   it('archive job propagates paperless errors so pg-boss can retry', async () => {

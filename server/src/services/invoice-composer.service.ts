@@ -155,6 +155,30 @@ export class InvoiceComposerService {
     });
     const docId = await this.paperlessService.waitForDocumentId(upload.taskId);
     await this.invoiceRepository.setPaperlessDocId(invoice.id, docId);
+
+    // Strip any inbox tags Paperless's consume-workflow auto-applied. These
+    // docs are ours — we KNOW what they are — so they shouldn't sit in the
+    // operator's triage queue. Best-effort: a failure here doesn't undo the
+    // archive (the doc is still in paperless with whatever tags it ended up
+    // with) and the next archive job won't retry it (idempotency check
+    // returns early once paperlessDocId is set). Acceptable for an ergonomics
+    // tweak — the inbox tag is annoying but not load-bearing.
+    try {
+      const inboxTagIds = await this.paperlessService.listInboxTagIds();
+      if (inboxTagIds.length > 0) {
+        const doc = await this.paperlessService.getDocument(docId);
+        const stripped = doc.tags.filter((id) => !inboxTagIds.includes(id));
+        if (stripped.length !== doc.tags.length) {
+          await this.paperlessService.setDocumentTags(docId, stripped);
+          this.logger.log(`invoice ${invoice.number}: stripped inbox tags from paperless doc ${docId}`);
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `invoice ${invoice.number}: inbox-tag strip skipped for doc ${docId}: ${(error as Error).message}`,
+      );
+    }
+
     this.logger.log(`invoice ${invoice.number} archived as paperless doc ${docId}`);
   }
 

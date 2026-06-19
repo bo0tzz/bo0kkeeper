@@ -39,6 +39,20 @@ export class InvoiceRepository {
   }
 
   /**
+   * Lookup an invoice by its paperless doc id (we set this after the
+   * outgoing-invoice archive job lands the PDF in paperless). Used by the
+   * expense-ingestion guard so a doc we generated doesn't loop back in as
+   * an inbound expense.
+   */
+  async findByPaperlessDocId(paperlessDocId: string): Promise<Invoice | undefined> {
+    return (await this.db
+      .selectFrom('invoice')
+      .selectAll()
+      .where('paperlessDocId', '=', paperlessDocId)
+      .executeTakeFirst()) as Invoice | undefined;
+  }
+
+  /**
    * Lookup the invoice composed from a given outbound Wise transfer.
    * Returns undefined when none has been composed yet — drives the
    * "Compose invoice" UI affordance + idempotency on composeFromWise.
