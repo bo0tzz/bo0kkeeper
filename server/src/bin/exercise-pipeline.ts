@@ -89,7 +89,7 @@ async function main(): Promise<void> {
     const expenseRepo = new ExpenseRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
     const eventRepo = new EventRepository(db);
-    const sheetSync = new SheetSyncService(db, clientRepo, invoiceRepo, sheetWriter, eventRepo);
+    const sheetSync = new SheetSyncService(db, clientRepo, expenseRepo, invoiceRepo, sheetWriter, eventRepo);
     const recurringFee = new RecurringFeeService(bankRepo, expenseRepo, eventRepo, sheetSync);
     const matcher = new BankMatcherService(db, bankRepo, sheetSync, eventRepo, recurringFee);
 

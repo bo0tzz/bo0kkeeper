@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Kysely, sql } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
-import { EventSource, ExpenseStatus, MatchConfidence } from 'src/enum';
+import { EventSource, MatchConfidence } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { DB } from 'src/schema';
@@ -441,24 +441,18 @@ export class BankMatcherService {
         MatchConfidence.Manual,
       );
       this.logger.log(`bank_tx ${bankTxId} → expense ${expense.id} (manual)`);
-      // Bank-tx match is the canonical kasstelsel money-out signal — this
-      // is where the sheet row fires for expenses. Approval (in the admin
-      // UI) intentionally does NOT write a sheet row anymore. If the
-      // expense was still pending_review, the match implicitly approves
-      // it. Rejected expenses are skipped (a tombstone shouldn't end up
-      // on the books).
-      if (expense.status !== ExpenseStatus.Rejected) {
-        if (expense.status === ExpenseStatus.PendingReview) {
-          const now = new Date();
-          await this.db
-            .updateTable('expense')
-            .set({ status: ExpenseStatus.Approved, reviewedAt: now, updatedAt: now })
-            .where('id', '=', expense.id)
-            .execute();
-        }
-        const txDate = toDate(bankTx.txDate);
-        await this.sheetSync.writeExpenseRowSafely(expense, txDate, bankTx.id);
-      }
+      // Sheet row writes IFF the expense is already approved — otherwise
+      // we'd be committing a half-filled pending_review row (no amount,
+      // no BTW, no locationClass) to the accountant sheet. Previously this
+      // path silently flipped pending → approved at link time and wrote
+      // the row immediately, which corrupted the sheet whenever an
+      // operator linked first and reviewed later.
+      //
+      // The mirror call lives on `approveExpense` — whichever event
+      // completes (matched ∧ approved) triggers the write. The helper is
+      // idempotent and status-gated, so this is a safe no-op for
+      // pending_review (and rejected).
+      await this.sheetSync.writeExpenseRowIfReady(expense.id);
     }
 
     const refreshed = await this.bankTransactionRepository.findById(bankTxId);

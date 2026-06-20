@@ -179,6 +179,33 @@ export class ExpenseRepository {
    * than `staleAfterMs`. Parallel to
    * BankTransactionRepository.countStaleSheetWrites for the expense side.
    */
+  /**
+   * Approved expense + its manual-confidence bank-tx link, surfaced with
+   * the bank-tx id + date, for rows that don't yet have a sheet write.
+   * Used by the sheet-write helper that runs after either approval or
+   * link to fire the row when both conditions are satisfied.
+   *
+   * Pass `expenseId` to scope to a single row (post-approval / post-link
+   * triggers); omit to walk all eligible rows (retry job).
+   */
+  async findMatchedReadyForSheet(
+    expenseId?: string,
+  ): Promise<Array<Expense & { bankTxId: string; bankTxDate: Date | string }>> {
+    let query = this.db
+      .selectFrom('expense')
+      .innerJoin('bank_transaction', 'bank_transaction.matchedExpenseId', 'expense.id')
+      .where('expense.status', '=', ExpenseStatus.Approved)
+      .where('expense.sheetRowAt', 'is', null)
+      .where('bank_transaction.matchConfidence', '=', MatchConfidence.Manual);
+    if (expenseId !== undefined) {
+      query = query.where('expense.id', '=', expenseId);
+    }
+    return (await query
+      .selectAll('expense')
+      .select(['bank_transaction.id as bankTxId', 'bank_transaction.txDate as bankTxDate'])
+      .execute()) as Array<Expense & { bankTxId: string; bankTxDate: Date | string }>;
+  }
+
   async countStaleSheetWrites(staleAfterMs: number): Promise<number> {
     const threshold = new Date(Date.now() - staleAfterMs);
     const result = (await this.db

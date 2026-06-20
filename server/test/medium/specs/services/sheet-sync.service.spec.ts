@@ -85,7 +85,14 @@ describe('SheetSyncService', () => {
       writeIncomeRow: ReturnType<typeof vi.fn>;
       writeExpenseRow: ReturnType<typeof vi.fn>;
     };
-    sheetSync = new SheetSyncService(db, clientRepo, new InvoiceRepository(db), sheetWriter, new EventRepository(db));
+    sheetSync = new SheetSyncService(
+      db,
+      clientRepo,
+      expenseRepo,
+      new InvoiceRepository(db),
+      sheetWriter,
+      new EventRepository(db),
+    );
   });
 
   afterEach(async () => {

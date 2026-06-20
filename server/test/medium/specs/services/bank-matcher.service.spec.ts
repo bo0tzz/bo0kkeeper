@@ -76,7 +76,14 @@ describe('BankMatcherService', () => {
       writeIncomeRow: ReturnType<typeof vi.fn>;
       writeExpenseRow: ReturnType<typeof vi.fn>;
     };
-    sheetSync = new SheetSyncService(db, clientRepo, new InvoiceRepository(db), sheetWriter, new EventRepository(db));
+    sheetSync = new SheetSyncService(
+      db,
+      clientRepo,
+      new ExpenseRepository(db),
+      new InvoiceRepository(db),
+      sheetWriter,
+      new EventRepository(db),
+    );
     recurringFee = new RecurringFeeService(bankRepo, new ExpenseRepository(db), new EventRepository(db), sheetSync);
     matcher = new BankMatcherService(db, bankRepo, sheetSync, new EventRepository(db), recurringFee);
   });
@@ -338,7 +345,14 @@ describe('BankMatcherService', () => {
     }
   });
 
-  it('manualMatch to a pending_review expense flips it to approved and writes the sheet row', async () => {
+  it('manualMatch to a pending_review expense links it but does NOT auto-approve or write the sheet row', async () => {
+    // Previously this path silently flipped pending → approved at link time
+    // and wrote the row immediately, which committed a half-filled
+    // expense (no amount / no BTW / no locationClass) to the accountant
+    // sheet whenever an operator linked first and reviewed later. New
+    // semantics: link is recorded, status stays pending, no sheet row.
+    // Sheet write fires later via the approveExpense path (or the retry
+    // job's matched-and-approved sweep).
     const expenseRepo = new ExpenseRepository(db);
     const expense = await expenseRepo.ingest({
       paperlessDocId: 'manual-doc-1',
@@ -373,33 +387,23 @@ describe('BankMatcherService', () => {
 
     await matcher.manualMatch(bankIngest.row.id, { type: 'expense', targetId: expense.row.id });
 
-    // Expense flipped to approved.
+    // Match recorded on the bank-tx.
+    const bankRefetched = await bankRepo.findById(bankIngest.row.id);
+    expect(bankRefetched?.matchedExpenseId).toBe(expense.row.id);
+    expect(bankRefetched?.matchConfidence).toBe(MatchConfidence.Manual);
+
+    // But expense status NOT touched — still pending_review.
     const refetched = await db
       .selectFrom('expense')
       .selectAll()
       .where('id', '=', expense.row.id)
       .executeTakeFirstOrThrow();
-    expect(refetched.status).toBe(ExpenseStatus.Approved);
-    expect(refetched.reviewedAt).not.toBeNull();
+    expect(refetched.status).toBe(ExpenseStatus.PendingReview);
+    expect(refetched.reviewedAt).toBeNull();
+    expect(refetched.sheetRowAt).toBeNull();
 
-    // Sheet row written with the bank-tx date (kasstelsel), not the receipt date.
-    expect(sheetWriter.writeExpenseRow).toHaveBeenCalledOnce();
-    const args = sheetWriter.writeExpenseRow.mock.calls[0][0] as {
-      id: string;
-      vendor: string;
-      eurAmountMinor: bigint;
-      date: Date;
-      vatPercent: string | undefined;
-      vatMinor: bigint | undefined;
-      source: string;
-    };
-    expect(args.id).toBe('manual-doc-1');
-    expect(args.vendor).toBe('Acme Cables');
-    expect(args.eurAmountMinor).toBe(12_100n);
-    expect(args.date.toISOString().slice(0, 10)).toBe('2099-04-10');
-    expect(args.vatPercent).toBe('21%');
-    expect(args.vatMinor).toBe(2100n);
-    expect(args.source).toBe(`expense/${expense.row.id}`);
+    // And no sheet row written.
+    expect(sheetWriter.writeExpenseRow).not.toHaveBeenCalled();
   });
 
   it('manualMatch to an already-approved expense writes the sheet row (approval no longer writes)', async () => {

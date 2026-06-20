@@ -2,11 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Kysely } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { OnJob } from 'src/decorators';
-import { ClientClass, EventSource, ExpenseStatus, JobName, MatchConfidence, QueueName } from 'src/enum';
+import { ClientClass, EventSource, JobName, MatchConfidence, QueueName } from 'src/enum';
 import { BankTransaction } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
-import { Expense } from 'src/repositories/expense.repository';
+import { Expense, ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { DB } from 'src/schema';
 import { expenseToSheetRow, SheetWriterService } from 'src/services/sheet-writer.service';
@@ -33,6 +33,7 @@ export class SheetSyncService {
   constructor(
     @InjectKysely() private readonly db: Kysely<DB>,
     private readonly clientRepository: ClientRepository,
+    private readonly expenseRepository: ExpenseRepository,
     private readonly invoiceRepository: InvoiceRepository,
     private readonly sheetWriter: SheetWriterService,
     private readonly eventRepository: EventRepository,
@@ -164,6 +165,26 @@ export class SheetSyncService {
   }
 
   /**
+   * Write the sheet row for an expense IFF it's approved AND matched AND
+   * hasn't been written yet. Called from both manual-match (bank-tx side)
+   * and approve (expense side) — whichever event completes the
+   * (matched ∧ approved) condition triggers the write. Idempotent: the
+   * `sheetRowAt IS NULL` clause makes a double-call a no-op, so callers
+   * don't have to know whether the other side has already fired.
+   *
+   * Returns true when a row was actually written. False when not ready
+   * (still pending_review, not matched, already written, or rejected).
+   */
+  async writeExpenseRowIfReady(expenseId: string): Promise<boolean> {
+    const rows = await this.expenseRepository.findMatchedReadyForSheet(expenseId);
+    const row = rows[0];
+    if (!row) {
+      return false;
+    }
+    return await this.writeExpenseRowSafely(row, toDate(row.bankTxDate), row.bankTxId);
+  }
+
+  /**
    * Retry any sheet writes that failed earlier. Identifies missing rows by
    * scanning entities that should have a sheet row (matched bank_tx,
    * approved + bank-tx-matched expense) but whose `sheetRowAt` is still null.
@@ -226,15 +247,7 @@ export class SheetSyncService {
 
     // Expense side: approved expenses with a manual-confidence bank_tx link,
     // missing their sheet row.
-    const expenseRows = await this.db
-      .selectFrom('expense')
-      .innerJoin('bank_transaction', 'bank_transaction.matchedExpenseId', 'expense.id')
-      .where('expense.status', '=', ExpenseStatus.Approved)
-      .where('expense.sheetRowAt', 'is', null)
-      .where('bank_transaction.matchConfidence', '=', MatchConfidence.Manual)
-      .selectAll('expense')
-      .select(['bank_transaction.id as bankTxId', 'bank_transaction.txDate as bankTxDate'])
-      .execute();
+    const expenseRows = await this.expenseRepository.findMatchedReadyForSheet();
 
     for (const row of expenseRows) {
       attempted += 1;

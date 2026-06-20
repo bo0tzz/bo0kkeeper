@@ -71,6 +71,7 @@ describe('BankingController', () => {
     const sheetSync = new SheetSyncService(
       db,
       clientRepo,
+      expenseRepo,
       new InvoiceRepository(db),
       sheetWriter,
       new EventRepository(db),

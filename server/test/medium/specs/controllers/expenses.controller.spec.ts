@@ -15,6 +15,7 @@ import { JobRepository } from 'src/repositories/job.repository';
 import { PaperlessDocument, PaperlessRepository } from 'src/repositories/paperless.repository';
 import { DB } from 'src/schema';
 import { SettingsService } from 'src/services/settings.service';
+import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { WebhookService } from 'src/services/webhook.service';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -38,16 +39,27 @@ describe('ExpensesController', () => {
   let db: Kysely<DB>;
   let repo: ExpenseRepository;
   let controller: ExpensesController;
+  let writeIfReadyMock: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     db = await getKyselyDB();
     repo = new ExpenseRepository(db);
-    // The existing tests don't exercise the paperless-rescan path; pass typed
-    // nulls cast to the service shape so the controller wires up.
+    // The existing tests don't exercise the paperless-rescan path nor the
+    // sheet-write side; pass typed nulls cast to the service shape so the
+    // controller wires up.
     const stubPaperless = {} as unknown as PaperlessRepository;
     const stubSettings = {} as unknown as SettingsService;
+    writeIfReadyMock = vi.fn().mockResolvedValue(false);
+    const stubSheetSync = { writeExpenseRowIfReady: writeIfReadyMock } as unknown as SheetSyncService;
     const stubWebhook = {} as unknown as WebhookService;
-    controller = new ExpensesController(repo, new EventRepository(db), stubPaperless, stubSettings, stubWebhook);
+    controller = new ExpensesController(
+      repo,
+      new EventRepository(db),
+      stubPaperless,
+      stubSettings,
+      stubSheetSync,
+      stubWebhook,
+    );
   });
 
   afterEach(async () => {
@@ -81,6 +93,18 @@ describe('ExpensesController', () => {
     } as ListExpensesQueryDto);
     expect(onlyDomestic.items).toHaveLength(1);
     expect(onlyDomestic.items[0].paperlessDocId).toBe('d-1');
+  });
+
+  it('approve triggers the sheet-write helper (writes when matched, no-op otherwise)', async () => {
+    // The helper is status- and match-gated; the controller doesn't need to
+    // know whether a bank-tx is linked. We just verify it ASKS — if a link
+    // arrives later (manualMatch) it'll fire from that side instead.
+    const ingest = await repo.ingest(fakeExpense({ paperlessDocId: 'approve-sheet-trigger' }));
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+    await controller.approveExpense(ingest.row.id, {} as ExpenseApproveDto);
+    expect(writeIfReadyMock).toHaveBeenCalledWith(ingest.row.id);
   });
 
   it('approve patches editable fields atomically with the status flip', async () => {
@@ -233,8 +257,9 @@ function buildRescanController(
     getPaperlessExpenseTags: vi.fn().mockResolvedValue(input.tags),
   } as unknown as SettingsService;
   const webhookSvc = new WebhookService(eventRepo, jobRepo);
+  const stubSheetSync = { writeExpenseRowIfReady: vi.fn().mockResolvedValue(false) } as unknown as SheetSyncService;
   return {
-    controller: new ExpensesController(repo, eventRepo, paperlessSvc, settingsSvc, webhookSvc),
+    controller: new ExpensesController(repo, eventRepo, paperlessSvc, settingsSvc, stubSheetSync, webhookSvc),
     jobQueue,
     eventRepo,
   };

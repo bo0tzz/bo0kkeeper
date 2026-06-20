@@ -30,6 +30,7 @@ import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository, ExpenseUpdate } from 'src/repositories/expense.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
+import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { WebhookService } from 'src/services/webhook.service';
 
 @ApiTags('Expenses')
@@ -40,6 +41,7 @@ export class ExpensesController {
     private readonly eventRepository: EventRepository,
     private readonly paperlessService: PaperlessRepository,
     private readonly settingsService: SettingsService,
+    private readonly sheetSync: SheetSyncService,
     private readonly webhookService: WebhookService,
   ) {}
 
@@ -99,12 +101,11 @@ export class ExpensesController {
    * Approve a pending expense. Body fields are merged in atomically with the
    * status flip, so the UI can submit "save + approve" in a single request.
    *
-   * Approval is a pure DB state change — it does NOT write a sheet row.
-   * Under kasstelsel the sheet date must be the bank-movement date, which
-   * we only know once a bank tx is linked to the expense. The sheet row
-   * fires on bank-tx-match (auto if/when we add expense auto-matching, or
-   * manual via /banking link UI). Approved-but-unmatched expenses surface
-   * on the dashboard tile so they don't fall through the cracks.
+   * Sheet row writes here IFF the expense already has a bank-tx linked
+   * (the other half of the `matched ∧ approved` condition); otherwise this
+   * is a pure DB state change and the sheet row fires later when a bank-tx
+   * link lands. Approved-but-unmatched expenses surface on the dashboard
+   * tile so they don't fall through the cracks.
    */
   @Post(':id/approve')
   @Authenticated()
@@ -126,6 +127,8 @@ export class ExpensesController {
         currency: row.currency,
       },
     });
+    // No-op when no bank-tx is matched yet; idempotent on re-approval.
+    await this.sheetSync.writeExpenseRowIfReady(row.id);
     return mapExpense(row);
   }
 

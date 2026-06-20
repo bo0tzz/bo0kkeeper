@@ -63,13 +63,20 @@ async function main(): Promise<void> {
     const invoiceRepo = new InvoiceRepository(db);
     const eventRepo = new EventRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
-    const sheetSync = new SheetSyncService(db, clientRepo, invoiceRepo, sheetWriter, eventRepo);
+    const sheetSync = new SheetSyncService(db, clientRepo, expenseRepo, invoiceRepo, sheetWriter, eventRepo);
     const recurringFee = new RecurringFeeService(bankRepo, expenseRepo, eventRepo, sheetSync);
     const matcher = new BankMatcherService(db, bankRepo, sheetSync, eventRepo, recurringFee);
     const stubPaperless = {} as unknown as PaperlessRepository;
     const stubSettings = {} as unknown as SettingsService;
     const stubWebhook = {} as unknown as WebhookService;
-    const controller = new ExpensesController(expenseRepo, eventRepo, stubPaperless, stubSettings, stubWebhook);
+    const controller = new ExpensesController(
+      expenseRepo,
+      eventRepo,
+      stubPaperless,
+      stubSettings,
+      sheetSync,
+      stubWebhook,
+    );
 
     const paperlessDocId = `demo-${randomUUID().slice(0, 8)}`;
     const ingest = await expenseRepo.ingest({
