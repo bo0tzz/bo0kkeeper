@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.3](https://github.com/bo0tzz/bo0kkeeper/compare/v0.4.2...v0.4.3) (2026-06-20)
+
+
+### Bug Fixes
+
+* **deps:** update dependency pg-boss to v12 ([#48](https://github.com/bo0tzz/bo0kkeeper/issues/48)) ([8c6593e](https://github.com/bo0tzz/bo0kkeeper/commit/8c6593e19a1b65d5da524ac7798c0f8dee421aa3))
+* **deps:** update dependency typescript to v6 ([#49](https://github.com/bo0tzz/bo0kkeeper/issues/49)) ([ed87df4](https://github.com/bo0tzz/bo0kkeeper/commit/ed87df4625818db976f61ee529c165c00beb37ae))
+
 ## [0.4.2](https://github.com/bo0tzz/bo0kkeeper/compare/v0.4.1...v0.4.2) (2026-06-20)
 
 
