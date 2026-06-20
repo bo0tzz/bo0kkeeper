@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ModuleRef, Reflector } from '@nestjs/core';
-import PgBoss from 'pg-boss';
+import { type Job, PgBoss } from 'pg-boss';
 import { loadConfig } from 'src/config';
 import { MetadataKey } from 'src/constants';
 import { JobConfig } from 'src/decorators';
@@ -98,7 +98,7 @@ export class JobRepository implements OnModuleInit, OnModuleDestroy {
     for (const [jobName, item] of this.handlers) {
       const queueName = jobName as unknown as string;
       await this.boss.createQueue(queueName);
-      await this.boss.work(queueName, async (jobs) => {
+      await this.boss.work(queueName, async (jobs: Job[]) => {
         for (const job of jobs) {
           await item.handler(job.data);
         }
@@ -111,7 +111,7 @@ export class JobRepository implements OnModuleInit, OnModuleDestroy {
     if (!this.boss) {
       throw new Error('JobRepository.queue called before pg-boss started');
     }
-    return this.boss.send(name as unknown as string, data as object);
+    return await this.boss.send(name as unknown as string, data as object);
   }
 
   /** Enqueue many jobs at once. */
