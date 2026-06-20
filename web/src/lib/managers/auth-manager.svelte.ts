@@ -1,22 +1,12 @@
-type AuthMe = {
-  sub: string;
-  email?: string;
-  name?: string;
-};
+import { getMe, loginUrl, logout, type AuthMe } from '$lib/services/auth.service';
 
 class AuthManager {
   user = $state<AuthMe | null>(null);
   loaded = $state(false);
 
   async load(fetchFn: typeof fetch = fetch): Promise<void> {
-    try {
-      const res = await fetchFn('/api/auth/me');
-      this.user = res.ok ? ((await res.json()) as AuthMe) : null;
-    } catch {
-      this.user = null;
-    } finally {
-      this.loaded = true;
-    }
+    this.user = await getMe(fetchFn);
+    this.loaded = true;
   }
 
   get authenticated(): boolean {
@@ -24,12 +14,11 @@ class AuthManager {
   }
 
   loginUrl(returnTo: string): string {
-    const params = new URLSearchParams({ return_to: returnTo });
-    return `/api/auth/login?${params.toString()}`;
+    return loginUrl(returnTo);
   }
 
   async logout(): Promise<void> {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await logout();
     this.user = null;
   }
 }

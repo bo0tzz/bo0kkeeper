@@ -99,4 +99,23 @@ export default typescriptEslint.config(
       },
     },
   },
+  {
+    // All backend traffic must go through $lib/services/* (which routes via
+    // api.ts and gets auth-retry + error parsing for free). Direct `fetch(…)`
+    // calls outside the services layer would bypass that, so we ban them.
+    // Type annotations like `fetchFn?: typeof fetch` and identifier
+    // references (passing `fetch` as a parameter) are unaffected — the
+    // selector only matches an invocation of the global `fetch` identifier.
+    files: ['src/**/*.ts', 'src/**/*.svelte'],
+    ignores: ['src/lib/services/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.type='Identifier'][callee.name='fetch']",
+          message: 'Direct fetch() is restricted to $lib/services/**. Add a service function instead.',
+        },
+      ],
+    },
+  },
 );
