@@ -46,7 +46,7 @@ services:
   #       since {doc_tags} isn't a supported placeholder.)
   paperless-broker:
     container_name: bo0kkeeper_paperless_broker
-    image: docker.io/library/redis:7@sha256:33d7c9a245edd95e6703a0addbeaa48fe40c3b3b4783627a72085155462ebfdb
+    image: docker.io/library/redis:8@sha256:0a972391db0b24ec336e35d1bc98b237237e26f82bf5120cf2f6b1688d1df973
     restart: unless-stopped
     volumes:
       - paperless-redis:/data
