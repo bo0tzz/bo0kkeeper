@@ -166,6 +166,54 @@ export class InvoiceRepository {
   }
 
   /**
+   * Invoices not yet linked to a wise_transfer, with matching gross +
+   * currency, issued within `[issuedAfter, issuedBefore)`. Drives the
+   * "wise_transfer arrived, look for the invoice it pays" auto-link in
+   * the bank-matcher — for the manual-compose flow where the user issued
+   * the invoice before the Wise outgoing payout completed (so they
+   * couldn't use compose-from-wise). Currency + source-amount come from
+   * the wise_transfer's source side (e.g. USD 4791).
+   */
+  async findUnlinkedToWiseInWindow(input: {
+    totalMinor: bigint;
+    currency: string;
+    issuedAfter: Date;
+    issuedBefore: Date;
+  }): Promise<InvoiceHeuristicCandidate[]> {
+    return (await this.db
+      .selectFrom('invoice')
+      .innerJoin('client', 'client.id', 'invoice.clientId')
+      .select([
+        'invoice.id as invoiceId',
+        'invoice.number',
+        'invoice.totalMinor',
+        'invoice.currency',
+        'invoice.issuedAt',
+        'client.name as clientName',
+      ])
+      .where('invoice.totalMinor', '=', input.totalMinor)
+      .where('invoice.currency', '=', input.currency)
+      .where('invoice.issuedAt', '>=', input.issuedAfter)
+      .where('invoice.issuedAt', '<', input.issuedBefore)
+      .where('invoice.wiseTransferId', 'is', null)
+      .execute()) as InvoiceHeuristicCandidate[];
+  }
+
+  /**
+   * Wire an existing invoice to its paying wise_transfer post-hoc. Used by
+   * the bank-matcher's auto-link path when the manual-compose flow left
+   * the link unset. `updatedAt` is bumped so reconcile / audit can spot
+   * the change.
+   */
+  async setWiseTransferId(invoiceId: string, wiseTransferId: string): Promise<void> {
+    await this.db
+      .updateTable('invoice')
+      .set({ wiseTransferId, updatedAt: new Date() })
+      .where('id', '=', invoiceId)
+      .execute();
+  }
+
+  /**
    * Unmatched invoices with matching gross + currency, issued within
    * `[issuedAfter, issuedBefore)`. Drives the bank-matcher's auto-low
    * heuristic for incoming payments — the service still narrows on a

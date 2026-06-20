@@ -4,7 +4,11 @@ import { BankTransaction, BankTransactionRepository } from 'src/repositories/ban
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseMatchCandidate, ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceMatchCandidate, InvoiceRepository } from 'src/repositories/invoice.repository';
-import { WiseTransferMatchCandidate, WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
+import {
+  WiseTransferMatchCandidate,
+  WiseTransferRepository,
+  WiseTransferRow,
+} from 'src/repositories/wise-transfer.repository';
 import { RecurringFeeService } from 'src/services/recurring-fee.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { toDate } from 'src/utils/date';
@@ -25,6 +29,13 @@ const FUZZY_MIN_LENGTH = 4;
 const EXPENSE_DATE_TOLERANCE_DAYS = 7;
 /** Max days from invoice issue to bank tx for the heuristic to consider it. */
 const INVOICE_PAYMENT_WINDOW_DAYS = 60;
+/**
+ * Days around a wise_transfer's createdAt to look for the invoice that pays
+ * it. Wider than the bank-tx-side window because the invoice is typically
+ * issued before the Wise outgoing payout completes — sometimes weeks earlier
+ * for a slow-paying export client.
+ */
+const WISE_INVOICE_LINK_WINDOW_DAYS = 90;
 
 export type MatchCandidates = {
   transfers: WiseTransferMatchCandidate[];
@@ -96,6 +107,7 @@ export class BankMatcherService {
           MatchConfidence.AutoHigh,
         );
         this.logger.log(`bank_tx ${bankTx.id} → wise_transfer ${transfer.id} via ${txnRef}`);
+        await this.tryAutoLinkInvoiceToTransfer(transfer);
         await this.sheetSync.appendWiseIncomeRow(bankTx, transfer);
         return { matched: true, type: 'wise_transfer', transferId: transfer.id, confidence: MatchConfidence.AutoHigh };
       }
@@ -196,6 +208,51 @@ export class BankMatcherService {
       `bank_tx ${bankTx.id} → invoice ${invoice.number} via heuristic (client "${invoice.clientName}", amount ${absAmount})`,
     );
     return { matched: true, type: 'invoice', invoiceId: invoice.invoiceId, confidence: MatchConfidence.AutoLow };
+  }
+
+  /**
+   * Once a bank_tx → wise_transfer match lands (high-confidence via TXN
+   * ref), wire the corresponding invoice to that wise_transfer if it
+   * isn't linked already. Closes the gap left by the manual-compose
+   * flow: the user issues an invoice before the Wise outgoing payout
+   * completes (compose-from-wise refuses until then), so wiseTransferId
+   * stays NULL — and the dashboard's unmatched-invoices warning would
+   * fire forever otherwise.
+   *
+   * Match key is the wise_transfer's source side (currency + amount) —
+   * for an export-non-EU flow that's exactly what the client paid
+   * (e.g. 4791.00 USD), which equals invoice.totalMinor / currency. We
+   * require a unique candidate; ambiguity (multiple invoices matching)
+   * is logged and left for manual resolution.
+   */
+  private async tryAutoLinkInvoiceToTransfer(transfer: WiseTransferRow): Promise<void> {
+    const sourceAmount = BigInt(transfer.sourceAmountMinor as bigint | number | string);
+    const createdAt = toDate(transfer.createdAt);
+    const issuedAfter = addDays(createdAt, -WISE_INVOICE_LINK_WINDOW_DAYS);
+    const issuedBefore = addDays(createdAt, WISE_INVOICE_LINK_WINDOW_DAYS);
+
+    const candidates = await this.invoiceRepository.findUnlinkedToWiseInWindow({
+      totalMinor: sourceAmount,
+      currency: transfer.sourceCurrency,
+      issuedAfter,
+      issuedBefore,
+    });
+
+    if (candidates.length === 0) {
+      return;
+    }
+    if (candidates.length > 1) {
+      this.logger.warn(
+        `wise_transfer ${transfer.id} matches ${candidates.length} unlinked invoices ` +
+          `(${transfer.sourceCurrency} ${sourceAmount}) — skipping auto-link, resolve manually`,
+      );
+      return;
+    }
+    const invoice = candidates[0];
+    await this.invoiceRepository.setWiseTransferId(invoice.invoiceId, transfer.id);
+    this.logger.log(
+      `invoice ${invoice.number} → wise_transfer ${transfer.id} (auto-link, ${transfer.sourceCurrency} ${sourceAmount})`,
+    );
   }
 
   /**

@@ -173,6 +173,186 @@ describe('BankMatcherService', () => {
     expect(args.from).toBeUndefined();
   });
 
+  describe('bank_tx → wise_transfer match: auto-link unmatched invoice', () => {
+    // Mirrors the FUTO field case: user issued a USD invoice manually
+    // because compose-from-wise wasn't yet available (Wise outgoing not
+    // yet sent). When the EUR payout arrives and the matcher links the
+    // bank_tx to the wise_transfer via TXN ref, we ALSO retro-link the
+    // wise_transfer to the existing invoice — otherwise the dashboard
+    // would warn "invoice awaiting payment" forever.
+    // eslint-disable-next-line unicorn/consistent-function-scoping -- closure over clientRepo + transferRepo; pulling it out would force threading both as args
+    const seedNonEuFlow = async (overrides: { sourceAmountMinor: bigint; ourReference: string }) => {
+      const client = await clientRepo.create({
+        name: 'FUTO Holdings',
+        class: ClientClass.NonEu,
+        tradeName: TradeName.ItServices,
+        address: { line1: '1 Texan Way', city: 'Austin' },
+      });
+      const transfer = await transferRepo.create({
+        wiseTransferId: `WISE-${overrides.ourReference}`,
+        direction: WiseTransferDirection.Out,
+        sourceAmountMinor: overrides.sourceAmountMinor,
+        sourceCurrency: 'USD',
+        targetAmountMinor: 413_040n,
+        targetCurrency: 'EUR',
+        fxRate: '0.862',
+        feeMinor: 1442n,
+        feeCurrency: 'USD',
+        state: WiseTransferState.OutgoingPaymentSent,
+        stateUpdatedAt: new Date(),
+        ourReference: overrides.ourReference,
+        counterpartyName: null,
+        correlationId: null,
+      });
+      return { client, transfer };
+    };
+
+    it('auto-links the lone unlinked invoice when amount + currency + window all match', async () => {
+      const { client, transfer } = await seedNonEuFlow({
+        sourceAmountMinor: 479_100n,
+        ourReference: 'TXN-0045',
+      });
+      const invoice = await invoiceRepo.issue({
+        year: 2099,
+        invoice: {
+          clientId: client.id,
+          // Use a recent date so the wise_transfer.createdAt window
+          // (defaults to NOW) covers it.
+          issuedAt: new Date(),
+          currency: 'USD',
+          totalMinor: 479_100n,
+          btwRateBps: 0,
+          btwMinor: null,
+          sourceEventId: null,
+        },
+        lines: [{ ordinal: 0, description: 'Consulting', lineTotalMinor: 479_100n, unitLabel: null, quantity: null }],
+      });
+
+      const ingest = await bankRepo.ingest({
+        source: BankSource.SnsCsv,
+        externalId: 'auto-link-1',
+        txDate: new Date('2099-06-12'),
+        amountMinor: 413_040n,
+        currency: 'EUR',
+        counterpartyName: 'Boet Barteld de Willigen',
+        counterpartyIban: 'NL00WISE0000000000',
+        description: 'TXN-0045',
+        rawPayload: {},
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+
+      const result = await matcher.tryMatch(ingest.row);
+      expect(result.matched).toBe(true);
+      if (result.matched && result.type === 'wise_transfer') {
+        expect(result.transferId).toBe(transfer.id);
+      }
+
+      const refetchedInvoice = await invoiceRepo.findById(invoice.id);
+      expect(refetchedInvoice?.wiseTransferId).toBe(transfer.id);
+    });
+
+    it('skips auto-link when an invoice was already linked via compose-from-wise', async () => {
+      const { client, transfer } = await seedNonEuFlow({
+        sourceAmountMinor: 250_000n,
+        ourReference: 'TXN-0046',
+      });
+      const invoice = await invoiceRepo.issue({
+        year: 2099,
+        invoice: {
+          clientId: client.id,
+          // Use a recent date so the wise_transfer.createdAt window
+          // (defaults to NOW) covers it.
+          issuedAt: new Date(),
+          currency: 'USD',
+          totalMinor: 250_000n,
+          btwRateBps: 0,
+          btwMinor: null,
+          sourceEventId: null,
+          wiseTransferId: transfer.id,
+        },
+        lines: [{ ordinal: 0, description: 'Consulting', lineTotalMinor: 250_000n, unitLabel: null, quantity: null }],
+      });
+
+      const ingest = await bankRepo.ingest({
+        source: BankSource.SnsCsv,
+        externalId: 'auto-link-2',
+        txDate: new Date('2099-06-12'),
+        amountMinor: 215_500n,
+        currency: 'EUR',
+        counterpartyName: 'Wise',
+        counterpartyIban: 'NL00WISE0000000000',
+        description: 'TXN-0046',
+        rawPayload: {},
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+
+      await matcher.tryMatch(ingest.row);
+
+      // Still pointing at the originally-linked transfer (idempotent).
+      const refetched = await invoiceRepo.findById(invoice.id);
+      expect(refetched?.wiseTransferId).toBe(transfer.id);
+    });
+
+    it('skips auto-link and warns when multiple unlinked invoices match', async () => {
+      const { client, transfer } = await seedNonEuFlow({
+        sourceAmountMinor: 100_000n,
+        ourReference: 'TXN-0047',
+      });
+      // Two USD invoices, identical totalMinor + currency, both within window.
+      // Real bookkeeping ambiguity: don't guess, leave for manual link.
+      for (let i = 0; i < 2; i++) {
+        await invoiceRepo.issue({
+          year: 2099,
+          invoice: {
+            clientId: client.id,
+            issuedAt: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
+            currency: 'USD',
+            totalMinor: 100_000n,
+            btwRateBps: 0,
+            btwMinor: null,
+            sourceEventId: null,
+          },
+          lines: [{ ordinal: 0, description: 'Consulting', lineTotalMinor: 100_000n, unitLabel: null, quantity: null }],
+        });
+      }
+
+      const ingest = await bankRepo.ingest({
+        source: BankSource.SnsCsv,
+        externalId: 'auto-link-3',
+        txDate: new Date('2099-06-12'),
+        amountMinor: 86_200n,
+        currency: 'EUR',
+        counterpartyName: 'Wise',
+        counterpartyIban: 'NL00WISE0000000000',
+        description: 'TXN-0047',
+        rawPayload: {},
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+
+      await matcher.tryMatch(ingest.row);
+
+      // Neither invoice should have been touched.
+      const rows = await db
+        .selectFrom('invoice')
+        .select(['id', 'wiseTransferId'])
+        .where('clientId', '=', client.id)
+        .execute();
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row.wiseTransferId).toBeNull();
+      }
+      // And the bank_tx → wise_transfer match still landed regardless.
+      const refetchedBank = await bankRepo.findById(ingest.row.id);
+      expect(refetchedBank?.matchedTransferId).toBe(transfer.id);
+    });
+  });
+
   it('matches a bank tx to an invoice via YYYY/NNN reference', async () => {
     const client = await clientRepo.create({
       name: 'Acme Studio',
