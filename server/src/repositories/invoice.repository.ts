@@ -98,11 +98,14 @@ export class InvoiceRepository {
   }
 
   /**
-   * Paginated list with optional year + status filters. Status is derived
-   * from the bank_transaction left-join — `paid` ⇒ a row matched this
-   * invoice, `open` ⇒ none. Returns the page slice plus the unsliced total
-   * so the UI can size the pager without a second round trip. Newest
-   * issuedAt first (ties broken by number desc).
+   * Paginated list with optional year + status filters. An invoice counts
+   * as `paid` when a bank_transaction points at it directly (matched
+   * domestic invoice) OR at its wise_transfer (export-non-EU flow paid
+   * via Wise). Two left-joins cover both routes; `matchedBankTxId` in
+   * the returned row coalesces them so callers don't have to care which
+   * path landed. Returns the page slice plus the unsliced total so the
+   * UI can size the pager without a second round trip. Newest issuedAt
+   * first (ties broken by number desc).
    */
   async findPaginated(input: { year?: number; status?: 'open' | 'paid'; offset: number; limit: number }): Promise<{
     items: Array<Invoice & { clientName: string | null; matchedBankTxId: string | null }>;
@@ -111,16 +114,17 @@ export class InvoiceRepository {
     let query = this.db
       .selectFrom('invoice')
       .innerJoin('client', 'client.id', 'invoice.clientId')
-      .leftJoin('bank_transaction', 'bank_transaction.matchedInvoiceId', 'invoice.id');
+      .leftJoin('bank_transaction as bt_direct', 'bt_direct.matchedInvoiceId', 'invoice.id')
+      .leftJoin('bank_transaction as bt_wise', 'bt_wise.matchedTransferId', 'invoice.wiseTransferId');
     if (input.year !== undefined) {
       const start = new Date(Date.UTC(input.year, 0, 1));
       const end = new Date(Date.UTC(input.year + 1, 0, 1));
       query = query.where('invoice.issuedAt', '>=', start).where('invoice.issuedAt', '<', end);
     }
     if (input.status === 'paid') {
-      query = query.where('bank_transaction.id', 'is not', null);
+      query = query.where((eb) => eb.or([eb('bt_direct.id', 'is not', null), eb('bt_wise.id', 'is not', null)]));
     } else if (input.status === 'open') {
-      query = query.where('bank_transaction.id', 'is', null);
+      query = query.where('bt_direct.id', 'is', null).where('bt_wise.id', 'is', null);
     }
 
     const totalRow = (await query.select((eb) => eb.fn.countAll<string>().as('count')).executeTakeFirst()) as
@@ -130,7 +134,7 @@ export class InvoiceRepository {
 
     const items = (await query
       .selectAll('invoice')
-      .select(['client.name as clientName', 'bank_transaction.id as matchedBankTxId'])
+      .select((eb) => ['client.name as clientName', eb.fn.coalesce('bt_direct.id', 'bt_wise.id').as('matchedBankTxId')])
       .orderBy('invoice.issuedAt', 'desc')
       .orderBy('invoice.number', 'desc')
       .limit(input.limit)

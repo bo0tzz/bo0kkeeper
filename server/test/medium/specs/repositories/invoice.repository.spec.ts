@@ -1,8 +1,16 @@
 import { Kysely } from 'kysely';
-import { BankSource, ClientClass, MatchConfidence, TradeName } from 'src/enum';
+import {
+  BankSource,
+  ClientClass,
+  MatchConfidence,
+  TradeName,
+  WiseTransferDirection,
+  WiseTransferState,
+} from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -12,6 +20,7 @@ describe('InvoiceRepository', () => {
   let clientRepo: ClientRepository;
   let invoiceRepo: InvoiceRepository;
   let bankTxRepo: BankTransactionRepository;
+  let wiseRepo: WiseTransferRepository;
   let clientId: string;
 
   beforeEach(async () => {
@@ -19,6 +28,7 @@ describe('InvoiceRepository', () => {
     clientRepo = new ClientRepository(db);
     invoiceRepo = new InvoiceRepository(db);
     bankTxRepo = new BankTransactionRepository(db);
+    wiseRepo = new WiseTransferRepository(db);
     const client = await clientRepo.create({
       name: 'Test Client',
       class: ClientClass.NonEu,
@@ -214,6 +224,69 @@ describe('InvoiceRepository', () => {
       const open = await invoiceRepo.findPaginated({ status: 'open', offset: 0, limit: 50 });
       expect(open.total).toBe(1);
       expect(open.items[0].matchedBankTxId).toBeNull();
+    });
+
+    it('treats an invoice as paid when its wise_transfer has a matched bank_tx (Wise route)', async () => {
+      // Mirrors the FUTO field case: USD invoice paid via Wise USD→EUR
+      // payout. bank_tx points at the wise_transfer (not at the invoice
+      // directly), but the invoice is paid for accounting purposes.
+      const transfer = await wiseRepo.create({
+        wiseTransferId: 'WISE-PAID-VIA-WISE',
+        direction: WiseTransferDirection.Out,
+        sourceAmountMinor: 479_100n,
+        sourceCurrency: 'USD',
+        targetAmountMinor: 413_040n,
+        targetCurrency: 'EUR',
+        fxRate: '0.862',
+        feeMinor: 1442n,
+        feeCurrency: 'USD',
+        state: WiseTransferState.OutgoingPaymentSent,
+        stateUpdatedAt: new Date(),
+        ourReference: 'TXN-9001',
+        counterpartyName: null,
+        correlationId: null,
+      });
+      const invoice = await invoiceRepo.issue({
+        year: 2099,
+        invoice: {
+          clientId,
+          issuedAt: new Date('2099-07-01'),
+          currency: 'USD',
+          totalMinor: 479_100n,
+          sourceEventId: null,
+          wiseTransferId: transfer.id,
+        },
+        lines: [],
+      });
+      const bankIngest = await bankTxRepo.ingest({
+        source: BankSource.SnsCsv,
+        externalId: 'wise-payout',
+        txDate: new Date('2099-07-05'),
+        amountMinor: 413_040n,
+        currency: 'EUR',
+        counterpartyName: null,
+        counterpartyIban: null,
+        description: 'TXN-9001',
+        rawPayload: {},
+      });
+      if (!bankIngest.ingested) {
+        throw new Error('precondition');
+      }
+      await db
+        .updateTable('bank_transaction')
+        .set({
+          matchedTransferId: transfer.id,
+          matchedAt: new Date(),
+          matchConfidence: MatchConfidence.AutoHigh,
+        })
+        .where('id', '=', bankIngest.row.id)
+        .execute();
+
+      const paid = await invoiceRepo.findPaginated({ status: 'paid', offset: 0, limit: 50 });
+      expect(paid.items.find((i) => i.id === invoice.id)?.matchedBankTxId).toBe(bankIngest.row.id);
+
+      const open = await invoiceRepo.findPaginated({ status: 'open', offset: 0, limit: 50 });
+      expect(open.items.find((i) => i.id === invoice.id)).toBeUndefined();
     });
 
     it('combines year + status filters', async () => {
