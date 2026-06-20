@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.2](https://github.com/bo0tzz/bo0kkeeper/compare/v0.4.1...v0.4.2) (2026-06-20)
+
+
+### Bug Fixes
+
+* **deps:** update actions/checkout action to v7 ([#43](https://github.com/bo0tzz/bo0kkeeper/issues/43)) ([28ca53b](https://github.com/bo0tzz/bo0kkeeper/commit/28ca53bc65561571e7c946715283088146f360cb))
+* **deps:** update debian docker tag to v13 ([#44](https://github.com/bo0tzz/bo0kkeeper/issues/44)) ([c0d20a0](https://github.com/bo0tzz/bo0kkeeper/commit/c0d20a0e97e4f165bd62caf552c76904b987d818))
+* **deps:** update dependency globals to v17 ([#45](https://github.com/bo0tzz/bo0kkeeper/issues/45)) ([a65e204](https://github.com/bo0tzz/bo0kkeeper/commit/a65e204c928526ce8f96b5cbee8530a67e587390))
+* **deps:** update dependency nestjs-cls to v6 ([#46](https://github.com/bo0tzz/bo0kkeeper/issues/46)) ([8786207](https://github.com/bo0tzz/bo0kkeeper/commit/8786207b6f26bf2e25ae3760d3e11ad20a941e47))
+* **deps:** update docker/dockerfile docker tag to v1.25 ([#40](https://github.com/bo0tzz/bo0kkeeper/issues/40)) ([5069502](https://github.com/bo0tzz/bo0kkeeper/commit/50695020177144eb33ad3068abab39f6f8847c31))
+* **deps:** update playwright monorepo to v1.61.0 ([#41](https://github.com/bo0tzz/bo0kkeeper/issues/41)) ([166d96d](https://github.com/bo0tzz/bo0kkeeper/commit/166d96d60dc5de686b28e8ce31f85f480a6682d5))
+* **deps:** update svelte ([#42](https://github.com/bo0tzz/bo0kkeeper/issues/42)) ([3366961](https://github.com/bo0tzz/bo0kkeeper/commit/33669613144b170b06a4382331fbcd94a6ea63de))
+* **deps:** update vitest to v4.1.9 ([#39](https://github.com/bo0tzz/bo0kkeeper/issues/39)) ([90d0dc9](https://github.com/bo0tzz/bo0kkeeper/commit/90d0dc94514a75a82310fdd9949237dfbbc8eb28))
+* **invoices:** /invoices status = paid when wise_transfer is matched too ([6cc649a](https://github.com/bo0tzz/bo0kkeeper/commit/6cc649a58e349c5bd62b9db69c555a0bdaa09a57))
+* **matcher:** auto-link invoice to wise_transfer on bank_tx → transfer match ([6425e88](https://github.com/bo0tzz/bo0kkeeper/commit/6425e88b659e305fb5c7701dcf21b08c805b174a))
+* **matcher:** don't auto-approve pending expenses on link; sheet-write on whichever event completes (matched ∧ approved) ([be3d5d7](https://github.com/bo0tzz/bo0kkeeper/commit/be3d5d7dff1a74aee646c79670b6bbea5544c355))
+
 ## [0.4.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.4.0...v0.4.1) (2026-06-19)
 
 
