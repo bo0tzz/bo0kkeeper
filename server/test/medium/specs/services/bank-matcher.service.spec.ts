@@ -77,15 +77,24 @@ describe('BankMatcherService', () => {
       writeExpenseRow: ReturnType<typeof vi.fn>;
     };
     sheetSync = new SheetSyncService(
-      db,
+      bankRepo,
       clientRepo,
       new ExpenseRepository(db),
       new InvoiceRepository(db),
+      new WiseTransferRepository(db),
       sheetWriter,
       new EventRepository(db),
     );
     recurringFee = new RecurringFeeService(bankRepo, new ExpenseRepository(db), new EventRepository(db), sheetSync);
-    matcher = new BankMatcherService(db, bankRepo, sheetSync, new EventRepository(db), recurringFee);
+    matcher = new BankMatcherService(
+      bankRepo,
+      new ExpenseRepository(db),
+      invoiceRepo,
+      transferRepo,
+      sheetSync,
+      new EventRepository(db),
+      recurringFee,
+    );
   });
 
   afterEach(async () => {

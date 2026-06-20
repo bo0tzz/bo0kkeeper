@@ -45,9 +45,25 @@ async function main(): Promise<void> {
     const expenseRepo = new ExpenseRepository(db);
     const transferRepo = new WiseTransferRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
-    const sheetSync = new SheetSyncService(db, clientRepo, expenseRepo, invoiceRepo, sheetWriter, eventRepo);
+    const sheetSync = new SheetSyncService(
+      bankRepo,
+      clientRepo,
+      expenseRepo,
+      invoiceRepo,
+      new WiseTransferRepository(db),
+      sheetWriter,
+      eventRepo,
+    );
     const recurringFee = new RecurringFeeService(bankRepo, expenseRepo, eventRepo, sheetSync);
-    const matcher = new BankMatcherService(db, bankRepo, sheetSync, eventRepo, recurringFee);
+    const matcher = new BankMatcherService(
+      bankRepo,
+      expenseRepo,
+      invoiceRepo,
+      transferRepo,
+      sheetSync,
+      eventRepo,
+      recurringFee,
+    );
 
     console.log('=== Wise transfers (varied states) ===');
     await ensureWiseTransfer(transferRepo, {

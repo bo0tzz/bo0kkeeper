@@ -58,6 +58,28 @@ export class BankTransactionRepository {
   }
 
   /**
+   * Count + small id-sample of auto-low matches booked in `[start, end)`.
+   * Drives the quarterly-aggregator's "expense_low_confidence_match" warning
+   * so the user knows what to confirm before filing.
+   */
+  async findLowConfidenceInPeriod(input: {
+    start: Date;
+    end: Date;
+    sampleLimit: number;
+  }): Promise<{ count: number; sampleIds: string[] }> {
+    const base = this.db
+      .selectFrom('bank_transaction')
+      .where('matchConfidence', '=', MatchConfidence.AutoLow)
+      .where('txDate', '>=', input.start)
+      .where('txDate', '<', input.end);
+    const [countRow, sample] = await Promise.all([
+      base.select((eb) => eb.fn.countAll<string>().as('total')).executeTakeFirstOrThrow(),
+      base.select(['id']).limit(input.sampleLimit).execute(),
+    ]);
+    return { count: Number(countRow.total), sampleIds: sample.map((row) => row.id) };
+  }
+
+  /**
    * Set the manual category for a row (or clear it with null). Categorizing
    * implies "not a real income/expense", so any existing match is cleared —
    * match and category are mutually exclusive resolution paths. Returns the
@@ -138,6 +160,41 @@ export class BankTransactionRepository {
       .where('txDate', '>=', new Date(since))
       .executeTakeFirst()) as { total: string | null } | undefined;
     return result?.total ? BigInt(result.total) : 0n;
+  }
+
+  /**
+   * Income-side bank_txs (matched to invoice or wise_transfer at auto_high
+   * or manual confidence) whose sheet row never landed. Drives the retry
+   * sweep.
+   */
+  async findMatchedReadyForSheet(): Promise<BankTransaction[]> {
+    return (await this.db
+      .selectFrom('bank_transaction')
+      .selectAll()
+      .where('matchedAt', 'is not', null)
+      .where('matchConfidence', 'in', [MatchConfidence.AutoHigh, MatchConfidence.Manual])
+      .where('sheetRowAt', 'is', null)
+      .where((eb) => eb.or([eb('matchedInvoiceId', 'is not', null), eb('matchedTransferId', 'is not', null)]))
+      .execute()) as BankTransaction[];
+  }
+
+  /** Mark a bank_tx as having its sheet income row successfully written. */
+  async markSheetRowWritten(id: string): Promise<void> {
+    await this.db
+      .updateTable('bank_transaction')
+      .set({ sheetRowAt: new Date(), updatedAt: new Date() })
+      .where('id', '=', id)
+      .execute();
+  }
+
+  /** Just the `sheetRowAt` value — used by the retry job to detect success after a side-effecting append. */
+  async getSheetRowAt(id: string): Promise<Date | string | null> {
+    const row = (await this.db
+      .selectFrom('bank_transaction')
+      .select('sheetRowAt')
+      .where('id', '=', id)
+      .executeTakeFirst()) as { sheetRowAt: Date | string | null } | undefined;
+    return row?.sheetRowAt ?? null;
   }
 
   /**

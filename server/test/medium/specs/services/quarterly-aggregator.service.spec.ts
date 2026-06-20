@@ -48,7 +48,7 @@ describe('QuarterlyAggregatorService', () => {
     clientRepo = new ClientRepository(db);
     expenseRepo = new ExpenseRepository(db);
     transferRepo = new WiseTransferRepository(db);
-    aggregator = new QuarterlyAggregatorService(db);
+    aggregator = new QuarterlyAggregatorService(invoiceRepo, transferRepo, expenseRepo, bankRepo);
   });
 
   afterEach(async () => {

@@ -47,6 +47,22 @@ export class ExpenseRepository {
   }
 
   /**
+   * Bulk lookup of vendor labels keyed by id. Used by the /transactions
+   * unified view to label matched bank rows in one round trip.
+   */
+  async findVendorsByIds(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) {
+      return new Map();
+    }
+    const rows = (await this.db
+      .selectFrom('expense')
+      .select(['id', 'vendor'])
+      .where('id', 'in', ids)
+      .execute()) as Array<{ id: string; vendor: string }>;
+    return new Map(rows.map((row) => [row.id, row.vendor]));
+  }
+
+  /**
    * Look up an auto-created bank-fee expense by its source bank-tx.
    * Used by the matcher's create-Expense branch to stay idempotent on
    * reprocess / repeat ingest.
@@ -206,6 +222,116 @@ export class ExpenseRepository {
       .execute()) as Array<Expense & { bankTxId: string; bankTxDate: Date | string }>;
   }
 
+  /**
+   * Unmatched expenses with matching amount + currency in a date window.
+   * Drives the bank-matcher's auto-low heuristic — the service still
+   * applies the fuzzy-vendor narrowing on top.
+   */
+  async findUnmatchedAmountAndDateWindow(input: {
+    amountMinor: bigint;
+    currency: string;
+    dateLow: Date;
+    dateHigh: Date;
+  }): Promise<Expense[]> {
+    return (await this.db
+      .selectFrom('expense')
+      .selectAll()
+      .where('amountMinor', '=', input.amountMinor)
+      .where('currency', '=', input.currency)
+      .where('expenseDate', '>=', input.dateLow)
+      .where('expenseDate', '<=', input.dateHigh)
+      .where(({ not, exists, selectFrom }) =>
+        not(
+          exists(
+            selectFrom('bank_transaction')
+              .select('id')
+              .whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
+          ),
+        ),
+      )
+      .execute()) as Expense[];
+  }
+
+  /**
+   * Match-candidate list for the bank-tx Link modal. Returns the abbreviated
+   * shape the UI cares about. With `query`, runs a case-insensitive vendor
+   * substring filter and includes already-matched rows (the operator may be
+   * fixing a wrong link). Without, restricts to unmatched.
+   */
+  async findMatchCandidates(input: { query?: string; limit: number }): Promise<ExpenseMatchCandidate[]> {
+    const like = input.query ? `%${input.query.toLowerCase()}%` : null;
+    let qb = this.db
+      .selectFrom('expense')
+      .select(['id', 'vendor', 'amountMinor', 'currency', 'expenseDate', 'status'])
+      .orderBy('expenseDate', 'desc')
+      .limit(input.limit);
+    qb = like
+      ? qb.where((eb) => eb(eb.fn<string>('lower', ['vendor']), 'like', like))
+      : qb.where(({ not, exists, selectFrom }) =>
+          not(
+            exists(
+              selectFrom('bank_transaction')
+                .select('id')
+                .whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
+            ),
+          ),
+        );
+    return (await qb.execute()) as ExpenseMatchCandidate[];
+  }
+
+  /** Mark an expense as having its sheet row successfully written. */
+  async markSheetRowWritten(id: string): Promise<void> {
+    await this.db
+      .updateTable('expense')
+      .set({ sheetRowAt: new Date(), updatedAt: new Date() })
+      .where('id', '=', id)
+      .execute();
+  }
+
+  /**
+   * Pending-review expense count + a small vendor sample for the
+   * quarterly-aggregator warning panel. One round trip.
+   */
+  async findPendingInPeriod(input: {
+    start: Date;
+    end: Date;
+    sampleLimit: number;
+  }): Promise<{ count: number; sampleVendors: string[] }> {
+    const [countRow, sample] = await Promise.all([
+      this.db
+        .selectFrom('expense')
+        .select((eb) => eb.fn.countAll<string>().as('total'))
+        .where('status', '=', ExpenseStatus.PendingReview)
+        .where('expenseDate', '>=', input.start)
+        .where('expenseDate', '<', input.end)
+        .executeTakeFirstOrThrow(),
+      this.db
+        .selectFrom('expense')
+        .select(['vendor'])
+        .where('status', '=', ExpenseStatus.PendingReview)
+        .where('expenseDate', '>=', input.start)
+        .where('expenseDate', '<', input.end)
+        .limit(input.sampleLimit)
+        .execute(),
+    ]);
+    return { count: Number(countRow.total), sampleVendors: sample.map((row) => row.vendor) };
+  }
+
+  /**
+   * Approved expenses whose `expenseDate` falls in `[start, end)`. Drives
+   * the per-quarter accountant export.
+   */
+  async findApprovedInPeriod(start: Date, end: Date): Promise<Expense[]> {
+    return (await this.db
+      .selectFrom('expense')
+      .selectAll()
+      .where('status', '=', ExpenseStatus.Approved)
+      .where('expenseDate', '>=', start)
+      .where('expenseDate', '<', end)
+      .orderBy('expenseDate', 'asc')
+      .execute()) as Expense[];
+  }
+
   async countStaleSheetWrites(staleAfterMs: number): Promise<number> {
     const threshold = new Date(Date.now() - staleAfterMs);
     const result = (await this.db
@@ -245,4 +371,14 @@ export type ExpenseListPage = {
   items: Expense[];
   total: number;
   hasMore: boolean;
+};
+
+/** Abbreviated row returned by the match-candidate list. */
+export type ExpenseMatchCandidate = {
+  id: string;
+  vendor: string;
+  amountMinor: bigint | string;
+  currency: string;
+  expenseDate: Date | string;
+  status: string;
 };

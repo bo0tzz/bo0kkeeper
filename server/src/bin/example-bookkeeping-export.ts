@@ -8,6 +8,8 @@
 import { Kysely } from 'kysely';
 import { writeFileSync } from 'node:fs';
 import { loadConfig } from 'src/config';
+import { ExpenseRepository } from 'src/repositories/expense.repository';
+import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { DB } from 'src/schema';
 import { BookkeepingExportService } from 'src/services/bookkeeping-export.service';
 import { Quarter } from 'src/services/quarterly-aggregator.service';
@@ -24,7 +26,7 @@ async function main(): Promise<void> {
   const cfg = loadConfig();
   const db = new Kysely<DB>(getKyselyConfig(cfg.database));
   try {
-    const service = new BookkeepingExportService(db);
+    const service = new BookkeepingExportService(new InvoiceRepository(db), new ExpenseRepository(db));
     const { buffer, filename } = await service.exportQuarter(year, quarter);
     writeFileSync(outPath, buffer);
     console.log(`wrote ${outPath} (server filename would be: ${filename})`);

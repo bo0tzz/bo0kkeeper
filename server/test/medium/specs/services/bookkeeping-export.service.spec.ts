@@ -46,7 +46,7 @@ describe('BookkeepingExportService', () => {
     clientRepo = new ClientRepository(db);
     invoiceRepo = new InvoiceRepository(db);
     expenseRepo = new ExpenseRepository(db);
-    service = new BookkeepingExportService(db);
+    service = new BookkeepingExportService(invoiceRepo, expenseRepo);
   });
 
   afterEach(async () => {

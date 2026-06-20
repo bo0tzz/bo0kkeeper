@@ -86,10 +86,11 @@ describe('SheetSyncService', () => {
       writeExpenseRow: ReturnType<typeof vi.fn>;
     };
     sheetSync = new SheetSyncService(
-      db,
+      bankRepo,
       clientRepo,
       expenseRepo,
       new InvoiceRepository(db),
+      new WiseTransferRepository(db),
       sheetWriter,
       new EventRepository(db),
     );

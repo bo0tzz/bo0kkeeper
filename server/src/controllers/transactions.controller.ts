@@ -1,12 +1,11 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Kysely } from 'kysely';
-import { InjectKysely } from 'nestjs-kysely';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import { ListTransactionsQueryDto, ListTransactionsResponseDto } from 'src/dtos/transactions.dto';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
+import { ExpenseRepository } from 'src/repositories/expense.repository';
+import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
-import { DB } from 'src/schema';
 
 /**
  * Unified "all money flows" view — the in-system equivalent of the
@@ -23,9 +22,10 @@ import { DB } from 'src/schema';
 @Controller('/api/transactions')
 export class TransactionsController {
   constructor(
-    @InjectKysely() private readonly db: Kysely<DB>,
     private readonly bankTransactionRepository: BankTransactionRepository,
     private readonly wiseTransferRepository: WiseTransferRepository,
+    private readonly invoiceRepository: InvoiceRepository,
+    private readonly expenseRepository: ExpenseRepository,
   ) {}
 
   @Get()
@@ -47,9 +47,11 @@ export class TransactionsController {
     const matchedTransferIds = unique(bankRows.map((r) => r.matchedTransferId).filter((v) => v !== null));
     const matchedInvoiceIds = unique(bankRows.map((r) => r.matchedInvoiceId).filter((v) => v !== null));
     const matchedExpenseIds = unique(bankRows.map((r) => r.matchedExpenseId).filter((v) => v !== null));
-    const transferRefs = await this.lookupTransferRefs(matchedTransferIds);
-    const invoiceNumbers = await this.lookupInvoiceNumbers(matchedInvoiceIds);
-    const expenseVendors = await this.lookupExpenseVendors(matchedExpenseIds);
+    const [transferRefs, invoiceNumbers, expenseVendors] = await Promise.all([
+      this.wiseTransferRepository.findOurReferencesByIds(matchedTransferIds),
+      this.invoiceRepository.findNumbersByIds(matchedInvoiceIds),
+      this.expenseRepository.findVendorsByIds(matchedExpenseIds),
+    ]);
 
     const all = [
       ...bankRows.map((r) => mapBankRow(r, { transferRefs, invoiceNumbers, expenseVendors })),
@@ -66,34 +68,6 @@ export class TransactionsController {
     });
     filtered.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0));
     return { items: filtered, total: filtered.length };
-  }
-
-  private async lookupTransferRefs(ids: string[]): Promise<Map<string, string | null>> {
-    if (ids.length === 0) {
-      return new Map();
-    }
-    const rows = await this.db
-      .selectFrom('wise_transfer')
-      .select(['id', 'ourReference'])
-      .where('id', 'in', ids)
-      .execute();
-    return new Map(rows.map((r) => [r.id, r.ourReference]));
-  }
-
-  private async lookupInvoiceNumbers(ids: string[]): Promise<Map<string, string>> {
-    if (ids.length === 0) {
-      return new Map();
-    }
-    const rows = await this.db.selectFrom('invoice').select(['id', 'number']).where('id', 'in', ids).execute();
-    return new Map(rows.map((r) => [r.id, r.number]));
-  }
-
-  private async lookupExpenseVendors(ids: string[]): Promise<Map<string, string>> {
-    if (ids.length === 0) {
-      return new Map();
-    }
-    const rows = await this.db.selectFrom('expense').select(['id', 'vendor']).where('id', 'in', ids).execute();
-    return new Map(rows.map((r) => [r.id, r.vendor]));
   }
 }
 

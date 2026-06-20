@@ -85,4 +85,42 @@ export default typescriptEslint.config([
       '@typescript-eslint/require-await': 'off',
     },
   },
+  {
+    // Kysely + nestjs-kysely are the DB access layer. Only repositories may
+    // import them; everything else (services, controllers, jobs, etc.) talks
+    // to the DB via a repository. Exemptions:
+    //   - src/repositories/**: the layer that owns DB queries.
+    //   - src/schema/**: Kysely type defs for the DB shape.
+    //   - src/utils/database.ts + src/utils/migrations.ts: build the Kysely
+    //     instance the repos consume.
+    //   - src/app.module.ts: registers KyselyModule at app startup.
+    //   - src/bin/**: CLI compositions that wire up a Kysely + repos locally.
+    files: ['src/**/*.ts'],
+    ignores: [
+      'src/repositories/**',
+      'src/schema/**',
+      'src/utils/database.ts',
+      'src/utils/migrations.ts',
+      'src/app.module.ts',
+      'src/bin/**',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['.*'],
+              message: 'Relative imports are not allowed.',
+            },
+            {
+              group: ['kysely', 'kysely/*', 'nestjs-kysely'],
+              message:
+                'Direct DB access is restricted to src/repositories/**. Add a method to the relevant repository instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);

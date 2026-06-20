@@ -1,8 +1,6 @@
 import { Controller, Get, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { Kysely, sql } from 'kysely';
-import { InjectKysely } from 'nestjs-kysely';
-import { DB } from 'src/schema';
+import { HealthRepository } from 'src/repositories/health.repository';
 
 /**
  * Liveness + readiness probes. Both intentionally unauthenticated so
@@ -28,7 +26,7 @@ import { DB } from 'src/schema';
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);
 
-  constructor(@InjectKysely() private readonly db: Kysely<DB>) {}
+  constructor(private readonly healthRepository: HealthRepository) {}
 
   @Get()
   getHealth() {
@@ -38,7 +36,7 @@ export class HealthController {
   @Get('ready')
   async getReady(): Promise<{ status: 'ok' }> {
     try {
-      await sql`SELECT 1`.execute(this.db);
+      await this.healthRepository.ping();
       return { status: 'ok' };
     } catch (error) {
       const reason = (error as Error).message;

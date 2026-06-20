@@ -18,6 +18,7 @@ import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { BankingSessionService } from 'src/services/banking-session.service';
@@ -69,15 +70,24 @@ describe('BankingController', () => {
     const expenseRepo = new ExpenseRepository(db);
     const sheetWriter = { writeIncomeRow: vi.fn().mockResolvedValue(void 0) } as unknown as SheetWriterService;
     const sheetSync = new SheetSyncService(
-      db,
+      bankTxRepo,
       clientRepo,
       expenseRepo,
       new InvoiceRepository(db),
+      new WiseTransferRepository(db),
       sheetWriter,
       new EventRepository(db),
     );
     const recurringFee = new RecurringFeeService(bankTxRepo, expenseRepo, new EventRepository(db), sheetSync);
-    const matcher = new BankMatcherService(db, bankTxRepo, sheetSync, new EventRepository(db), recurringFee);
+    const matcher = new BankMatcherService(
+      bankTxRepo,
+      expenseRepo,
+      new InvoiceRepository(db),
+      new WiseTransferRepository(db),
+      sheetSync,
+      new EventRepository(db),
+      recurringFee,
+    );
     const enableBankingStub = { listAspsps: vi.fn().mockResolvedValue([]) } as unknown as EnableBankingRepository;
     controller = new BankingController(
       service,

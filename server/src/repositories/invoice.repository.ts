@@ -140,6 +140,22 @@ export class InvoiceRepository {
     return { items, total };
   }
 
+  /**
+   * Bulk lookup of invoice numbers keyed by id. Used by the /transactions
+   * unified view to label matched bank rows in one round trip.
+   */
+  async findNumbersByIds(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) {
+      return new Map();
+    }
+    const rows = (await this.db
+      .selectFrom('invoice')
+      .select(['id', 'number'])
+      .where('id', 'in', ids)
+      .execute()) as Array<{ id: string; number: string }>;
+    return new Map(rows.map((row) => [row.id, row.number]));
+  }
+
   /** Set the paperless document id once the PDF has been pushed. */
   async setPaperlessDocId(invoiceId: string, paperlessDocId: string): Promise<void> {
     await this.db
@@ -148,13 +164,216 @@ export class InvoiceRepository {
       .where('id', '=', invoiceId)
       .execute();
   }
+
+  /**
+   * Unmatched invoices with matching gross + currency, issued within
+   * `[issuedAfter, issuedBefore)`. Drives the bank-matcher's auto-low
+   * heuristic for incoming payments — the service still narrows on a
+   * fuzzy client-name match.
+   */
+  async findUnmatchedAmountAndIssueWindow(input: {
+    totalMinor: bigint;
+    currency: string;
+    issuedAfter: Date;
+    issuedBefore: Date;
+  }): Promise<InvoiceHeuristicCandidate[]> {
+    return (await this.db
+      .selectFrom('invoice')
+      .innerJoin('client', 'client.id', 'invoice.clientId')
+      .select([
+        'invoice.id as invoiceId',
+        'invoice.number',
+        'invoice.totalMinor',
+        'invoice.currency',
+        'invoice.issuedAt',
+        'client.name as clientName',
+      ])
+      .where('invoice.totalMinor', '=', input.totalMinor)
+      .where('invoice.currency', '=', input.currency)
+      .where('invoice.issuedAt', '>=', input.issuedAfter)
+      .where('invoice.issuedAt', '<', input.issuedBefore)
+      .where(({ not, exists, selectFrom }) =>
+        not(
+          exists(
+            selectFrom('bank_transaction')
+              .select('id')
+              .whereRef('bank_transaction.matchedInvoiceId', '=', 'invoice.id'),
+          ),
+        ),
+      )
+      .execute()) as InvoiceHeuristicCandidate[];
+  }
+
+  /**
+   * Match-candidate list for the bank-tx Link modal. Substring search on
+   * number + client name; unmatched-only when query is empty.
+   */
+  async findMatchCandidates(input: { query?: string; limit: number }): Promise<InvoiceMatchCandidate[]> {
+    const like = input.query ? `%${input.query.toLowerCase()}%` : null;
+    let qb = this.db
+      .selectFrom('invoice')
+      .leftJoin('client', 'client.id', 'invoice.clientId')
+      .select([
+        'invoice.id',
+        'invoice.number',
+        'invoice.totalMinor',
+        'invoice.currency',
+        'invoice.issuedAt',
+        'client.name as clientName',
+      ])
+      .orderBy('invoice.issuedAt', 'desc')
+      .limit(input.limit);
+    qb = like
+      ? qb.where((eb) =>
+          eb.or([
+            eb(eb.fn<string>('lower', ['invoice.number']), 'like', like),
+            eb(eb.fn<string>('lower', ['client.name']), 'like', like),
+          ]),
+        )
+      : qb.where(({ not, exists, selectFrom }) =>
+          not(
+            exists(
+              selectFrom('bank_transaction')
+                .select('id')
+                .whereRef('bank_transaction.matchedInvoiceId', '=', 'invoice.id'),
+            ),
+          ),
+        );
+    return (await qb.execute()) as InvoiceMatchCandidate[];
+  }
+
+  /**
+   * Invoices "paid in `[start, end)`" — joined with bank_transaction on
+   * matchedInvoiceId, where the bank_tx booked in the period. Drives the
+   * kasstelsel income side of the quarterly aggregate.
+   */
+  async findPaidInPeriod(start: Date, end: Date): Promise<InvoicePaidRow[]> {
+    return (await this.db
+      .selectFrom('bank_transaction')
+      .innerJoin('invoice', 'invoice.id', 'bank_transaction.matchedInvoiceId')
+      .innerJoin('client', 'client.id', 'invoice.clientId')
+      .select([
+        'invoice.number',
+        'invoice.totalMinor',
+        'invoice.eurTotalMinor',
+        'invoice.btwMinor',
+        'invoice.currency',
+        'client.class as clientClass',
+      ])
+      .where('bank_transaction.txDate', '>=', start)
+      .where('bank_transaction.txDate', '<', end)
+      .execute()) as InvoicePaidRow[];
+  }
+
+  /**
+   * Count + small number-sample of invoices issued before `end` that still
+   * have no matched bank_transaction. Wise-flow invoices (paid via Wise) are
+   * excluded — their match lives on wise_transfer, not invoice. Drives the
+   * quarterly-aggregator's "invoice_unmatched" warning.
+   */
+  async findUnmatchedBefore(input: {
+    end: Date;
+    sampleLimit: number;
+  }): Promise<{ count: number; sampleNumbers: string[] }> {
+    const base = this.db
+      .selectFrom('invoice')
+      .leftJoin('bank_transaction', 'bank_transaction.matchedInvoiceId', 'invoice.id')
+      .where('invoice.issuedAt', '<', input.end)
+      .where('invoice.wiseTransferId', 'is', null)
+      .where('bank_transaction.id', 'is', null);
+
+    const [countRow, sample] = await Promise.all([
+      base.select((eb) => eb.fn.countAll<string>().as('total')).executeTakeFirstOrThrow(),
+      base.select(['invoice.number']).limit(input.sampleLimit).execute(),
+    ]);
+    return { count: Number(countRow.total), sampleNumbers: sample.map((row) => row.number) };
+  }
+
+  /**
+   * Invoices issued in `[start, end)`, joined with client + the first
+   * invoice_line (ordinal=0) for the accountant export. invoice_line is
+   * left-joined because legacy / synthetic rows may not have lines yet.
+   */
+  async findInPeriodWithClientAndFirstLine(start: Date, end: Date): Promise<InvoiceExportRow[]> {
+    return (
+      (await this.db
+        .selectFrom('invoice')
+        .innerJoin('client', 'client.id', 'invoice.clientId')
+        // invoice_line ordinals are 0-indexed (set by invoice-composer.service);
+        // the first line carries the canonical description for the accountant.
+        .leftJoin('invoice_line', (join_) =>
+          join_.onRef('invoice_line.invoiceId', '=', 'invoice.id').on('invoice_line.ordinal', '=', 0),
+        )
+        .select([
+          'invoice.number',
+          'invoice.issuedAt',
+          'invoice.totalMinor',
+          'invoice.eurTotalMinor',
+          'invoice.btwMinor',
+          'invoice.currency',
+          'client.name as clientName',
+          'client.class as clientClass',
+          'client.vatId',
+          'client.defaultDescription',
+          'invoice_line.description as lineDescription',
+        ])
+        .where('invoice.issuedAt', '>=', start)
+        .where('invoice.issuedAt', '<', end)
+        .orderBy('invoice.issuedAt', 'asc')
+        .execute()) as InvoiceExportRow[]
+    );
+  }
 }
+
+/** Row returned by `findPaidInPeriod` — slim projection for the quarterly aggregator. */
+export type InvoicePaidRow = {
+  number: string;
+  totalMinor: bigint | string;
+  eurTotalMinor: bigint | string | null;
+  btwMinor: bigint | string | null;
+  currency: string;
+  clientClass: string;
+};
+
+export type InvoiceExportRow = {
+  number: string;
+  issuedAt: Date | string;
+  totalMinor: bigint | string;
+  eurTotalMinor: bigint | string | null;
+  btwMinor: bigint | string | null;
+  currency: string;
+  clientName: string;
+  clientClass: string;
+  vatId: string | null;
+  defaultDescription: string | null;
+  lineDescription: string | null;
+};
 
 /**
  * Allocate the next `YYYY/NNN` invoice number for the given year, gap-free.
  * Upsert pattern lets the first invoice of a new year auto-create the row.
  * Wrapped in the issuing transaction to prevent races.
  */
+/** Heuristic-candidate row used by the bank-matcher auto-low path. */
+export type InvoiceHeuristicCandidate = {
+  invoiceId: string;
+  number: string;
+  totalMinor: bigint | string;
+  currency: string;
+  issuedAt: Date | string;
+  clientName: string;
+};
+
+/** Abbreviated row used by the manual match-candidate picker. */
+export type InvoiceMatchCandidate = {
+  id: string;
+  number: string;
+  totalMinor: bigint | string;
+  currency: string;
+  issuedAt: Date | string;
+  clientName: string | null;
+};
+
 async function allocateInvoiceNumber(trx: Transaction<DB>, year: number): Promise<string> {
   const result = await sql<{ lastNumber: number }>`
     INSERT INTO "invoice_number_sequence" ("year", "lastNumber")

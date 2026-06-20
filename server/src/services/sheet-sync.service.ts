@@ -1,14 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Kysely } from 'kysely';
-import { InjectKysely } from 'nestjs-kysely';
 import { OnJob } from 'src/decorators';
-import { ClientClass, EventSource, JobName, MatchConfidence, QueueName } from 'src/enum';
-import { BankTransaction } from 'src/repositories/bank-transaction.repository';
+import { ClientClass, EventSource, JobName, QueueName } from 'src/enum';
+import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { Expense, ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
-import { DB } from 'src/schema';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { expenseToSheetRow, SheetWriterService } from 'src/services/sheet-writer.service';
 import { JobOf } from 'src/types';
 import { toDate } from 'src/utils/date';
@@ -31,10 +29,11 @@ export class SheetSyncService {
   private readonly logger = new Logger(SheetSyncService.name);
 
   constructor(
-    @InjectKysely() private readonly db: Kysely<DB>,
+    private readonly bankTransactionRepository: BankTransactionRepository,
     private readonly clientRepository: ClientRepository,
     private readonly expenseRepository: ExpenseRepository,
     private readonly invoiceRepository: InvoiceRepository,
+    private readonly wiseTransferRepository: WiseTransferRepository,
     private readonly sheetWriter: SheetWriterService,
     private readonly eventRepository: EventRepository,
   ) {}
@@ -73,7 +72,7 @@ export class SheetSyncService {
         vatMinor,
         source: `bank_tx/${bankTx.id}`,
       });
-      await this.markBankTxSheetRowAt(bankTx.id);
+      await this.bankTransactionRepository.markSheetRowWritten(bankTx.id);
     } catch (error) {
       const message = (error as Error).message;
       this.logger.error(`Sheet write failed for invoice ${invoice.number}: ${message}`);
@@ -126,7 +125,7 @@ export class SheetSyncService {
         // bookkeeping party.
         source: `wise_transfer/${transfer.id}`,
       });
-      await this.markBankTxSheetRowAt(bankTx.id);
+      await this.bankTransactionRepository.markSheetRowWritten(bankTx.id);
     } catch (error) {
       const message = (error as Error).message;
       this.logger.error(`Sheet write failed for wise_transfer ${transfer.id}: ${message}`);
@@ -149,7 +148,7 @@ export class SheetSyncService {
   async writeExpenseRowSafely(expense: Expense, date: Date, bankTxId: string): Promise<boolean> {
     try {
       await this.sheetWriter.writeExpenseRow(expenseToSheetRow(expense, date));
-      await this.markExpenseSheetRowAt(expense.id);
+      await this.expenseRepository.markSheetRowWritten(expense.id);
       return true;
     } catch (error) {
       const message = (error as Error).message;
@@ -204,43 +203,24 @@ export class SheetSyncService {
     let succeeded = 0;
 
     // Income side: matched bank_txs (auto_high or manual) missing their row.
-    const incomeRows = await this.db
-      .selectFrom('bank_transaction')
-      .selectAll()
-      .where('matchedAt', 'is not', null)
-      .where('matchConfidence', 'in', [MatchConfidence.AutoHigh, MatchConfidence.Manual])
-      .where('sheetRowAt', 'is', null)
-      .where((eb) => eb.or([eb('matchedInvoiceId', 'is not', null), eb('matchedTransferId', 'is not', null)]))
-      .execute();
+    const incomeRows = await this.bankTransactionRepository.findMatchedReadyForSheet();
 
-    for (const bankTx of incomeRows as BankTransaction[]) {
+    for (const bankTx of incomeRows) {
       attempted += 1;
       const before = bankTx.sheetRowAt;
       if (bankTx.matchedInvoiceId) {
-        const invoice = await this.db
-          .selectFrom('invoice')
-          .selectAll()
-          .where('id', '=', bankTx.matchedInvoiceId)
-          .executeTakeFirst();
+        const invoice = await this.invoiceRepository.findById(bankTx.matchedInvoiceId);
         if (invoice) {
           await this.appendInvoiceIncomeRow(bankTx, invoice);
         }
       } else if (bankTx.matchedTransferId) {
-        const transfer = await this.db
-          .selectFrom('wise_transfer')
-          .selectAll()
-          .where('id', '=', bankTx.matchedTransferId)
-          .executeTakeFirst();
+        const transfer = await this.wiseTransferRepository.findById(bankTx.matchedTransferId);
         if (transfer) {
           await this.appendWiseIncomeRow(bankTx, transfer);
         }
       }
-      const after = await this.db
-        .selectFrom('bank_transaction')
-        .select('sheetRowAt')
-        .where('id', '=', bankTx.id)
-        .executeTakeFirst();
-      if (after?.sheetRowAt && !before) {
+      const after = await this.bankTransactionRepository.getSheetRowAt(bankTx.id);
+      if (after && !before) {
         succeeded += 1;
       }
     }
@@ -261,28 +241,6 @@ export class SheetSyncService {
       this.logger.log(`Sheet write retry: ${succeeded}/${attempted} succeeded`);
     }
     return { attempted, succeeded };
-  }
-
-  /**
-   * Mark a bank_tx as having its sheet income row successfully written.
-   * The retry job uses `sheetRowAt IS NULL` to find writes to retry; setting
-   * it here closes the loop.
-   */
-  private async markBankTxSheetRowAt(bankTxId: string): Promise<void> {
-    await this.db
-      .updateTable('bank_transaction')
-      .set({ sheetRowAt: new Date(), updatedAt: new Date() })
-      .where('id', '=', bankTxId)
-      .execute();
-  }
-
-  /** Same as markBankTxSheetRowAt but for the expense row. */
-  private async markExpenseSheetRowAt(expenseId: string): Promise<void> {
-    await this.db
-      .updateTable('expense')
-      .set({ sheetRowAt: new Date(), updatedAt: new Date() })
-      .where('id', '=', expenseId)
-      .execute();
   }
 
   /**

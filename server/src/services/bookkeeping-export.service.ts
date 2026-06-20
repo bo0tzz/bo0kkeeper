@@ -1,10 +1,9 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import ExcelJS from 'exceljs';
-import { Kysely } from 'kysely';
-import { InjectKysely } from 'nestjs-kysely';
 import { join, resolve } from 'node:path';
-import { ClientClass, ExpenseLocationClass, ExpenseStatus } from 'src/enum';
-import { DB } from 'src/schema';
+import { ClientClass, ExpenseLocationClass } from 'src/enum';
+import { ExpenseRepository } from 'src/repositories/expense.repository';
+import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { Quarter } from 'src/services/quarterly-aggregator.service';
 import { minorToMajor } from 'src/utils/money';
 
@@ -35,7 +34,8 @@ export class BookkeepingExportService {
   private readonly templatesDir: string;
 
   constructor(
-    @InjectKysely() private readonly db: Kysely<DB>,
+    private readonly invoiceRepository: InvoiceRepository,
+    private readonly expenseRepository: ExpenseRepository,
     @Optional() templatesDir: string = TEMPLATES_DIR,
   ) {
     this.templatesDir = templatesDir;
@@ -115,31 +115,7 @@ export class BookkeepingExportService {
   }
 
   private async loadInvoices(periodStart: Date, periodEnd: Date): Promise<InvoiceExportRow[]> {
-    const rows = await this.db
-      .selectFrom('invoice')
-      .innerJoin('client', 'client.id', 'invoice.clientId')
-      // invoice_line ordinals are 0-indexed (set by invoice-composer.service);
-      // the first line carries the canonical description for the accountant.
-      .leftJoin('invoice_line', (join_) =>
-        join_.onRef('invoice_line.invoiceId', '=', 'invoice.id').on('invoice_line.ordinal', '=', 0),
-      )
-      .select([
-        'invoice.number',
-        'invoice.issuedAt',
-        'invoice.totalMinor',
-        'invoice.eurTotalMinor',
-        'invoice.btwMinor',
-        'invoice.currency',
-        'client.name as clientName',
-        'client.class as clientClass',
-        'client.vatId',
-        'client.defaultDescription',
-        'invoice_line.description as lineDescription',
-      ])
-      .where('invoice.issuedAt', '>=', periodStart)
-      .where('invoice.issuedAt', '<', periodEnd)
-      .orderBy('invoice.issuedAt', 'asc')
-      .execute();
+    const rows = await this.invoiceRepository.findInPeriodWithClientAndFirstLine(periodStart, periodEnd);
 
     return rows.map((r) => {
       const totalIncMinor = r.eurTotalMinor === null ? BigInt(r.totalMinor) : BigInt(r.eurTotalMinor);
@@ -163,14 +139,7 @@ export class BookkeepingExportService {
   }
 
   private async loadExpenses(periodStart: Date, periodEnd: Date): Promise<ExpenseExportRow[]> {
-    const rows = await this.db
-      .selectFrom('expense')
-      .selectAll()
-      .where('status', '=', ExpenseStatus.Approved)
-      .where('expenseDate', '>=', periodStart)
-      .where('expenseDate', '<', periodEnd)
-      .orderBy('expenseDate', 'asc')
-      .execute();
+    const rows = await this.expenseRepository.findApprovedInPeriod(periodStart, periodEnd);
 
     return rows.map((r) => {
       const totalIncMinor = BigInt(r.amountMinor);

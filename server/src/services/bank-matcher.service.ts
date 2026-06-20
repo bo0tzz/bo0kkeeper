@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Kysely, sql } from 'kysely';
-import { InjectKysely } from 'nestjs-kysely';
 import { EventSource, MatchConfidence } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { EventRepository } from 'src/repositories/event.repository';
-import { DB } from 'src/schema';
+import { ExpenseMatchCandidate, ExpenseRepository } from 'src/repositories/expense.repository';
+import { InvoiceMatchCandidate, InvoiceRepository } from 'src/repositories/invoice.repository';
+import { WiseTransferMatchCandidate, WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { RecurringFeeService } from 'src/services/recurring-fee.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { toDate } from 'src/utils/date';
@@ -26,40 +26,10 @@ const EXPENSE_DATE_TOLERANCE_DAYS = 7;
 /** Max days from invoice issue to bank tx for the heuristic to consider it. */
 const INVOICE_PAYMENT_WINDOW_DAYS = 60;
 
-export type TransferCandidate = {
-  id: string;
-  wiseTransferId: string;
-  ourReference: string | null;
-  state: string;
-  sourceCurrency: string;
-  sourceAmountMinor: bigint;
-  targetCurrency: string;
-  targetAmountMinor: bigint;
-  createdAt: Date;
-};
-
-export type InvoiceCandidate = {
-  id: string;
-  number: string;
-  totalMinor: bigint;
-  currency: string;
-  issuedAt: Date;
-  clientName: string | null;
-};
-
-export type ExpenseCandidate = {
-  id: string;
-  vendor: string;
-  amountMinor: bigint;
-  currency: string;
-  expenseDate: Date;
-  status: string;
-};
-
 export type MatchCandidates = {
-  transfers: TransferCandidate[];
-  invoices: InvoiceCandidate[];
-  expenses: ExpenseCandidate[];
+  transfers: WiseTransferMatchCandidate[];
+  invoices: InvoiceMatchCandidate[];
+  expenses: ExpenseMatchCandidate[];
 };
 
 /**
@@ -86,8 +56,10 @@ export class BankMatcherService {
   private readonly logger = new Logger(BankMatcherService.name);
 
   constructor(
-    @InjectKysely() private readonly db: Kysely<DB>,
     private readonly bankTransactionRepository: BankTransactionRepository,
+    private readonly expenseRepository: ExpenseRepository,
+    private readonly invoiceRepository: InvoiceRepository,
+    private readonly wiseTransferRepository: WiseTransferRepository,
     private readonly sheetSync: SheetSyncService,
     private readonly eventRepository: EventRepository,
     private readonly recurringFee: RecurringFeeService,
@@ -116,11 +88,7 @@ export class BankMatcherService {
 
     const txnRef = TXN_REF_PATTERN.exec(description)?.[0];
     if (txnRef) {
-      const transfer = await this.db
-        .selectFrom('wise_transfer')
-        .selectAll()
-        .where('ourReference', '=', txnRef)
-        .executeTakeFirst();
+      const transfer = await this.wiseTransferRepository.findByOurReference(txnRef);
       if (transfer) {
         await this.bankTransactionRepository.setMatch(
           bankTx.id,
@@ -135,11 +103,7 @@ export class BankMatcherService {
 
     const invoiceNumber = INVOICE_NUMBER_PATTERN.exec(description)?.[0];
     if (invoiceNumber) {
-      const invoice = await this.db
-        .selectFrom('invoice')
-        .selectAll()
-        .where('number', '=', invoiceNumber)
-        .executeTakeFirst();
+      const invoice = await this.invoiceRepository.findByNumber(invoiceNumber);
       if (invoice) {
         await this.bankTransactionRepository.setMatch(
           bankTx.id,
@@ -174,23 +138,12 @@ export class BankMatcherService {
     const dateLow = addDays(txDate, -EXPENSE_DATE_TOLERANCE_DAYS);
     const dateHigh = addDays(txDate, EXPENSE_DATE_TOLERANCE_DAYS);
 
-    const candidates = await this.db
-      .selectFrom('expense')
-      .selectAll()
-      .where('amountMinor', '=', absAmount)
-      .where('currency', '=', bankTx.currency)
-      .where('expenseDate', '>=', dateLow)
-      .where('expenseDate', '<=', dateHigh)
-      .where(({ not, exists, selectFrom }) =>
-        not(
-          exists(
-            selectFrom('bank_transaction')
-              .select('id')
-              .whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
-          ),
-        ),
-      )
-      .execute();
+    const candidates = await this.expenseRepository.findUnmatchedAmountAndDateWindow({
+      amountMinor: absAmount,
+      currency: bankTx.currency,
+      dateLow,
+      dateHigh,
+    });
 
     const matches = candidates.filter((e) => fuzzyContains(counterparty, e.vendor));
     if (matches.length !== 1) {
@@ -222,31 +175,12 @@ export class BankMatcherService {
     // the EUR-denominated bank row; that's a meaningful slice of false-negatives
     // for the non-EU/USD flow, but those are already TXN-NNNN-matched (auto_high)
     // so the heuristic skipping them is fine.
-    const candidates = await this.db
-      .selectFrom('invoice')
-      .innerJoin('client', 'client.id', 'invoice.clientId')
-      .select([
-        'invoice.id as invoiceId',
-        'invoice.number',
-        'invoice.totalMinor',
-        'invoice.currency',
-        'invoice.issuedAt',
-        'client.name as clientName',
-      ])
-      .where('invoice.totalMinor', '=', absAmount)
-      .where('invoice.currency', '=', bankTx.currency)
-      .where('invoice.issuedAt', '>=', issuedAfter)
-      .where('invoice.issuedAt', '<', issuedBefore)
-      .where(({ not, exists, selectFrom }) =>
-        not(
-          exists(
-            selectFrom('bank_transaction')
-              .select('id')
-              .whereRef('bank_transaction.matchedInvoiceId', '=', 'invoice.id'),
-          ),
-        ),
-      )
-      .execute();
+    const candidates = await this.invoiceRepository.findUnmatchedAmountAndIssueWindow({
+      totalMinor: absAmount,
+      currency: bankTx.currency,
+      issuedAfter,
+      issuedBefore,
+    });
 
     const matches = candidates.filter((i) => i.clientName && fuzzyContains(counterparty, i.clientName));
     if (matches.length !== 1) {
@@ -282,106 +216,12 @@ export class BankMatcherService {
    */
   async findMatchCandidates(query: string | undefined, limit = 20): Promise<MatchCandidates> {
     const q = query?.trim().toLowerCase();
-    const like = q ? `%${q}%` : null;
-    const excludeAlreadyMatched = !like;
-
-    const transfers = await (() => {
-      let qb = this.db
-        .selectFrom('wise_transfer')
-        .select([
-          'id',
-          'wiseTransferId',
-          'ourReference',
-          'state',
-          'sourceCurrency',
-          'sourceAmountMinor',
-          'targetCurrency',
-          'targetAmountMinor',
-          'createdAt',
-        ])
-        .orderBy('createdAt', 'desc')
-        .limit(limit);
-      if (like) {
-        qb = qb.where((eb) =>
-          eb.or([
-            eb(eb.fn<string>('lower', ['ourReference']), 'like', like),
-            eb(eb.fn<string>('lower', ['wiseTransferId']), 'like', like),
-          ]),
-        );
-      }
-      if (excludeAlreadyMatched) {
-        qb = qb.where(({ not, exists, selectFrom }) =>
-          not(
-            exists(
-              selectFrom('bank_transaction')
-                .select('id')
-                .whereRef('bank_transaction.matchedTransferId', '=', 'wise_transfer.id'),
-            ),
-          ),
-        );
-      }
-      return qb.execute();
-    })();
-
-    const invoices = await (() => {
-      let qb = this.db
-        .selectFrom('invoice')
-        .leftJoin('client', 'client.id', 'invoice.clientId')
-        .select([
-          'invoice.id',
-          'invoice.number',
-          'invoice.totalMinor',
-          'invoice.currency',
-          'invoice.issuedAt',
-          'client.name as clientName',
-        ])
-        .orderBy('invoice.issuedAt', 'desc')
-        .limit(limit);
-      if (like) {
-        qb = qb.where((eb) =>
-          eb.or([
-            eb(eb.fn<string>('lower', ['invoice.number']), 'like', like),
-            eb(eb.fn<string>('lower', ['client.name']), 'like', like),
-          ]),
-        );
-      }
-      if (excludeAlreadyMatched) {
-        qb = qb.where(({ not, exists, selectFrom }) =>
-          not(
-            exists(
-              selectFrom('bank_transaction')
-                .select('id')
-                .whereRef('bank_transaction.matchedInvoiceId', '=', 'invoice.id'),
-            ),
-          ),
-        );
-      }
-      return qb.execute();
-    })();
-
-    const expenses = await (() => {
-      let qb = this.db
-        .selectFrom('expense')
-        .select(['id', 'vendor', 'amountMinor', 'currency', 'expenseDate', 'status'])
-        .orderBy('expenseDate', 'desc')
-        .limit(limit);
-      if (like) {
-        qb = qb.where((eb) => eb(eb.fn<string>('lower', ['vendor']), 'like', like));
-      }
-      if (excludeAlreadyMatched) {
-        qb = qb.where(({ not, exists, selectFrom }) =>
-          not(
-            exists(
-              selectFrom('bank_transaction')
-                .select('id')
-                .whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
-            ),
-          ),
-        );
-      }
-      return qb.execute();
-    })();
-
+    const args = { query: q || undefined, limit };
+    const [transfers, invoices, expenses] = await Promise.all([
+      this.wiseTransferRepository.findMatchCandidates(args),
+      this.invoiceRepository.findMatchCandidates(args),
+      this.expenseRepository.findMatchCandidates(args),
+    ]);
     return { transfers, invoices, expenses };
   }
 
@@ -395,11 +235,7 @@ export class BankMatcherService {
     }
 
     if (target.type === 'wise_transfer') {
-      const transfer = await this.db
-        .selectFrom('wise_transfer')
-        .selectAll()
-        .where('id', '=', target.targetId)
-        .executeTakeFirst();
+      const transfer = await this.wiseTransferRepository.findById(target.targetId);
       if (!transfer) {
         throw new Error(`wise_transfer ${target.targetId} not found`);
       }
@@ -411,11 +247,7 @@ export class BankMatcherService {
       this.logger.log(`bank_tx ${bankTxId} → wise_transfer ${transfer.id} (manual)`);
       await this.sheetSync.appendWiseIncomeRow(bankTx, transfer);
     } else if (target.type === 'invoice') {
-      const invoice = await this.db
-        .selectFrom('invoice')
-        .selectAll()
-        .where('id', '=', target.targetId)
-        .executeTakeFirst();
+      const invoice = await this.invoiceRepository.findById(target.targetId);
       if (!invoice) {
         throw new Error(`invoice ${target.targetId} not found`);
       }
@@ -427,11 +259,7 @@ export class BankMatcherService {
       this.logger.log(`bank_tx ${bankTxId} → invoice ${invoice.id} (manual)`);
       await this.sheetSync.appendInvoiceIncomeRow(bankTx, invoice);
     } else {
-      const expense = await this.db
-        .selectFrom('expense')
-        .selectAll()
-        .where('id', '=', target.targetId)
-        .executeTakeFirst();
+      const expense = await this.expenseRepository.findById(target.targetId);
       if (!expense) {
         throw new Error(`expense ${target.targetId} not found`);
       }
@@ -551,9 +379,6 @@ export class BankMatcherService {
     return { matched, unmatched };
   }
 }
-
-// Reference sql to avoid unused-import warning if Kysely's strict-mode trips.
-void sql;
 
 /**
  * "Either name contains the other" — handles the common case where the bank

@@ -119,15 +119,24 @@ describe('BankingSyncService', () => {
     const expenseRepo = new ExpenseRepository(db);
     const sheetWriter = { append: vi.fn().mockResolvedValue(void 0) } as unknown as SheetWriterService;
     const sheetSync = new SheetSyncService(
-      db,
+      bankRepo,
       clientRepo,
       expenseRepo,
       new InvoiceRepository(db),
+      new WiseTransferRepository(db),
       sheetWriter,
       new EventRepository(db),
     );
     const recurringFee = new RecurringFeeService(bankRepo, expenseRepo, new EventRepository(db), sheetSync);
-    matcher = new BankMatcherService(db, bankRepo, sheetSync, new EventRepository(db), recurringFee);
+    matcher = new BankMatcherService(
+      bankRepo,
+      expenseRepo,
+      new InvoiceRepository(db),
+      new WiseTransferRepository(db),
+      sheetSync,
+      new EventRepository(db),
+      recurringFee,
+    );
     api = fakeApi([]);
     service = new BankingSyncService(sessionRepo, bankRepo, api, matcher, new EventRepository(db));
   });

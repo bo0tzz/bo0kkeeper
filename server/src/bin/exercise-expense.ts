@@ -21,6 +21,7 @@ import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SheetsRepository } from 'src/repositories/sheets.repository';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { RecurringFeeService } from 'src/services/recurring-fee.service';
@@ -63,9 +64,25 @@ async function main(): Promise<void> {
     const invoiceRepo = new InvoiceRepository(db);
     const eventRepo = new EventRepository(db);
     const sheetWriter = new SheetWriterService(new SheetsRepository());
-    const sheetSync = new SheetSyncService(db, clientRepo, expenseRepo, invoiceRepo, sheetWriter, eventRepo);
+    const sheetSync = new SheetSyncService(
+      bankRepo,
+      clientRepo,
+      expenseRepo,
+      invoiceRepo,
+      new WiseTransferRepository(db),
+      sheetWriter,
+      eventRepo,
+    );
     const recurringFee = new RecurringFeeService(bankRepo, expenseRepo, eventRepo, sheetSync);
-    const matcher = new BankMatcherService(db, bankRepo, sheetSync, eventRepo, recurringFee);
+    const matcher = new BankMatcherService(
+      bankRepo,
+      expenseRepo,
+      invoiceRepo,
+      new WiseTransferRepository(db),
+      sheetSync,
+      eventRepo,
+      recurringFee,
+    );
     const stubPaperless = {} as unknown as PaperlessRepository;
     const stubSettings = {} as unknown as SettingsService;
     const stubWebhook = {} as unknown as WebhookService;

@@ -5,6 +5,7 @@ import { ClientRepository } from 'src/repositories/client.repository';
 import { EnableBankingRepository } from 'src/repositories/enable-banking.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
+import { HealthRepository } from 'src/repositories/health.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { OidcRepository } from 'src/repositories/oidc.repository';
@@ -23,6 +24,7 @@ export const repositories = [
   EnableBankingRepository,
   EventRepository,
   ExpenseRepository,
+  HealthRepository,
   InvoiceRepository,
   JobRepository,
   OidcRepository,
