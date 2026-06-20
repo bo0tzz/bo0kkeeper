@@ -24,6 +24,7 @@
     "migrations:run": "sql-tools -u ${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/bo0kkeeper} migrations run",
     "migrations:revert": "sql-tools -u ${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/bo0kkeeper} migrations revert",
     "migrations:debug": "sql-tools -u ${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/bo0kkeeper} migrations generate --debug",
+    "boot:check": "node ./dist/bin/boot-check.js",
     "scrub": "node ./dist/bin/scrub.js",
     "replay": "node ./dist/bin/replay.js",
     "sync:open-api": "node ./dist/bin/sync-open-api.js",

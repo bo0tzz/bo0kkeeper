@@ -103,9 +103,64 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter web build
 
+  upgrade-smoke:
+    name: server / upgrade smoke
+    runs-on: ubuntu-latest
+    # Catches the class of bug where main works fine and HEAD works fine on a
+    # fresh DB, but the transition main → HEAD breaks (e.g. pg-boss skipping
+    # a schema version, a forward-only Kysely migration that won't replay).
+    # Boots main's boot-check first to build the prior schema state, then
+    # boots HEAD's against the same DB.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_DATABASE_NAME: postgres
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: immich-app/devtools/actions/use-mise@cf6e190bacde3d7bda59372a786b36ac7d01536a # use-mise-action-v2.0.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Phase 1 — bring DB to main's state
+        run: |
+          git worktree add /tmp/main-worktree origin/main
+          cd /tmp/main-worktree
+          pnpm install --frozen-lockfile
+          pnpm --filter bo0kkeeper build
+          # Skip if main predates boot:check (bootstrap PR). After this PR
+          # lands, every subsequent PR exercises the real upgrade path.
+          if [ -f server/dist/bin/boot-check.js ]; then
+            pnpm --filter bo0kkeeper boot:check
+          else
+            echo "::warning ::main lacks boot:check; skipping phase 1 (bootstrap)"
+          fi
+
+      - name: Phase 2 — replay HEAD's migrations on top
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm --filter bo0kkeeper build
+          pnpm --filter bo0kkeeper boot:check
+
   image:
     runs-on: ubuntu-latest
-    needs: [format, server-lint, server-check, server-unit, server-medium, web-lint, web-check, web-build]
+    needs: [format, server-lint, server-check, server-unit, server-medium, upgrade-smoke, web-lint, web-check, web-build]
     permissions:
       contents: read
       packages: write
