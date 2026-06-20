@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@bo0kkeeper/sdk": "workspace:*",
-    "@immich/ui": "^0.77.3"
+    "@immich/ui": "^0.81.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
