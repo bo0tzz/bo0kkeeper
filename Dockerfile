@@ -64,7 +64,13 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 
 # ---- Stage: runtime ------------------------------------------------------
 FROM node:24-bookworm-slim@sha256:c2d5ade763cacfb03fe9cb8e8af5d1be5041ff331921fa26a9b231ca3a4f780a AS runtime
+# Build identifier — CI passes the release tag (e.g. `0.4.3`) or short SHA.
+# Surfaced in startup logs + `/api/system/info` so the running build
+# uniquely identifies a commit. `dev` is the fallback when this image is
+# built locally without CI passing a value.
+ARG APP_VERSION=dev
 ENV NODE_ENV=production \
+    APP_VERSION=$APP_VERSION \
     WEB_DIST_DIR=/app/web \
     PORT=2283 \
     HOST=0.0.0.0

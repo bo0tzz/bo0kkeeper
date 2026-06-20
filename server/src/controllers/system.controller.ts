@@ -1,6 +1,7 @@
 import { Controller, Get, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { loadConfig } from 'src/config';
+import { APP_VERSION } from 'src/constants';
 import { Authenticated } from 'src/decorators';
 import { IntegrationsResponseDto, SheetWriteStatusDto, SystemInfoDto } from 'src/dtos/system.dto';
 import { JobName } from 'src/enum';
@@ -32,6 +33,7 @@ export class SystemController {
   getInfo(): SystemInfoDto {
     const cutoverDate = loadConfig().cutoverDate ?? null;
     return {
+      version: APP_VERSION,
       cutoverDate,
       ingestionEnabled: cutoverDate !== null,
     };

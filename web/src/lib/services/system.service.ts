@@ -1,6 +1,7 @@
 import { apiGet, apiPost } from '$lib/services/api';
 
 export type SystemInfo = {
+  version: string;
   cutoverDate: string | null;
   ingestionEnabled: boolean;
 };

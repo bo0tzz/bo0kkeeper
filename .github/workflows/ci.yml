@@ -192,5 +192,11 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # APP_VERSION is what /api/system/info and the startup log report.
+          # metadata-action's `outputs.version` is the primary tag picked by
+          # the tag rules above: a semver string for release events, the
+          # branch name for main pushes, the short SHA for PR builds.
+          build-args: |
+            APP_VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

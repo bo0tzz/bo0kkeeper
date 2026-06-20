@@ -3,6 +3,12 @@ import z from 'zod';
 
 const SystemInfoSchema = z
   .object({
+    /**
+     * Build identifier — release tag (e.g. `0.4.3`) in prod, `dev` when
+     * running unbuilt locally. Baked into the Docker image as APP_VERSION
+     * by CI, so what's serving traffic uniquely identifies a commit/release.
+     */
+    version: z.string(),
     /** Active CUTOVER_DATE if configured; null = ingestion disabled. */
     cutoverDate: z.iso.date().nullable(),
     /** Convenience boolean derived from cutoverDate, for UI banners. */

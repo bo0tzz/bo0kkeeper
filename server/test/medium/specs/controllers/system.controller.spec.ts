@@ -21,12 +21,12 @@ describe('SystemController', () => {
   it('reports the active cutover date and ingestionEnabled=true when set', () => {
     process.env.CUTOVER_DATE = '2026-05-01';
     const result = new SystemController({} as never, {} as never, {} as never, {} as never).getInfo();
-    expect(result).toEqual({ cutoverDate: '2026-05-01', ingestionEnabled: true });
+    expect(result).toEqual({ version: 'dev', cutoverDate: '2026-05-01', ingestionEnabled: true });
   });
 
   it('reports cutoverDate=null and ingestionEnabled=false when unset', () => {
     delete process.env.CUTOVER_DATE;
     const result = new SystemController({} as never, {} as never, {} as never, {} as never).getInfo();
-    expect(result).toEqual({ cutoverDate: null, ingestionEnabled: false });
+    expect(result).toEqual({ version: 'dev', cutoverDate: null, ingestionEnabled: false });
   });
 });

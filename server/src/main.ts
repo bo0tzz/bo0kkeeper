@@ -6,12 +6,13 @@ import { join, resolve } from 'node:path';
 import { applyCommonAppConfig, serveWebStatic } from 'src/app.common';
 import { AppModule } from 'src/app.module';
 import { loadConfig } from 'src/config';
-import { APP_NAME } from 'src/constants';
+import { APP_NAME, APP_VERSION } from 'src/constants';
 import { runMigrations } from 'src/utils/migrations';
 
 async function bootstrap() {
   const config = loadConfig();
   process.title = `${APP_NAME}-server`;
+  new Logger(APP_NAME).log(`${APP_NAME}-server starting (version=${APP_VERSION})`);
 
   // Run migrations before Nest instantiates — many onModuleInit hooks
   // (JobRepository.setup, SettingsService.ensureInitialized) read schema
