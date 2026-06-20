@@ -16,7 +16,7 @@ jobs:
     name: format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: immich-app/devtools/actions/use-mise@cf6e190bacde3d7bda59372a786b36ac7d01536a # use-mise-action-v2.0.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -28,7 +28,7 @@ jobs:
     name: server / lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: immich-app/devtools/actions/use-mise@cf6e190bacde3d7bda59372a786b36ac7d01536a # use-mise-action-v2.0.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -39,7 +39,7 @@ jobs:
     name: server / typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: immich-app/devtools/actions/use-mise@cf6e190bacde3d7bda59372a786b36ac7d01536a # use-mise-action-v2.0.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -50,7 +50,7 @@ jobs:
     name: server / unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: immich-app/devtools/actions/use-mise@cf6e190bacde3d7bda59372a786b36ac7d01536a # use-mise-action-v2.0.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -63,7 +63,7 @@ jobs:
     # Medium tests spin Postgres via testcontainers. GitHub runners ship
     # Docker pre-installed; no `services:` block needed.
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: immich-app/devtools/actions/use-mise@cf6e190bacde3d7bda59372a786b36ac7d01536a # use-mise-action-v2.0.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -74,7 +74,7 @@ jobs:
     name: web / lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: immich-app/devtools/actions/use-mise@cf6e190bacde3d7bda59372a786b36ac7d01536a # use-mise-action-v2.0.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -85,7 +85,7 @@ jobs:
     name: web / typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: immich-app/devtools/actions/use-mise@cf6e190bacde3d7bda59372a786b36ac7d01536a # use-mise-action-v2.0.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -96,7 +96,7 @@ jobs:
     name: web / build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: immich-app/devtools/actions/use-mise@cf6e190bacde3d7bda59372a786b36ac7d01536a # use-mise-action-v2.0.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -110,7 +110,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
       # Push on anything that isn't a PR: main pushes (main / sha-* / latest)
       # and published releases (the :X.Y.Z semver tag). PRs build only.
