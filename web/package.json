@@ -24,7 +24,7 @@
     "@immich/ui": "^0.81.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
+    "@eslint/js": "^10.0.0",
     "@playwright/test": "^1.60.0",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.63.0",
