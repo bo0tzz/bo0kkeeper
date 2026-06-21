@@ -46,12 +46,13 @@ export class AuthController {
   async callback(@Query() dto: AuthCallbackDto, @Req() req: Request, @Res({ passthrough: false }) res: Response) {
     const expectedState = req.cookies[STATE_COOKIE];
     const codeVerifier = req.cookies[VERIFIER_COOKIE];
-    const returnTo = req.cookies[RETURN_TO_COOKIE];
 
     if (!expectedState || !codeVerifier) {
       res.status(HttpStatus.BAD_REQUEST).json({ message: 'Missing OAuth state or verifier cookies' });
       return;
     }
+
+    const returnTo = req.cookies[RETURN_TO_COOKIE];
 
     const callbackUrl = new URL(`${req.protocol}://${req.get('host')}${req.originalUrl}`);
     const { idToken, refreshToken } = await this.authService.exchangeCode(callbackUrl, expectedState, codeVerifier);

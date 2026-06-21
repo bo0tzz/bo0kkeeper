@@ -78,6 +78,23 @@ export default typescriptEslint.config(
       'unicorn/filename-case': 'off',
       'unicorn/prefer-top-level-await': 'off',
       'unicorn/import-style': 'off',
+      // See server/eslint.config.mjs for the rationale on these unicorn v68
+      // additions; same rules don't fit our codebase here either.
+      'unicorn/name-replacements': 'off',
+      'unicorn/consistent-class-member-order': 'off',
+      'unicorn/no-non-function-verb-prefix': 'off',
+      'unicorn/max-nested-calls': 'off',
+      'unicorn/prefer-https': 'off',
+      'unicorn/no-useless-coercion': 'off',
+      'unicorn/prefer-await': 'off',
+      'unicorn/no-break-in-nested-loop': 'off',
+      'unicorn/prefer-minimal-ternary': 'off',
+      'unicorn/prefer-number-coercion': 'off',
+      'unicorn/prefer-uint8array-base64': 'off',
+      // Svelte 5's `$state`-bound module-level reactive variables are
+      // *intended* to be reassigned from event handlers, which trips this rule
+      // hundreds of times. The pattern is the whole point of $state().
+      'unicorn/no-top-level-assignment-in-function': 'off',
       'svelte/button-has-type': 'error',
       '@typescript-eslint/await-thenable': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
@@ -97,6 +114,13 @@ export default typescriptEslint.config(
       parserOptions: {
         parser: typescriptEslint.parser,
       },
+    },
+
+    rules: {
+      // unicorn v68's consistent-boolean-name crashes when walking Svelte
+      // files (calls `findParameter` on a node it can't iterate). Disable
+      // here; the rule still runs on TS via the block above.
+      'unicorn/consistent-boolean-name': 'off',
     },
   },
   {

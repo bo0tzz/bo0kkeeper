@@ -195,7 +195,7 @@
 
   function expand(expense: ExpenseResponse) {
     expandedId = expense.id;
-    if (!drafts[expense.id]) {
+    if (!Object.hasOwn(drafts, expense.id)) {
       drafts[expense.id] = toDraft(expense);
     }
   }
@@ -539,7 +539,7 @@
             variant="outline"
             disabled={!data.hasMore}
             onclick={() => {
-              offset = offset + PAGE_SIZE;
+              offset += PAGE_SIZE;
             }}
           >
             Next

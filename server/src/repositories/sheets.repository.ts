@@ -125,7 +125,8 @@ export class SheetsRepository {
         },
       },
     ];
-    for (const cf of init.columnFormats ?? []) {
+    const columnFormats = init.columnFormats ?? [];
+    for (const cf of columnFormats) {
       requests.push({
         repeatCell: {
           range: {

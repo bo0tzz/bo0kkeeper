@@ -52,6 +52,49 @@ export default typescriptEslint.config([
       'unicorn/import-style': 'off',
       'unicorn/prefer-structured-clone': 'off',
       'unicorn/no-for-loop': 'off',
+      // unicorn v68 additions — disabled below because:
+      //   - name-replacements: suggestions are contradictory (`req → request`
+      //     AND `jobRepository → jobRepo`) and the churn is enormous.
+      //   - consistent-class-member-order: alphabetic-by-default ordering
+      //     fights deliberate grouping (constructor, lifecycle, public, helpers).
+      //   - no-non-function-verb-prefix: bans verb-prefixed property names like
+      //     `getInfo` on controllers, which fights NestJS route conventions.
+      //   - max-nested-calls: zod schemas (`z.object({ a: z.array(z.string()) })`)
+      //     legitimately nest more than 3 levels deep.
+      //   - prefer-https: only fires on test-fixture URLs (`http://idp.test`,
+      //     `http://localhost`) which are deliberately HTTP.
+      //   - no-useless-coercion: incorrectly strips `BigInt(x as bigint | string)`
+      //     calls. We use that pattern because pg serializes bigint columns as
+      //     strings at runtime; the cast hints the type, the BigInt() call does
+      //     the actual coercion. Removing it breaks at runtime.
+      //   - prefer-await: our `main().catch(handler)` top-level error handler in
+      //     bin/ scripts is the established convention; the rule wants top-level
+      //     await + try/catch, which is purely a re-write with no behavior change.
+      //   - no-break-in-nested-loop: `continue`/`break` inside a for-of loop to
+      //     skip an item is idiomatic — the suggested refactor (extract to a
+      //     function with early-return) is more code for the same logic.
+      //   - no-top-level-assignment-in-function: triggers on the standard
+      //     `beforeAll(async () => { privateKey = await … })` test pattern.
+      //   - prefer-minimal-ternary: stylistic preference; some of our existing
+      //     ternaries read more naturally in the non-minimal form.
+      //   - prefer-number-coercion: wants `Number.parseInt(x, 10)` → `Number(x)`,
+      //     but `parseInt` is more explicit about the integer intent.
+      'unicorn/name-replacements': 'off',
+      'unicorn/consistent-class-member-order': 'off',
+      'unicorn/no-non-function-verb-prefix': 'off',
+      'unicorn/max-nested-calls': 'off',
+      'unicorn/prefer-https': 'off',
+      'unicorn/no-useless-coercion': 'off',
+      'unicorn/prefer-await': 'off',
+      'unicorn/no-break-in-nested-loop': 'off',
+      'unicorn/no-top-level-assignment-in-function': 'off',
+      'unicorn/prefer-minimal-ternary': 'off',
+      'unicorn/prefer-number-coercion': 'off',
+      // `Uint8Array.fromBase64` / `toBase64` is a stage-3 proposal; not in
+      // Node 24's runtime yet (`typeof Uint8Array.fromBase64 === 'undefined'`)
+      // even though TS's `esnext` lib advertises it. `Buffer.from/toString`
+      // stays correct.
+      'unicorn/prefer-uint8array-base64': 'off',
       curly: 2,
       'prettier/prettier': 0,
       'object-shorthand': ['error', 'always'],

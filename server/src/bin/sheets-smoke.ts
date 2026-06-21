@@ -17,7 +17,7 @@
 import { loadConfig } from 'src/config';
 import { SheetsRepository } from 'src/repositories/sheets.repository';
 
-const WRITE = process.argv.includes('--write');
+const IS_WRITE = process.argv.includes('--write');
 const SMOKE_TAB = 'smoke-test';
 
 async function main(): Promise<void> {
@@ -38,7 +38,7 @@ async function main(): Promise<void> {
     console.log(`    ${t.title} (sheetId=${t.sheetId})`);
   }
 
-  if (WRITE) {
+  if (IS_WRITE) {
     const now = new Date().toISOString();
     await service.ensureTab(SMOKE_TAB);
     await service.appendRow(SMOKE_TAB, [now, 'sheets-smoke', 'OK', `from ${process.env.HOSTNAME ?? 'unknown'}`]);

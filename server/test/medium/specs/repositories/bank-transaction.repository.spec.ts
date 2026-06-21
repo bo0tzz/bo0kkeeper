@@ -67,7 +67,11 @@ describe('BankTransactionRepository', () => {
         limit: 50,
       });
       expect(result.total).toBe(3);
-      expect(result.items.map((t) => t.externalId).toSorted()).toEqual(['end', 'mid', 'start']);
+      expect(result.items.map((t) => t.externalId).toSorted((a, b) => a.localeCompare(b))).toEqual([
+        'end',
+        'mid',
+        'start',
+      ]);
     });
 
     it('status filter partitions matched / categorized / unmatched', async () => {

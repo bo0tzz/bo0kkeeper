@@ -23,8 +23,8 @@ describe('majorToMinor', () => {
 
   it('throws on non-finite input', () => {
     expect(() => majorToMinor('not a number')).toThrow(/minor units/);
-    expect(() => majorToMinor(Number.NaN)).toThrow(/minor units/);
-    expect(() => majorToMinor(Number.POSITIVE_INFINITY)).toThrow(/minor units/);
+    expect(() => majorToMinor(NaN)).toThrow(/minor units/);
+    expect(() => majorToMinor(Infinity)).toThrow(/minor units/);
   });
 });
 

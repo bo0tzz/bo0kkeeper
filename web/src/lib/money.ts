@@ -14,22 +14,22 @@ export function majorToMinor(major: string): string {
   if (!trimmed) {
     return '0';
   }
-  const negative = trimmed.startsWith('-');
-  const body = negative ? trimmed.slice(1) : trimmed;
+  const isNegative = trimmed.startsWith('-');
+  const body = isNegative ? trimmed.slice(1) : trimmed;
   const [whole, frac = ''] = body.split('.');
   const cents = (frac + '00').slice(0, 2);
   const total = BigInt(whole || '0') * 100n + BigInt(cents || '0');
-  return (negative ? -total : total).toString();
+  return (isNegative ? -total : total).toString();
 }
 
 /** Minor-unit (cents) string → major-unit string ("1234" → "12.34", "-1234" → "-12.34"). */
 export function minorToMajor(minor: string): string {
   const cents = BigInt(minor);
-  const negative = cents < 0n;
-  const abs = negative ? -cents : cents;
+  const isNegative = cents < 0n;
+  const abs = isNegative ? -cents : cents;
   const major = abs / 100n;
   const tail = (abs % 100n).toString().padStart(2, '0');
-  return `${negative ? '-' : ''}${major}.${tail}`;
+  return `${isNegative ? '-' : ''}${major}.${tail}`;
 }
 
 /** Minor-unit (cents) string → euro display string ("1234" → "€12.34", "-1234" → "-€12.34"). */

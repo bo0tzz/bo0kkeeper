@@ -12,7 +12,7 @@ function templateConnection() {
     'BO0KKEEPER_TEST_POSTGRES_TEMPLATE',
   ];
   for (const key of required) {
-    if (!process.env[key]) {
+    if (process.env[key] === undefined || process.env[key] === '') {
       throw new Error(`Missing test env: ${key}. Did globalSetup run?`);
     }
   }

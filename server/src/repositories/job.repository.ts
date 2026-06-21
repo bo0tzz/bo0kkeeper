@@ -44,10 +44,12 @@ export class JobRepository implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (this.boss) {
-      await this.boss.stop({ graceful: true, timeout: 5000 });
-      this.boss = null;
+    if (!this.boss) {
+      return;
     }
+
+    await this.boss.stop({ graceful: true, timeout: 5000 });
+    this.boss = null;
   }
 
   /**

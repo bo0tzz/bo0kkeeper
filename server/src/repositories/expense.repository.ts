@@ -185,7 +185,7 @@ export class ExpenseRepository {
     return this.update(id, {
       status: ExpenseStatus.Rejected,
       reviewedAt: new Date(),
-      ...(notes ? { notes } : {}),
+      ...(notes && { notes }),
     });
   }
 

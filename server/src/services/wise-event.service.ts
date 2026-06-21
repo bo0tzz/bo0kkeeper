@@ -63,15 +63,14 @@ function parseStateChangePayload(payload: Record<string, unknown>): ParsedStateC
   const data = payload['data'] as Record<string, unknown> | undefined;
   const resource = data?.['resource'] as Record<string, unknown> | undefined;
   const id = resource?.['id'];
-  const state = data?.['current_state'];
-  const occurredAt = data?.['occurred_at'];
-
   if (id === undefined || id === null) {
     throw new Error('transfer state-change payload missing data.resource.id');
   }
+  const state = data?.['current_state'];
   if (typeof state !== 'string') {
     throw new TypeError(`transfer state-change payload missing or non-string current_state (${typeof state})`);
   }
+  const occurredAt = data?.['occurred_at'];
   if (typeof occurredAt !== 'string') {
     throw new TypeError(`transfer state-change payload missing occurred_at`);
   }

@@ -45,7 +45,7 @@ export class OidcRepository {
       state,
       code_challenge: codeChallenge,
       code_challenge_method: 'S256',
-    }).toString();
+    }).href;
 
     return { url, state, codeVerifier };
   }
@@ -145,7 +145,7 @@ export class OidcRepository {
     if (postLogoutRedirectUri) {
       url.searchParams.set('post_logout_redirect_uri', postLogoutRedirectUri);
     }
-    return url.toString();
+    return url.href;
   }
 
   private getClient(): Promise<DiscoveredClient> {

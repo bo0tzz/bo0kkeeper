@@ -157,7 +157,7 @@ export class BankMatcherService {
       dateHigh,
     });
 
-    const matches = candidates.filter((e) => fuzzyContains(counterparty, e.vendor));
+    const matches = candidates.filter((e) => isFuzzyMatch(counterparty, e.vendor));
     if (matches.length !== 1) {
       return null;
     }
@@ -194,7 +194,7 @@ export class BankMatcherService {
       issuedBefore,
     });
 
-    const matches = candidates.filter((i) => i.clientName && fuzzyContains(counterparty, i.clientName));
+    const matches = candidates.filter((i) => i.clientName && isFuzzyMatch(counterparty, i.clientName));
     if (matches.length !== 1) {
       return null;
     }
@@ -444,7 +444,7 @@ export class BankMatcherService {
  * Case-insensitive, with a length floor enforced by the caller so generic
  * names like "Wise" don't match overly-broadly.
  */
-function fuzzyContains(a: string, b: string): boolean {
+function isFuzzyMatch(a: string, b: string): boolean {
   const al = a.trim().toLowerCase();
   const bl = b.trim().toLowerCase();
   if (al.length < FUZZY_MIN_LENGTH || bl.length < FUZZY_MIN_LENGTH) {

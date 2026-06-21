@@ -2,8 +2,11 @@ import { authManager } from '$lib/managers/auth-manager.svelte';
 import { redirect } from '@sveltejs/kit';
 import type { LayoutLoad } from './$types';
 
+// eslint-disable-next-line unicorn/consistent-boolean-name -- SvelteKit framework-required export names
 export const ssr = false;
+// eslint-disable-next-line unicorn/consistent-boolean-name -- SvelteKit framework-required export names
 export const csr = true;
+// eslint-disable-next-line unicorn/consistent-boolean-name -- SvelteKit framework-required export names
 export const prerender = false;
 
 const PUBLIC_PATHS = new Set<string>(['/api/auth/login', '/api/auth/callback']);

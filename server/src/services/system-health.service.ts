@@ -78,8 +78,8 @@ export class SystemHealthService {
   private async checkWise(): Promise<IntegrationCheck> {
     const cfg = loadConfig().wise;
     const lastEvent = await this.lastEventAt(EventSource.Wise);
-    const configured = Boolean(cfg.apiToken && cfg.profileId !== undefined);
-    if (!configured) {
+    const isConfigured = Boolean(cfg.apiToken && cfg.profileId !== undefined);
+    if (!isConfigured) {
       return {
         id: 'wise',
         name: 'Wise',
@@ -114,8 +114,8 @@ export class SystemHealthService {
   private async checkPaperless(): Promise<IntegrationCheck> {
     const cfg = loadConfig().paperless;
     const lastEvent = await this.lastEventAt(EventSource.Paperless);
-    const configured = Boolean(cfg.baseUrl && cfg.token);
-    if (!configured) {
+    const isConfigured = Boolean(cfg.baseUrl && cfg.token);
+    if (!isConfigured) {
       return {
         id: 'paperless',
         name: 'Paperless',
@@ -171,8 +171,8 @@ export class SystemHealthService {
 
   private async checkEnableBanking(): Promise<IntegrationCheck> {
     const cfg = loadConfig().enableBanking;
-    const configured = Boolean(cfg.appId && cfg.privateKey && cfg.redirectUri);
-    if (!configured) {
+    const isConfigured = Boolean(cfg.appId && cfg.privateKey && cfg.redirectUri);
+    if (!isConfigured) {
       return {
         id: 'enable_banking',
         name: 'Enable Banking',
@@ -238,8 +238,8 @@ export class SystemHealthService {
 
   private checkSheets(): IntegrationCheck {
     const cfg = loadConfig().sheets;
-    const configured = Boolean(cfg.serviceAccountEmail && cfg.serviceAccountPrivateKey && cfg.spreadsheetId);
-    if (!configured) {
+    const isConfigured = Boolean(cfg.serviceAccountEmail && cfg.serviceAccountPrivateKey && cfg.spreadsheetId);
+    if (!isConfigured) {
       return {
         id: 'sheets',
         name: 'Google Sheets',

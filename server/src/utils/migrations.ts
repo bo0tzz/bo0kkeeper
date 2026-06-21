@@ -44,7 +44,8 @@ export async function runMigrations(connection: DatabaseConnectionParams): Promi
     logger.log('Checking for pending migrations…');
     const { error, results } = await migrator.migrateToLatest();
 
-    for (const result of results ?? []) {
+    const migrationResults = results ?? [];
+    for (const result of migrationResults) {
       if (result.status === 'Success') {
         logger.log(`Applied migration ${result.migrationName}`);
       } else if (result.status === 'Error') {
