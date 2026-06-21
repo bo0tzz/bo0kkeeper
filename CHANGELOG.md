@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.5.0...v0.5.1) (2026-06-21)
+
+
+### Bug Fixes
+
+* **deps:** update eslint (major) ([#62](https://github.com/bo0tzz/bo0kkeeper/issues/62)) ([320e81d](https://github.com/bo0tzz/bo0kkeeper/commit/320e81d249b67ef381dfa83ed6ce901152b8e9e4))
+* **deps:** update pnpm to v11 ([#59](https://github.com/bo0tzz/bo0kkeeper/issues/59)) ([b9d8775](https://github.com/bo0tzz/bo0kkeeper/commit/b9d8775c03aad25111489145b6d7c73c06e45bc9))
+
 ## [0.5.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.4.3...v0.5.0) (2026-06-21)
 
 
