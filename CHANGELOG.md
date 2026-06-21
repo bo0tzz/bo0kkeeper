@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.4.3...v0.5.0) (2026-06-21)
+
+
+### Features
+
+* surface app version in /api/system/info and startup log ([476c343](https://github.com/bo0tzz/bo0kkeeper/commit/476c34375c00a73797babb08725dd0e791caff49))
+
+
+### Bug Fixes
+
+* **deps:** pin dependencies ([#58](https://github.com/bo0tzz/bo0kkeeper/issues/58)) ([3b6402d](https://github.com/bo0tzz/bo0kkeeper/commit/3b6402d2964624174bcd9f73963d103d70d66f47))
+* **deps:** update dependency vite to v8 ([#51](https://github.com/bo0tzz/bo0kkeeper/issues/51)) ([a709fc6](https://github.com/bo0tzz/bo0kkeeper/commit/a709fc66b7e3cddbb53a3d3b6604be7315e01313))
+* **deps:** update docker.io/library/redis docker tag to v8 ([#52](https://github.com/bo0tzz/bo0kkeeper/issues/52)) ([ae9a92b](https://github.com/bo0tzz/bo0kkeeper/commit/ae9a92b04583e0d123f3d0f351307050a5093de4))
+* **deps:** update eslint monorepo to v10 ([#55](https://github.com/bo0tzz/bo0kkeeper/issues/55)) ([2ca2fd2](https://github.com/bo0tzz/bo0kkeeper/commit/2ca2fd2abe06cc9914277276f1489590cc78f90e))
+* **deps:** update svelte ([#60](https://github.com/bo0tzz/bo0kkeeper/issues/60)) ([adcb0d5](https://github.com/bo0tzz/bo0kkeeper/commit/adcb0d53173584884a36b8cf05a279d2d3fba674))
+* **deps:** update testcontainers-node monorepo to v12 ([#61](https://github.com/bo0tzz/bo0kkeeper/issues/61)) ([a5ade71](https://github.com/bo0tzz/bo0kkeeper/commit/a5ade714d9163442efa657b72e1b2df29cdff61a))
+
 ## [0.4.3](https://github.com/bo0tzz/bo0kkeeper/compare/v0.4.2...v0.4.3) (2026-06-20)
 
 
