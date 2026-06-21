@@ -82,16 +82,20 @@ export class InvoiceRepository {
         .returningAll()
         .executeTakeFirstOrThrow()) as Invoice;
 
-      let lines: InvoiceLine[] = [];
-      if (input.lines.length > 0) {
-        lines = (await trx
-          .insertInto('invoice_line')
-          .values(
-            input.lines.map((line, index) => ({ ...line, invoiceId: inserted.id, ordinal: line.ordinal ?? index })),
-          )
-          .returningAll()
-          .execute()) as InvoiceLine[];
-      }
+      const lines: InvoiceLine[] =
+        input.lines.length === 0
+          ? []
+          : ((await trx
+              .insertInto('invoice_line')
+              .values(
+                input.lines.map((line, index) => ({
+                  ...line,
+                  invoiceId: inserted.id,
+                  ordinal: line.ordinal ?? index,
+                })),
+              )
+              .returningAll()
+              .execute()) as InvoiceLine[]);
 
       return { ...inserted, lines };
     });

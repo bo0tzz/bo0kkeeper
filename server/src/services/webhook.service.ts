@@ -49,8 +49,8 @@ export class WebhookService {
     verifier.update(rawBody);
     verifier.end();
 
-    const ok = verifier.verify(this.wiseConfig.publicKey, signatureHeader, 'base64');
-    if (!ok) {
+    const isOk = verifier.verify(this.wiseConfig.publicKey, signatureHeader, 'base64');
+    if (!isOk) {
       throw new UnauthorizedException('Invalid Wise webhook signature');
     }
   }
@@ -115,12 +115,12 @@ export class WebhookService {
   }
 
   private async enqueueFollowUp(eventType: string, eventId: string): Promise<void> {
-    if (eventType === 'transfers#state-change') {
-      await this.jobRepository.queue(JobName.WiseTransferStateChange, { eventId });
-      return;
-    }
     // `balances#credit` is intentionally not auto-enqueued: drafts need a TXN
     // reference and human review. The admin UI calls `/api/wise/draft-from-event`.
+    if (eventType !== 'transfers#state-change') {
+      return;
+    }
+    await this.jobRepository.queue(JobName.WiseTransferStateChange, { eventId });
   }
 
   /**
@@ -135,7 +135,7 @@ export class WebhookService {
       return;
     }
     const presented = authHeader?.replace(/^Bearer\s+/i, '').trim();
-    if (!presented || !constantTimeEquals(presented, expected)) {
+    if (!presented || !isConstantTimeEqual(presented, expected)) {
       throw new UnauthorizedException('Invalid Paperless webhook token');
     }
   }
@@ -183,7 +183,7 @@ export class WebhookService {
   }
 }
 
-function constantTimeEquals(a: string, b: string): boolean {
+function isConstantTimeEqual(a: string, b: string): boolean {
   const aBuf = Buffer.from(a);
   const bBuf = Buffer.from(b);
   if (aBuf.length !== bBuf.length) {

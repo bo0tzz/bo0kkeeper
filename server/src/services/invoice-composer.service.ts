@@ -198,8 +198,8 @@ export class InvoiceComposerService {
     // — the compose form's BTW field defaults to 21 and isn't class-aware, so
     // guard server-side. The rendered PDF already omits BTW for these classes;
     // recording it anyway would inflate the aggregator's collected-BTW total.
-    const chargesBtw = client.class === ClientClass.Domestic || client.class === ClientClass.Eu;
-    const btwRateBps = chargesBtw ? (input.btwRateBps ?? null) : null;
+    const isChargesBtw = client.class === ClientClass.Domestic || client.class === ClientClass.Eu;
+    const btwRateBps = isChargesBtw ? (input.btwRateBps ?? null) : null;
     const subtotalMinor = input.lines.reduce((sum, line) => sum + line.lineTotalMinor, 0n);
     const btwMinor = btwRateBps ? btwOnNet(subtotalMinor, btwRateBps) : null;
     const totalMinor = subtotalMinor + (btwMinor ?? 0n);
@@ -355,12 +355,12 @@ export class InvoiceComposerService {
 
 /** Period decimals, e.g. 4155.12 — used for non-EU invoices. */
 function formatMinor(minor: bigint): string {
-  const negative = minor < 0n;
-  const abs = negative ? -minor : minor;
+  const isNegative = minor < 0n;
+  const abs = isNegative ? -minor : minor;
   const major = abs / 100n;
   const cents = abs % 100n;
   const fractional = cents.toString().padStart(2, '0');
-  return `${negative ? '-' : ''}${major.toString()}.${fractional}`;
+  return `${isNegative ? '-' : ''}${major.toString()}.${fractional}`;
 }
 
 /** Same value but drop ".00" for whole amounts: "4791" not "4791.00". */
@@ -377,11 +377,11 @@ function formatMinorWhole(minor: bigint): string {
  * "32,50" for fractional.
  */
 function formatMinorDutch(minor: bigint): string {
-  const negative = minor < 0n;
-  const abs = negative ? -minor : minor;
+  const isNegative = minor < 0n;
+  const abs = isNegative ? -minor : minor;
   const major = abs / 100n;
   const cents = abs % 100n;
-  const sign = negative ? '-' : '';
+  const sign = isNegative ? '-' : '';
   if (cents === 0n) {
     return `${sign}${major.toString()},-`;
   }
@@ -497,7 +497,7 @@ function buildInvoiceData(client: Client, invoice: InvoiceWithLines, issuer: Iss
     data.payment = {
       iban: issuer.iban,
       name: client.tradeName === TradeName.ItServices ? 'de Willigen IT Services' : 'de Willigen 3D',
-      ...(invoice.paymentLink ? { paymentLink: invoice.paymentLink } : {}),
+      ...(invoice.paymentLink && { paymentLink: invoice.paymentLink }),
     };
   }
 

@@ -30,7 +30,7 @@ describe('WiseApiRepository', () => {
     const fetchFn = vi.fn().mockResolvedValue(
       okResponse({
         id: 'quote-uuid-1',
-        rate: 0.846_991,
+        rate: 0.846991,
         sourceAmount: 4791,
         sourceCurrency: 'USD',
         targetCurrency: 'EUR',
@@ -95,7 +95,7 @@ describe('WiseApiRepository', () => {
         id: 9_999_999,
         status: 'incoming_payment_waiting',
         reference: 'TXN-0044',
-        rate: 0.846_991,
+        rate: 0.846991,
         sourceCurrency: 'USD',
         sourceValue: 4791,
         targetCurrency: 'EUR',
@@ -134,7 +134,7 @@ describe('WiseApiRepository', () => {
         id: 9_999_999,
         status: 'outgoing_payment_sent',
         reference: 'TXN-0044',
-        rate: 0.846_991,
+        rate: 0.846991,
         sourceCurrency: 'USD',
         sourceValue: 4791,
         targetCurrency: 'EUR',

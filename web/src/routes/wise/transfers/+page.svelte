@@ -107,7 +107,7 @@
     if (state === 'cancelled' || state === 'failed') {
       return 'danger';
     }
-    if (state === 'incoming_payment_waiting' || state === 'processing' || state === 'funds_converted') {
+    if (['incoming_payment_waiting', 'processing', 'funds_converted'].includes(state)) {
       return 'warning';
     }
     return 'secondary';

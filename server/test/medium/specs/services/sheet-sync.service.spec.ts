@@ -122,9 +122,9 @@ describe('SheetSyncService', () => {
     it('writes the row, marks sheetRowAt, and returns true on success', async () => {
       const expense = await seedApprovedExpense();
 
-      const ok = await sheetSync.writeExpenseRowSafely(expense, new Date('2099-02-12'), 'bank-tx-1');
+      const isOk = await sheetSync.writeExpenseRowSafely(expense, new Date('2099-02-12'), 'bank-tx-1');
 
-      expect(ok).toBe(true);
+      expect(isOk).toBe(true);
       expect(sheetWriter.writeExpenseRow).toHaveBeenCalledOnce();
       // Id column carries the paperless doc id for traceability.
       expect(sheetWriter.writeExpenseRow.mock.calls[0][0]).toMatchObject({ id: 'doc-1', vendor: 'Acme BV' });
@@ -136,9 +136,9 @@ describe('SheetSyncService', () => {
       const expense = await seedApprovedExpense();
       sheetWriter.writeExpenseRow.mockRejectedValueOnce(new Error('sheets down'));
 
-      const ok = await sheetSync.writeExpenseRowSafely(expense, new Date('2099-02-12'), 'bank-tx-1');
+      const isOk = await sheetSync.writeExpenseRowSafely(expense, new Date('2099-02-12'), 'bank-tx-1');
 
-      expect(ok).toBe(false);
+      expect(isOk).toBe(false);
       const refetched = await expenseRepo.findById(expense.id);
       expect(refetched?.sheetRowAt).toBeNull();
 

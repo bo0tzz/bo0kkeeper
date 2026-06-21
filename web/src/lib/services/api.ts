@@ -103,11 +103,11 @@ async function request<T>(spec: RequestSpec, options: ApiOptions): Promise<T> {
   // replay the original. Skip the refresh if we're already inside an auth
   // route (e.g. the refresh endpoint itself returning 401), otherwise we'd
   // loop on the same request.
-  if (globalThis.location !== undefined && globalThis.location.pathname.startsWith('/api/auth/')) {
+  if (location !== undefined && location.pathname.startsWith('/api/auth/')) {
     return parse<T>(first);
   }
-  const refreshed = await attemptRefresh(fetchFn);
-  if (!refreshed) {
+  const isRefreshed = await attemptRefresh(fetchFn);
+  if (!isRefreshed) {
     return parse<T>(first);
   }
   const second = await fetchFn(spec.url, spec.init);
@@ -172,9 +172,9 @@ async function parse<T>(res: Response): Promise<T> {
     // 401 reaching here means either the original request 401'd AND silent
     // refresh failed, OR we're inside an auth flow already. Bounce the user
     // through the login redirect so they end up back where they started.
-    if (res.status === 401 && globalThis.location && !globalThis.location.pathname.startsWith('/api/auth/')) {
-      const returnTo = globalThis.location.pathname + globalThis.location.search;
-      globalThis.location.replace(`/api/auth/login?return_to=${encodeURIComponent(returnTo)}`);
+    if (res.status === 401 && location && !location.pathname.startsWith('/api/auth/')) {
+      const returnTo = location.pathname + location.search;
+      location.replace(`/api/auth/login?return_to=${encodeURIComponent(returnTo)}`);
       // Halt the in-flight Promise rather than throwing — SvelteKit's
       // load-error pipeline would otherwise try to render an error page
       // (and emit a noisy "Not found: /api/auth/login" in the console)

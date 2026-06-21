@@ -198,7 +198,7 @@
             variant="outline"
             disabled={!data.hasMore}
             onclick={() => {
-              offset = offset + PAGE_SIZE;
+              offset += PAGE_SIZE;
             }}
           >
             Next

@@ -104,18 +104,18 @@ export async function startFakeIdp(opts: { port: number; clientId: string }): Pr
       if (url.pathname === '/authorize' && req.method === 'GET') {
         const redirectUri = url.searchParams.get('redirect_uri');
         const state = url.searchParams.get('state');
-        const codeChallenge = url.searchParams.get('code_challenge') ?? undefined;
-        const audience = url.searchParams.get('client_id') ?? opts.clientId;
         if (!redirectUri || !state) {
           send(400, { error: 'invalid_request', missing: { redirectUri: !redirectUri, state: !state } });
           return;
         }
+        const codeChallenge = url.searchParams.get('code_challenge') ?? undefined;
+        const audience = url.searchParams.get('client_id') ?? opts.clientId;
         const code = randomUUID();
         issuedCodes.set(code, { code, redirectUri, user: nextUser, audience, codeChallenge });
         const redirect = new URL(redirectUri);
         redirect.searchParams.set('code', code);
         redirect.searchParams.set('state', state);
-        res.writeHead(302, { location: redirect.toString() });
+        res.writeHead(302, { location: redirect.href });
         res.end();
         return;
       }
@@ -249,7 +249,9 @@ export async function startFakeIdp(opts: { port: number; clientId: string }): Pr
 function readBody(req: import('node:http').IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
-    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('data', (chunk: Buffer) => {
+      chunks.push(chunk);
+    });
     req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
   });
@@ -306,7 +308,7 @@ export class CookieJar {
   }
 
   asHeader(): string {
-    return [...this.store.entries()].map(([k, v]) => `${k}=${v}`).join('; ');
+    return [...this.store].map(([k, v]) => `${k}=${v}`).join('; ');
   }
 
   get(name: string): string | undefined {

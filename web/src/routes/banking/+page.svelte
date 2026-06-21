@@ -143,7 +143,7 @@
     error = null;
     try {
       const result = await startBankingAuth({ aspspName: name, aspspCountry: country, psuType });
-      globalThis.location.href = result.redirectUrl;
+      location.assign(result.redirectUrl);
     } catch (error_) {
       error = (error_ as Error).message;
       starting = false;

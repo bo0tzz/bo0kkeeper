@@ -85,16 +85,16 @@ export function parseSnsCsv(content: string, accountIban: string): SnsCsvRow[] {
 function parseCsvLine(line: string): string[] {
   const out: string[] = [];
   let current = '';
-  let inQuotes = false;
+  let isInQuotes = false;
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
-    if (inQuotes) {
+    if (isInQuotes) {
       if (ch === '"') {
         if (line[i + 1] === '"') {
           current += '"';
           i++;
         } else {
-          inQuotes = false;
+          isInQuotes = false;
         }
       } else {
         current += ch;
@@ -103,7 +103,7 @@ function parseCsvLine(line: string): string[] {
       out.push(current);
       current = '';
     } else if (ch === '"') {
-      inQuotes = true;
+      isInQuotes = true;
     } else {
       current += ch;
     }

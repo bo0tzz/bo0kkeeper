@@ -20,7 +20,7 @@ function dbConfig(): DatabaseConnectionParams {
   }
   const required = ['DB_HOST', 'DB_PORT', 'DB_USERNAME', 'DB_PASSWORD', 'DB_DATABASE_NAME'];
   for (const key of required) {
-    if (!process.env[key]) {
+    if (process.env[key] === undefined || process.env[key] === '') {
       throw new Error(`Missing ${key} (set DB_URL or DB_HOST/PORT/USERNAME/PASSWORD/DATABASE_NAME)`);
     }
   }

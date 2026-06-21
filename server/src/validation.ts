@@ -11,10 +11,7 @@ function isIPOrRange(value: string, options?: IsIPRangeOptions): boolean {
   if (isIPRange(value)) {
     return true;
   }
-  if (!requireCIDR && isIP(value)) {
-    return true;
-  }
-  return false;
+  return Boolean(!requireCIDR && isIP(value));
 }
 
 /**
@@ -89,7 +86,7 @@ export class FilenameParamDto extends createZodDto(FilenameParamSchema) {}
 
 export const isValidInteger = (value: number, options: { min?: number; max?: number }): value is number => {
   const { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER } = options;
-  return Number.isInteger(value) && value >= min && value <= max;
+  return Number.isSafeInteger(value) && value >= min && value <= max;
 };
 
 /**

@@ -99,10 +99,12 @@
   }
 
   function reset() {
-    if (loaded) {
-      applyToDraft(loaded);
-      info = null;
+    if (!loaded) {
+      return;
     }
+
+    applyToDraft(loaded);
+    info = null;
   }
 
   async function runTagCheck() {

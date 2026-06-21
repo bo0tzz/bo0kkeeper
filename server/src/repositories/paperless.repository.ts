@@ -84,7 +84,8 @@ export class PaperlessRepository {
     if (input.documentTypeId !== undefined) {
       form.set('document_type', String(input.documentTypeId));
     }
-    for (const tag of input.tagIds ?? []) {
+    const tagIds = input.tagIds ?? [];
+    for (const tag of tagIds) {
       form.append('tags', String(tag));
     }
 

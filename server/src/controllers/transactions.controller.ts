@@ -35,11 +35,11 @@ export class TransactionsController {
     // The merge is in-memory, so we either fetch generously or accept that
     // the date filter trims things on the way out. Bumped to 500 each which
     // covers a single-zzp's whole year of activity comfortably.
-    const wantBank = query.source === undefined || query.source === 'bank';
-    const wantWise = query.source === undefined || query.source === 'wise';
+    const isWantBank = query.source === undefined || query.source === 'bank';
+    const isWantWise = query.source === undefined || query.source === 'wise';
     const [bankRows, wiseRows] = await Promise.all([
-      wantBank ? this.bankTransactionRepository.findRecent(500) : Promise.resolve([] as BankTransaction[]),
-      wantWise ? this.wiseTransferRepository.findRecent(500) : Promise.resolve([] as WiseTransferRow[]),
+      isWantBank ? this.bankTransactionRepository.findRecent(500) : Promise.resolve([] as BankTransaction[]),
+      isWantWise ? this.wiseTransferRepository.findRecent(500) : Promise.resolve([] as WiseTransferRow[]),
     ]);
 
     // Resolve the labels we'll need for matched bank rows in one round trip
@@ -61,12 +61,9 @@ export class TransactionsController {
       if (query.dateFrom && r.date < query.dateFrom) {
         return false;
       }
-      if (query.dateTo && r.date > query.dateTo) {
-        return false;
-      }
-      return true;
+      return !(query.dateTo && r.date > query.dateTo);
     });
-    filtered.sort((a, b) => (a.date > b.date ? -1 : a.date < b.date ? 1 : 0));
+    filtered.sort((a, b) => b.date.localeCompare(a.date));
     return { items: filtered, total: filtered.length };
   }
 }
@@ -140,5 +137,5 @@ function unique<T>(values: T[]): T[] {
 }
 
 function capitalize(s: string): string {
-  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1);
+  return s.length === 0 ? s : s.at(0)!.toUpperCase() + s.slice(1);
 }

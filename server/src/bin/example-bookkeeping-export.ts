@@ -18,10 +18,10 @@ import { getKyselyConfig } from 'src/utils/database';
 async function main(): Promise<void> {
   const year = Number.parseInt(process.argv[2] ?? '', 10);
   const quarter = Number.parseInt(process.argv[3] ?? '', 10) as Quarter;
-  const outPath = process.argv[4] ?? `/tmp/bookkeeping-${year}-Q${quarter}.xlsx`;
   if (!year || !quarter || quarter < 1 || quarter > 4) {
     throw new Error('usage: example-bookkeeping-export <year> <quarter> [outPath]');
   }
+  const outPath = process.argv[4] ?? `/tmp/bookkeeping-${year}-Q${quarter}.xlsx`;
 
   const cfg = loadConfig();
   const db = new Kysely<DB>(getKyselyConfig(cfg.database));

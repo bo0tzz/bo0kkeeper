@@ -109,7 +109,7 @@ export class BankingSyncService {
     const accounts = (session.accountsJson ?? []) as AccountWithBalance[];
     let ingested = 0;
     let matched = 0;
-    let revoked = false;
+    let isRevoked = false;
     for (const account of accounts) {
       try {
         const r = await this.syncAccount(session, account, opts);
@@ -133,7 +133,7 @@ export class BankingSyncService {
             `Session ${session.id} returned ${error.status}; marking revoked. Body: ${JSON.stringify(error.body)}`,
           );
           await this.sessionRepository.update(session.id, { status: BankingSessionStatus.Revoked });
-          revoked = true;
+          isRevoked = true;
           // No point trying the remaining accounts on this revoked session.
           break;
         }
@@ -141,7 +141,7 @@ export class BankingSyncService {
         this.logger.error(`account ${account.uid} sync failed in session ${session.id}: ${(error as Error).message}`);
       }
     }
-    if (!revoked) {
+    if (!isRevoked) {
       // Persist the (possibly balance-updated) accounts array alongside the
       // watermark; one write per session.
       await this.sessionRepository.update(session.id, {
