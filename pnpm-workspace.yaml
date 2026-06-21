@@ -2,16 +2,16 @@ packages:
   - server
   - web
   - open-api/typescript-sdk
+# pnpm v11 defaults `minimumReleaseAge` to 1440 minutes (24h) as a supply-chain
+# guard against very-fresh malicious publishes. Useful in principle, but it
+# rejects any same-day Renovate bump — they'd all sit blocked here until they
+# age in. Set to 0 until Renovate's own `minimumReleaseAge` is configured to
+# match; then we can flip this on with confidence the two won't fight.
+minimumReleaseAge: 0
 overrides:
   # Pin cookie ≥0.7.0 to fix CVE-2024-47764. SvelteKit (and any other transitive
   # consumer) gets the patched version; revisit when SvelteKit's own bound moves.
   cookie: ">=0.7.0"
-ignoredBuiltDependencies:
-  - "@nestjs/core"
-  - "@swc/core"
-  - esbuild
-onlyBuiltDependencies:
-  - "@tailwindcss/oxide"
 packageExtensions:
   nestjs-kysely:
     dependencies:
@@ -20,3 +20,16 @@ dedupePeerDependents: false
 preferWorkspacePackages: true
 injectWorkspacePackages: true
 shamefullyHoist: false
+# pnpm v11 replaced `ignoredBuiltDependencies` / `onlyBuiltDependencies` with
+# an explicit `allowBuilds` allow-list. Packages not listed default to NOT
+# running their build scripts (the safe behaviour we already wanted for the
+# v10-era ignored list); we only opt-in `@tailwindcss/oxide`, which needs its
+# native binding compiled at install time.
+allowBuilds:
+  "@scarf/scarf": false
+  "@swc/core": false
+  "@tailwindcss/oxide": true
+  cpu-features: false
+  esbuild: false
+  protobufjs: false
+  ssh2: false

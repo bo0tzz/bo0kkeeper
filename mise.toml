@@ -1,6 +1,11 @@
 [tools]
 node = "24"
-pnpm = "10"
+# Force the npm backend rather than aqua's default. pnpm v11 changed its
+# release-asset layout from a bare `pnpm-linux-x64` binary to a tarball
+# (`pnpm-linux-x64.tar.gz`), which aqua-registry's recipe doesn't handle
+# yet — install fails with `no asset found: pnpm-linux-x64`. The npm
+# registry always has it.
+"npm:pnpm" = "11"
 typst = "latest"
 
 # Local dev env (DB, OIDC, secrets). Gitignored — see .gitignore.

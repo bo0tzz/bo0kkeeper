@@ -3,7 +3,7 @@
   "version": "0.5.0",
   "description": "Bookkeeping automation for a Dutch zzp",
   "private": true,
-  "packageManager": "pnpm@10.34.4",
+  "packageManager": "pnpm@11.8.0",
   "engines": {
     "pnpm": ">=10.0.0",
     "node": ">=24.0.0"
