@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.5.1...v0.6.0) (2026-06-23)
+
+
+### Features
+
+* **invoices:** templated description + period prefill for compose-from-wise ([a4cc4bd](https://github.com/bo0tzz/bo0kkeeper/commit/a4cc4bd9e35e7de1bac2d2d59d8fe5380812ad29))
+
+
+### Bug Fixes
+
+* **deps:** update dependency globals to v17.7.0 ([#66](https://github.com/bo0tzz/bo0kkeeper/issues/66)) ([c454b54](https://github.com/bo0tzz/bo0kkeeper/commit/c454b5424903b4e65225cac978337ae055dd7c65))
+* **deps:** update dependency knip to v6.18.0 ([#64](https://github.com/bo0tzz/bo0kkeeper/issues/64)) ([aa38df3](https://github.com/bo0tzz/bo0kkeeper/commit/aa38df32a2f051663dc32f8909efe007386149f4))
+* **deps:** update eslint ([#67](https://github.com/bo0tzz/bo0kkeeper/issues/67)) ([c3919d1](https://github.com/bo0tzz/bo0kkeeper/commit/c3919d1aa918a74f2d8aa45cbbb52313fb12b8ed))
+* **deps:** update svelte ([#68](https://github.com/bo0tzz/bo0kkeeper/issues/68)) ([20d0912](https://github.com/bo0tzz/bo0kkeeper/commit/20d09126bd0fff23493f416184b9153679190560))
+* **deps:** update swc monorepo ([#65](https://github.com/bo0tzz/bo0kkeeper/issues/65)) ([bda32ad](https://github.com/bo0tzz/bo0kkeeper/commit/bda32ad68c3312461f52f4638b7a99d854b09428))
+
 ## [0.5.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.5.0...v0.5.1) (2026-06-21)
 
 
