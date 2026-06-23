@@ -9,6 +9,7 @@ import { BankTransactionRepository } from 'src/repositories/bank-transaction.rep
 import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { JobRepository } from 'src/repositories/job.repository';
 import { SystemHealthService } from 'src/services/system-health.service';
+import { SUPPORTED_PLACEHOLDERS } from 'src/utils/description-template';
 
 /** Treat a missing sheet row as "stale" if it's been pending longer than this. */
 const SHEET_WRITE_STALE_AFTER_MS = 60 * 60 * 1000;
@@ -36,6 +37,7 @@ export class SystemController {
       version: APP_VERSION,
       cutoverDate,
       ingestionEnabled: cutoverDate !== null,
+      descriptionPlaceholders: [...SUPPORTED_PLACEHOLDERS],
     };
   }
 

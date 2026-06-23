@@ -10,6 +10,7 @@
     type ClientResponse,
     type TradeName,
   } from '$lib/services/clients.service';
+  import { getSystemInfo, type SystemInfo } from '$lib/services/system.service';
   import {
     Badge,
     Button,
@@ -68,12 +69,15 @@
   }
 
   let draft = $state<Draft | null>(null);
+  let systemInfo = $state<SystemInfo | null>(null);
 
   async function load() {
     loading = true;
     error = null;
     try {
-      clients = await listClients();
+      const [list, info] = await Promise.all([listClients(), getSystemInfo()]);
+      clients = list;
+      systemInfo = info;
     } catch (error_) {
       error = (error_ as Error).message;
     } finally {
@@ -272,6 +276,14 @@
           </HStack>
           <Field label="Default description" invalid={hasIssue('defaultDescription')}>
             <Input bind:value={draft.defaultDescription} />
+            {#if systemInfo && systemInfo.descriptionPlaceholders.length > 0}
+              <Text size="small" color="muted">
+                Supported placeholders:
+                {#each systemInfo.descriptionPlaceholders as p, i (p)}
+                  <code>{`{${p}}`}</code>{i < systemInfo.descriptionPlaceholders.length - 1 ? ', ' : ''}
+                {/each}
+              </Text>
+            {/if}
           </Field>
           <HStack gap={3}>
             <Button variant="ghost" onclick={cancel}>Cancel</Button>

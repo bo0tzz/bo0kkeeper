@@ -164,6 +164,27 @@ export class InvoiceRepository {
     return new Map(rows.map((row) => [row.id, row.number]));
   }
 
+  /**
+   * Most recent `periodEnd` across this client's invoices. Used by
+   * `prefillFromWise` to suggest the next half-month period. Returns
+   * `undefined` when the client has no prior invoices with a period set
+   * (the prefill then falls back to today's half-month).
+   */
+  async findLatestPeriodEndForClient(clientId: string): Promise<Date | undefined> {
+    const row = (await this.db
+      .selectFrom('invoice')
+      .select('periodEnd')
+      .where('clientId', '=', clientId)
+      .where('periodEnd', 'is not', null)
+      .orderBy('periodEnd', 'desc')
+      .limit(1)
+      .executeTakeFirst()) as { periodEnd: Date | string | null } | undefined;
+    if (!row?.periodEnd) {
+      return undefined;
+    }
+    return row.periodEnd instanceof Date ? row.periodEnd : new Date(row.periodEnd);
+  }
+
   /** Set the paperless document id once the PDF has been pushed. */
   async setPaperlessDocId(invoiceId: string, paperlessDocId: string): Promise<void> {
     await this.db
@@ -363,6 +384,8 @@ export class InvoiceRepository {
         .select([
           'invoice.number',
           'invoice.issuedAt',
+          'invoice.periodStart',
+          'invoice.periodEnd',
           'invoice.totalMinor',
           'invoice.eurTotalMinor',
           'invoice.btwMinor',
@@ -394,6 +417,8 @@ export type InvoicePaidRow = {
 export type InvoiceExportRow = {
   number: string;
   issuedAt: Date | string;
+  periodStart: Date | string | null;
+  periodEnd: Date | string | null;
   totalMinor: bigint | string;
   eurTotalMinor: bigint | string | null;
   btwMinor: bigint | string | null;

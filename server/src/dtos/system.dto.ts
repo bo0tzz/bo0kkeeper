@@ -13,6 +13,12 @@ const SystemInfoSchema = z
     cutoverDate: z.iso.date().nullable(),
     /** Convenience boolean derived from cutoverDate, for UI banners. */
     ingestionEnabled: z.boolean(),
+    /**
+     * Every `{path}` placeholder the description-template engine resolves.
+     * Surfaced here so the /clients edit page can show the supported set
+     * under the defaultDescription input without duplicating the list.
+     */
+    descriptionPlaceholders: z.array(z.string()),
   })
   .meta({ id: 'SystemInfoDto' });
 export class SystemInfoDto extends createZodDto(SystemInfoSchema) {}

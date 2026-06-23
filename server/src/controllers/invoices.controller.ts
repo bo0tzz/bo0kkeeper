@@ -112,6 +112,9 @@ export class InvoicesController {
       eurTotalMinor: String(prefill.eurTotalMinor),
       ourReference: prefill.ourReference,
       suggestedClientId: prefill.suggestedClientId,
+      suggestedPeriodStart: prefill.suggestedPeriodStart ? toIsoDate(prefill.suggestedPeriodStart) : null,
+      suggestedPeriodEnd: prefill.suggestedPeriodEnd ? toIsoDate(prefill.suggestedPeriodEnd) : null,
+      suggestedLineDescription: prefill.suggestedLineDescription,
     };
   }
 

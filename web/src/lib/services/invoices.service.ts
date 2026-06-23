@@ -94,10 +94,18 @@ export type WiseInvoicePrefill = {
   totalMinor: string;
   /** EUR amount that actually arrived at SNS — net of Wise fees/spread. */
   eurTotalMinor: string;
-  /** Our TXN-NNNN reference; useful as the default line description. */
+  /** Our TXN-NNNN reference; surfaced as a small hint in the compose UI. */
   ourReference: string | null;
   /** Sole Non-EU client id if exactly one exists; null when operator must pick. */
   suggestedClientId: string | null;
+  /** YYYY-MM-DD; null when no suggested client. */
+  suggestedPeriodStart: string | null;
+  suggestedPeriodEnd: string | null;
+  /**
+   * client.defaultDescription with any `{period.*}` placeholders substituted
+   * using the suggested period. Empty string when there's no suggested client.
+   */
+  suggestedLineDescription: string;
 };
 
 export type InvoiceComposeFromWiseInput = {

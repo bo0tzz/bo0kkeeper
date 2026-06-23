@@ -65,8 +65,16 @@
       if (pf.suggestedClientId) {
         clientId = pf.suggestedClientId;
       }
-      // Single default line: full amount, description from TXN ref.
-      lines = [{ description: pf.ourReference ?? 'Services', amount: minorToMajor(pf.totalMinor) }];
+      // Period prefilled from the suggested client's last invoice (next half-month);
+      // operator can override. Server already substituted any `{period.*}` placeholders
+      // in client.defaultDescription, so `suggestedLineDescription` is the final string.
+      if (pf.suggestedPeriodStart) {
+        periodStart = pf.suggestedPeriodStart;
+      }
+      if (pf.suggestedPeriodEnd) {
+        periodEnd = pf.suggestedPeriodEnd;
+      }
+      lines = [{ description: pf.suggestedLineDescription, amount: minorToMajor(pf.totalMinor) }];
     } catch (error_) {
       prefillError = error_ instanceof ApiError ? error_.message : (error_ as Error).message;
     }

@@ -19,6 +19,7 @@ import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-t
 import { SettingsService } from 'src/services/settings.service';
 import { JobOf } from 'src/types';
 import { toDate } from 'src/utils/date';
+import { nextHalfMonth, Period, resolveDescription } from 'src/utils/description-template';
 
 export type InvoiceLineInput = {
   description: string;
@@ -74,7 +75,7 @@ export type WiseInvoicePrefill = {
   totalMinor: bigint;
   /** Actual EUR that landed at SNS — net of Wise fee/spread. */
   eurTotalMinor: bigint;
-  /** Our TXN-NNNN reference, useful as the default line description. */
+  /** Our TXN-NNNN reference. Surfaced as a small hint in the compose UI. */
   ourReference: string | null;
   /**
    * Sole Non-EU client id if exactly one exists; null when the operator
@@ -82,6 +83,21 @@ export type WiseInvoicePrefill = {
    * future case).
    */
   suggestedClientId: string | null;
+  /**
+   * Suggested next half-month after the suggested client's last invoice
+   * `periodEnd` (1-15 / 16-EOM convention). Falls back to today's
+   * half-month when no prior period exists. Null when no client could be
+   * suggested. Operator can override in the form.
+   */
+  suggestedPeriodStart: Date | null;
+  suggestedPeriodEnd: Date | null;
+  /**
+   * `client.defaultDescription` with template placeholders ({period.range}
+   * etc.) substituted using the suggested period. The compose UI uses this
+   * as the default line description so the operator doesn't have to think
+   * about either the period or the formatting boilerplate.
+   */
+  suggestedLineDescription: string;
 };
 
 /** Single template covers every client class; the data shape carries the variant. */
@@ -204,6 +220,22 @@ export class InvoiceComposerService {
     const btwMinor = btwRateBps ? btwOnNet(subtotalMinor, btwRateBps) : null;
     const totalMinor = subtotalMinor + (btwMinor ?? 0n);
 
+    // Templating happens here so stored `invoice_line.description` is the
+    // final customer-visible string. Downstream renders + exports never see a
+    // raw `{period.range}` placeholder; they just read the text. Templating
+    // also runs against the line text itself (not just defaultDescription)
+    // so per-line user-typed placeholders work too.
+    const templateVars =
+      input.periodStart && input.periodEnd ? { period: { start: input.periodStart, end: input.periodEnd } } : {};
+    const renderedLines = input.lines.map((line) => ({
+      ...line,
+      description: resolveDescription({
+        line: line.description,
+        defaultDescription: client.defaultDescription,
+        vars: templateVars,
+      }),
+    }));
+
     const issued = await this.invoiceRepository.issue({
       year: input.issuedAt.getUTCFullYear(),
       invoice: {
@@ -221,7 +253,7 @@ export class InvoiceComposerService {
         wiseTransferId: input.wiseTransferId ?? null,
         paymentLink: input.paymentLink ?? null,
       },
-      lines: input.lines.map((line, index) => ({
+      lines: renderedLines.map((line, index) => ({
         ordinal: index,
         description: line.description,
         unitLabel: line.unitLabel ?? null,
@@ -268,7 +300,19 @@ export class InvoiceComposerService {
     const transfer = await this.requireInvoiceableWiseTransfer(wiseTransferId);
     const clients = await this.clientRepository.findAll();
     const nonEuClients = clients.filter((c) => c.class === ClientClass.NonEu);
-    const suggestedClientId = nonEuClients.length === 1 ? nonEuClients[0].id : null;
+    const suggestedClient = nonEuClients.length === 1 ? nonEuClients[0] : null;
+
+    let suggestedPeriod: Period | null = null;
+    let suggestedLineDescription = '';
+    if (suggestedClient) {
+      const lastEnd = await this.invoiceRepository.findLatestPeriodEndForClient(suggestedClient.id);
+      suggestedPeriod = nextHalfMonth({ previousPeriodEnd: lastEnd ?? null, today: new Date() });
+      suggestedLineDescription = resolveDescription({
+        defaultDescription: suggestedClient.defaultDescription,
+        vars: { period: suggestedPeriod },
+      });
+    }
+
     return {
       wiseTransferId: transfer.id,
       currency: transfer.sourceCurrency,
@@ -278,7 +322,10 @@ export class InvoiceComposerService {
       // displays in the future should derive from target/source instead.
       eurTotalMinor: BigInt(transfer.targetAmountMinor as unknown as string),
       ourReference: transfer.ourReference,
-      suggestedClientId,
+      suggestedClientId: suggestedClient?.id ?? null,
+      suggestedPeriodStart: suggestedPeriod?.start ?? null,
+      suggestedPeriodEnd: suggestedPeriod?.end ?? null,
+      suggestedLineDescription,
     };
   }
 

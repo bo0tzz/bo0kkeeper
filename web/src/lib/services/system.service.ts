@@ -4,6 +4,8 @@ export type SystemInfo = {
   version: string;
   cutoverDate: string | null;
   ingestionEnabled: boolean;
+  /** Every `{path}` placeholder the description-template engine resolves. */
+  descriptionPlaceholders: string[];
 };
 
 export type IntegrationStatus = 'healthy' | 'degraded' | 'broken' | 'not_configured';

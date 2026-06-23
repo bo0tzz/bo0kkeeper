@@ -85,6 +85,15 @@ const WiseInvoicePrefillSchema = z
     eurTotalMinor: z.string(),
     ourReference: z.string().nullable(),
     suggestedClientId: z.string().nullable(),
+    /** YYYY-MM-DD; null when there's no suggested client. */
+    suggestedPeriodStart: z.iso.date().nullable(),
+    suggestedPeriodEnd: z.iso.date().nullable(),
+    /**
+     * Pre-rendered description text: `client.defaultDescription` with any
+     * `{period.*}` placeholders substituted using the suggested period.
+     * Empty string when there's no suggested client.
+     */
+    suggestedLineDescription: z.string(),
   })
   .meta({ id: 'WiseInvoicePrefillDto' });
 export class WiseInvoicePrefillDto extends createZodDto(WiseInvoicePrefillSchema) {}

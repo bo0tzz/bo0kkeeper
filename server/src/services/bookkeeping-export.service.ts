@@ -5,6 +5,7 @@ import { ClientClass, ExpenseLocationClass } from 'src/enum';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { Quarter } from 'src/services/quarterly-aggregator.service';
+import { resolveDescription } from 'src/utils/description-template';
 import { minorToMajor } from 'src/utils/money';
 
 /**
@@ -125,10 +126,23 @@ export class BookkeepingExportService {
       // total rather than leaving it blank — the accountant expects every
       // populated row to have a base amount.
       const exclVatMinor = vatMinor === 0n ? totalIncMinor : totalIncMinor - vatMinor;
+      const periodStart = r.periodStart === null ? null : new Date(r.periodStart);
+      const periodEnd = r.periodEnd === null ? null : new Date(r.periodEnd);
+      // resolveDescription handles the line-or-default fallback AND substitutes
+      // any `{period.*}` placeholders. Compose-time substitution already
+      // rendered line.description into final text for new invoices, but the
+      // fallback to client.defaultDescription still needs templating in case
+      // the operator leaves the line blank and defaultDescription carries a
+      // placeholder.
+      const description = resolveDescription({
+        line: r.lineDescription,
+        defaultDescription: r.defaultDescription,
+        vars: periodStart && periodEnd ? { period: { start: periodStart, end: periodEnd } } : {},
+      });
       return {
         date: new Date(r.issuedAt),
         counterparty: r.clientName,
-        description: r.lineDescription ?? r.defaultDescription ?? '',
+        description,
         vatId: r.vatId,
         totalIncMinor,
         exclVatMinor,
