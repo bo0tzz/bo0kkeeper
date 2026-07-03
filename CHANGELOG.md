@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.7.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.6.0...v0.7.0) (2026-07-03)
+
+
+### Features
+
+* **wise:** refetch amounts on state-change + dismiss action for below-minimum credits ([3673d28](https://github.com/bo0tzz/bo0kkeeper/commit/3673d283a1b2704fb72f87ec48597b4674c53e13))
+
+
+### Bug Fixes
+
+* **deps:** update debian:13-slim docker digest to 28de087 ([#75](https://github.com/bo0tzz/bo0kkeeper/issues/75)) ([1a9612f](https://github.com/bo0tzz/bo0kkeeper/commit/1a9612fa1c5c75f34a037f5235e3088c9245f82e))
+* **deps:** update dependency @nestjs/swagger to v11.4.5 ([#81](https://github.com/bo0tzz/bo0kkeeper/issues/81)) ([226d539](https://github.com/bo0tzz/bo0kkeeper/commit/226d539f625a04ca03801dd5f5dd2ea23e87437e))
+* **deps:** update dependency knip to v6.24.0 ([#79](https://github.com/bo0tzz/bo0kkeeper/issues/79)) ([fe2b2c9](https://github.com/bo0tzz/bo0kkeeper/commit/fe2b2c91b14a2c504b65bafc8fb61f3acf25e78a))
+* **deps:** update dependency pg-boss to v12.25.0 ([#74](https://github.com/bo0tzz/bo0kkeeper/issues/74)) ([7be4ed6](https://github.com/bo0tzz/bo0kkeeper/commit/7be4ed621f32beaa671bfa70bf1b04272e1a992f))
+* **deps:** update dependency testcontainers to v12.0.4 ([#82](https://github.com/bo0tzz/bo0kkeeper/issues/82)) ([b09f81f](https://github.com/bo0tzz/bo0kkeeper/commit/b09f81f265e820cbb10075b9edfff0896bef7062))
+* **deps:** update dependency vite to v8.1.3 ([#70](https://github.com/bo0tzz/bo0kkeeper/issues/70)) ([356cb3e](https://github.com/bo0tzz/bo0kkeeper/commit/356cb3e1139579d624fad5a0575bc05eed713ff8))
+* **deps:** update docker.io/library/redis:8 docker digest to 2838d55 ([#76](https://github.com/bo0tzz/bo0kkeeper/issues/76)) ([25e1472](https://github.com/bo0tzz/bo0kkeeper/commit/25e147244620338ef5aa8570c5920ef2dc84610f))
+* **deps:** update node.js to b31e7a4 ([#77](https://github.com/bo0tzz/bo0kkeeper/issues/77)) ([60eb08e](https://github.com/bo0tzz/bo0kkeeper/commit/60eb08e5db1f62e738e60a604b7379412c3a9c1a))
+* **deps:** update playwright monorepo to v1.61.1 ([#73](https://github.com/bo0tzz/bo0kkeeper/issues/73)) ([5f26421](https://github.com/bo0tzz/bo0kkeeper/commit/5f26421500fe2c507b2d64c244ff5420391095e4))
+* **deps:** update pnpm to v11.9.0 ([#72](https://github.com/bo0tzz/bo0kkeeper/issues/72)) ([a4bd30a](https://github.com/bo0tzz/bo0kkeeper/commit/a4bd30aa7a6bee4efa992381fbacee354ea73f04))
+* **deps:** update postgres:18 docker digest to 4aabea7 ([#78](https://github.com/bo0tzz/bo0kkeeper/issues/78)) ([e365047](https://github.com/bo0tzz/bo0kkeeper/commit/e365047e9a42ef22ea8482aa16c777892761aa53))
+* **deps:** update svelte ([#71](https://github.com/bo0tzz/bo0kkeeper/issues/71)) ([b634d1b](https://github.com/bo0tzz/bo0kkeeper/commit/b634d1bcc6363a9fc149106c22413b5e4e4e6fa7))
+
 ## [0.6.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.5.1...v0.6.0) (2026-06-23)
 
 
