@@ -9,9 +9,11 @@ packages:
 # match; then we can flip this on with confidence the two won't fight.
 minimumReleaseAge: 0
 overrides:
-  # Pin cookie ≥0.7.0 to fix CVE-2024-47764. SvelteKit (and any other transitive
-  # consumer) gets the patched version; revisit when SvelteKit's own bound moves.
-  cookie: ">=0.7.0"
+  # Pin cookie to the v1 line ≥0.7.0 — the lower bound fixes CVE-2024-47764,
+  # the upper bound excludes v2 which removed the named `parse`/`serialize`
+  # exports SvelteKit still imports. Revisit when SvelteKit's own bound moves
+  # past cookie v1.
+  cookie: ">=0.7.0 <2"
 packageExtensions:
   nestjs-kysely:
     dependencies:
