@@ -104,6 +104,21 @@ export class EventRepository {
       .execute();
   }
 
+  /**
+   * Drop an event out of the pending inbox without processing it. Used for
+   * cases where the event is a real signal (so we don't want to delete it)
+   * but there's no action to take — e.g. a Wise `balances#credit` for an
+   * amount below Wise's minimum transfer threshold, which naturally waits
+   * to be swept into the next larger transfer.
+   */
+  markSkipped(id: string): Promise<unknown> {
+    return this.db
+      .updateTable('event')
+      .set({ status: EventStatus.Skipped, processedAt: new Date() })
+      .where('id', '=', id)
+      .execute();
+  }
+
   markFailed(id: string, error: Record<string, unknown>): Promise<unknown> {
     return this.db
       .updateTable('event')

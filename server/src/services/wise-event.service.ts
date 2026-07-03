@@ -2,8 +2,10 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { OnJob } from 'src/decorators';
 import { EventSource, JobName, QueueName, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
+import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { JobOf } from 'src/types';
+import { majorToMinor } from 'src/utils/money';
 
 /**
  * Consumes events that need to mutate `wise_transfer` state. Job handlers run
@@ -17,6 +19,7 @@ export class WiseEventService {
   constructor(
     private readonly eventRepository: EventRepository,
     private readonly wiseTransferRepository: WiseTransferRepository,
+    private readonly wiseApi: WiseApiRepository,
   ) {}
 
   /**
@@ -47,7 +50,25 @@ export class WiseEventService {
       return;
     }
 
-    await this.wiseTransferRepository.updateState(parsed.transferId, parsed.state, parsed.occurredAt);
+    // Refetch amounts + rate from Wise so we catch any drift between what
+    // we quoted at draft time and what actually moved (user bumps the
+    // source amount at SCA time, Wise re-quotes at confirm, etc.). Fees on
+    // the /v1/transfers response are absent — we retain the original.
+    // Best-effort: a refetch failure still lets the state update land; the
+    // reconcile cron picks up any missed amount sync.
+    const upstream = await this.wiseApi.getTransfer(Number(parsed.transferId)).catch((error) => {
+      this.logger.warn(
+        `Refetch failed for wise_transfer ${parsed.transferId}: ${(error as Error).message}; applying state-only update`,
+      );
+      return null;
+    });
+    await this.wiseTransferRepository.updateState(parsed.transferId, {
+      state: parsed.state,
+      stateUpdatedAt: parsed.occurredAt,
+      sourceAmountMinor: upstream?.sourceValue == null ? undefined : majorToMinor(upstream.sourceValue),
+      targetAmountMinor: upstream?.targetValue == null ? undefined : majorToMinor(upstream.targetValue),
+      fxRate: upstream?.rate ?? undefined,
+    });
     await this.eventRepository.markProcessed(event.id);
     this.logger.log(`wise_transfer ${parsed.transferId} → ${parsed.state} (event ${event.id})`);
   }

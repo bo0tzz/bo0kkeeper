@@ -102,12 +102,39 @@ export class WiseTransferRepository {
     return (await qb.execute()) as WiseTransferMatchCandidate[];
   }
 
-  async updateState(wiseTransferId: string, state: WiseTransferUpdate['state'], stateUpdatedAt: Date): Promise<void> {
-    await this.db
-      .updateTable('wise_transfer')
-      .set({ state, stateUpdatedAt, updatedAt: new Date() })
-      .where('wiseTransferId', '=', wiseTransferId)
-      .execute();
+  /**
+   * Apply the current upstream state to the row. Accepts optional amount /
+   * rate fields so callers that have refetched from Wise can also correct
+   * any drift (user bumped the source amount at SCA time, Wise re-quoted at
+   * confirm, etc.). Fields left `undefined` are preserved. Fee stays as-is
+   * because the v1/transfers response doesn't include it — refresh via the
+   * originating quote if needed.
+   */
+  async updateState(
+    wiseTransferId: string,
+    patch: {
+      state: WiseTransferUpdate['state'];
+      stateUpdatedAt: Date;
+      sourceAmountMinor?: bigint;
+      targetAmountMinor?: bigint;
+      fxRate?: string | null;
+    },
+  ): Promise<void> {
+    const update: WiseTransferUpdate = {
+      state: patch.state,
+      stateUpdatedAt: patch.stateUpdatedAt,
+      updatedAt: new Date(),
+    };
+    if (patch.sourceAmountMinor !== undefined) {
+      update.sourceAmountMinor = patch.sourceAmountMinor;
+    }
+    if (patch.targetAmountMinor !== undefined) {
+      update.targetAmountMinor = patch.targetAmountMinor;
+    }
+    if (patch.fxRate !== undefined) {
+      update.fxRate = patch.fxRate;
+    }
+    await this.db.updateTable('wise_transfer').set(update).where('wiseTransferId', '=', wiseTransferId).execute();
   }
 
   /**

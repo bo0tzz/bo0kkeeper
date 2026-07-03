@@ -58,6 +58,7 @@ describe('WiseReconcileService', () => {
       sourceCurrency: 'USD',
       targetAmountMinor: 85_000n,
       targetCurrency: 'EUR',
+      fxRate: '0.85',
       feeMinor: 0n,
       feeCurrency: 'USD',
       state,
@@ -111,5 +112,43 @@ describe('WiseReconcileService', () => {
     const result = await service.reconcileAll();
     expect(api.getTransfer).not.toHaveBeenCalled();
     expect(result).toEqual({ checked: 1, updated: 0, missing: 0 });
+  });
+
+  it('detects amount drift (user bumped source at SCA time) even when state matches', async () => {
+    // Scenario: 0.41 USD cashback drafted, user bumped to 10.41 at Wise SCA
+    // screen. State stays `processing`, but sourceValue/targetValue changed.
+    const seeded = await repo.create({
+      wiseTransferId: '55555555',
+      direction: WiseTransferDirection.Out,
+      sourceAmountMinor: 41n,
+      sourceCurrency: 'USD',
+      targetAmountMinor: 35n,
+      targetCurrency: 'EUR',
+      fxRate: '0.85',
+      feeMinor: 0n,
+      feeCurrency: 'USD',
+      state: WiseTransferState.Processing,
+      stateUpdatedAt: new Date('2026-05-01'),
+      ourReference: 'TXN-BUMPED',
+    });
+    api.getTransfer.mockResolvedValue({
+      id: 55_555_555,
+      state: 'processing',
+      reference: 'TXN-BUMPED',
+      rate: '0.86',
+      sourceCurrency: 'USD',
+      sourceValue: 10.41,
+      targetCurrency: 'EUR',
+      targetValue: 8.95,
+      created: '2099-01-01T00:00:00Z',
+    });
+    const result = await service.reconcileAll();
+    expect(result).toEqual({ checked: 1, updated: 1, missing: 0 });
+    const refreshed = await repo.findByWiseTransferId(seeded.wiseTransferId);
+    // Amounts + rate should reflect the bumped values from upstream.
+    expect(String(refreshed!.sourceAmountMinor)).toBe('1041');
+    expect(String(refreshed!.targetAmountMinor)).toBe('895');
+    expect(refreshed!.fxRate).toBe('0.86');
+    expect(refreshed!.state).toBe('processing');
   });
 });

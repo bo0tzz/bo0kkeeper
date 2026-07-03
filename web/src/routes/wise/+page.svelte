@@ -1,6 +1,6 @@
 <script lang="ts">
   import { formatDateTime } from '$lib/format';
-  import { listEvents, type EventResponse, type ListEventsResponse } from '$lib/services/events.service';
+  import { dismissEvent, listEvents, type EventResponse, type ListEventsResponse } from '$lib/services/events.service';
   import { draftFromEvent, reconcileWise, type WiseTransferResponse } from '$lib/services/wise.service';
   import {
     Alert,
@@ -25,6 +25,7 @@
   let loading = $state(false);
   let error = $state<string | null>(null);
   let drafting = $state<string | null>(null);
+  let dismissing = $state<string | null>(null);
   let drafts = $state<Record<string, string>>({});
   let lastDrafted = $state<WiseTransferResponse | null>(null);
   let reconciling = $state(false);
@@ -73,6 +74,26 @@
       error = (error_ as Error).message;
     } finally {
       drafting = null;
+    }
+  }
+
+  async function dismiss(event: EventResponse) {
+    // Confirm dismiss so accidental clicks don't drop signal from the inbox.
+    // The event isn't deleted (status=skipped, audit-trailed), but the UI
+    // won't surface it again — the balance sitting behind it will get
+    // swept when the next larger transfer drafts.
+    if (!confirm(`Dismiss ${creditAmount(event)}? It'll wait in the Wise balance to be swept next time.`)) {
+      return;
+    }
+    dismissing = event.id;
+    error = null;
+    try {
+      await dismissEvent(event.id);
+      await load();
+    } catch (error_) {
+      error = (error_ as Error).message;
+    } finally {
+      dismissing = null;
     }
   }
 
@@ -150,9 +171,22 @@
                   </Field>
                 </TableCell>
                 <TableCell>
-                  <Button color="primary" disabled={drafting !== null} onclick={() => draft(event)}>
-                    {drafting === event.id ? 'Drafting…' : 'Draft transfer'}
-                  </Button>
+                  <div class="flex gap-2">
+                    <Button
+                      color="primary"
+                      disabled={drafting !== null || dismissing !== null}
+                      onclick={() => draft(event)}
+                    >
+                      {drafting === event.id ? 'Drafting…' : 'Draft transfer'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      disabled={drafting !== null || dismissing !== null}
+                      onclick={() => dismiss(event)}
+                    >
+                      {dismissing === event.id ? 'Dismissing…' : 'Dismiss'}
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             {/each}

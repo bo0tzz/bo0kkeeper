@@ -1,4 +1,4 @@
-import { apiGet } from '$lib/services/api';
+import { apiGet, apiPost } from '$lib/services/api';
 
 export type EventSource = 'wise' | 'paperless' | 'bank' | 'manual' | 'system';
 export type EventStatus = 'pending' | 'processing' | 'processed' | 'failed' | 'skipped';
@@ -37,3 +37,11 @@ export type ListEventsQuery = {
 
 export const listEvents = (query: ListEventsQuery, fetchFn?: typeof fetch) =>
   apiGet<ListEventsResponse>('/api/events', { fetch: fetchFn, query });
+
+/**
+ * Drop an event out of the pending inbox without acting on it. Use this
+ * for Wise credits that sit below the transfer minimum (they'll get swept
+ * into the next larger transfer once the balance accrues).
+ */
+export const dismissEvent = (eventId: string, fetchFn?: typeof fetch) =>
+  apiPost<EventResponse>(`/api/events/${eventId}/dismiss`, {}, { fetch: fetchFn });

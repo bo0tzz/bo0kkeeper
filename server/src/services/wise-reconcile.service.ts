@@ -4,6 +4,7 @@ import { EventSource, JobName, QueueName, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
 import { WiseApiError, WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
+import { majorToMinor } from 'src/utils/money';
 
 /**
  * Belt-and-braces for missed `transfers#state-change` webhooks.
@@ -73,12 +74,30 @@ export class WiseReconcileService {
       this.logger.error(`reconcile failed for ${row.wiseTransferId}: ${(error as Error).message}`);
       return 'error';
     }
-    if (upstream.state === row.state) {
+    const upstreamSourceMinor = upstream.sourceValue == null ? null : majorToMinor(upstream.sourceValue);
+    const upstreamTargetMinor = upstream.targetValue == null ? null : majorToMinor(upstream.targetValue);
+    const rowSourceMinor = BigInt(row.sourceAmountMinor as bigint | number | string);
+    const rowTargetMinor = BigInt(row.targetAmountMinor as bigint | number | string);
+    const hasStateDrift = upstream.state !== row.state;
+    const hasSourceDrift = upstreamSourceMinor !== null && upstreamSourceMinor !== rowSourceMinor;
+    const hasTargetDrift = upstreamTargetMinor !== null && upstreamTargetMinor !== rowTargetMinor;
+    const hasRateDrift = upstream.rate !== null && upstream.rate !== row.fxRate;
+    if (!hasStateDrift && !hasSourceDrift && !hasTargetDrift && !hasRateDrift) {
       return 'unchanged';
     }
-    this.logger.warn(
-      `wise transfer ${row.wiseTransferId}: local=${row.state} upstream=${upstream.state} (likely missed webhook)`,
-    );
+    if (hasStateDrift) {
+      this.logger.warn(
+        `wise transfer ${row.wiseTransferId}: local=${row.state} upstream=${upstream.state} (likely missed webhook)`,
+      );
+    }
+    if (hasSourceDrift || hasTargetDrift || hasRateDrift) {
+      this.logger.warn(
+        `wise transfer ${row.wiseTransferId}: amount drift — ` +
+          `source ${rowSourceMinor}→${upstreamSourceMinor} ` +
+          `target ${rowTargetMinor}→${upstreamTargetMinor} ` +
+          `rate ${row.fxRate ?? 'null'}→${upstream.rate ?? 'null'}`,
+      );
+    }
     // Honest caveat: Wise's GET /v1/transfers/{id} response exposes only
     // `created` (original transfer creation moment) — no `lastUpdated`, no
     // state-change history. We can't recover the real moment the state
@@ -86,7 +105,13 @@ export class WiseReconcileService {
     // "state last verified at" for reconciled rows; for webhook-driven
     // updates it's still the true state-change moment (`occurred_at` from
     // the payload).
-    await this.wiseTransferRepository.updateState(row.wiseTransferId, upstream.state as WiseTransferState, new Date());
+    await this.wiseTransferRepository.updateState(row.wiseTransferId, {
+      state: upstream.state as WiseTransferState,
+      stateUpdatedAt: new Date(),
+      sourceAmountMinor: upstreamSourceMinor ?? undefined,
+      targetAmountMinor: upstreamTargetMinor ?? undefined,
+      fxRate: upstream.rate ?? undefined,
+    });
     return 'updated';
   }
 }
