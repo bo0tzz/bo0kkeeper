@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.1...v0.7.2) (2026-07-03)
+
+
+### Bug Fixes
+
+* **deps:** update dependency prettier to v3.9.4 ([#84](https://github.com/bo0tzz/bo0kkeeper/issues/84)) ([1688e3b](https://github.com/bo0tzz/bo0kkeeper/commit/1688e3b7486c349c0108bc67954e9b0b055dae2f))
+
 ## [0.7.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.0...v0.7.1) (2026-07-03)
 
 
