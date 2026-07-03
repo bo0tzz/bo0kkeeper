@@ -31,3 +31,18 @@ body {
 body {
   @apply bg-light text-dark;
 }
+
+/*
+ * @immich/ui Buttons don't set `white-space: nowrap` on themselves, and
+ * Tailwind v4's default `overflow-wrap: anywhere` on the body lets narrow
+ * flex containers wrap button text mid-word (e.g. `Draft tran` → `sfer`).
+ * Apply nowrap globally so any Button placed in a table cell / narrow
+ * column keeps its label on one line. If we ever want a wrapping button,
+ * override with `whitespace-normal` on that instance.
+ */
+button {
+  white-space: nowrap;
+}
+a[role='button'] {
+  white-space: nowrap;
+}
