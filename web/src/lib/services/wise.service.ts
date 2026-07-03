@@ -17,12 +17,7 @@ export type WiseTransferResponse = {
 };
 
 export type WiseTransferState =
-  | 'incoming_payment_waiting'
-  | 'processing'
-  | 'funds_converted'
-  | 'outgoing_payment_sent'
-  | 'cancelled'
-  | 'failed';
+  'incoming_payment_waiting' | 'processing' | 'funds_converted' | 'outgoing_payment_sent' | 'cancelled' | 'failed';
 
 export type ListWiseTransfersParams = {
   state?: WiseTransferState;
