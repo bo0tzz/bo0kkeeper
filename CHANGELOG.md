@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.0...v0.7.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **deps:** update docker/build-push-action action to v7.3.0 ([#86](https://github.com/bo0tzz/bo0kkeeper/issues/86)) ([74d7b58](https://github.com/bo0tzz/bo0kkeeper/commit/74d7b58f53bda3335b6d3a548635d53a3b805c23))
+* **deps:** update docker/login-action action to v4.3.0 ([#87](https://github.com/bo0tzz/bo0kkeeper/issues/87)) ([22818c8](https://github.com/bo0tzz/bo0kkeeper/commit/22818c887ba712e1dc72ec29371c882b3c5dc428))
+* **deps:** update tailwindcss monorepo to v4.3.2 ([#83](https://github.com/bo0tzz/bo0kkeeper/issues/83)) ([0628361](https://github.com/bo0tzz/bo0kkeeper/commit/062836146f39b5a040cbe550168c58b741c9cf15))
+* **web:** keep button labels on one line across the app ([8616bab](https://github.com/bo0tzz/bo0kkeeper/commit/8616bab0562446c4e3eb24b4e2d62cf709323280))
+
 ## [0.7.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.6.0...v0.7.0) (2026-07-03)
 
 
