@@ -179,8 +179,7 @@ export class WiseTransferRepository {
     }
 
     const totalRow = (await query.select((eb) => eb.fn.countAll<string>().as('count')).executeTakeFirst()) as
-      | { count: string }
-      | undefined;
+      { count: string } | undefined;
     const total = Number(totalRow?.count ?? 0);
 
     // Left-join the linked invoice (unique per wise_transfer) so the UI can

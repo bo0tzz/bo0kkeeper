@@ -34,8 +34,7 @@ export class ClientRepository {
       .where('wiseSenderPattern', 'is not', null)
       .execute();
     return candidates.find((c) => c.wiseSenderPattern && senderText.includes(c.wiseSenderPattern)) as
-      | Client
-      | undefined;
+      Client | undefined;
   }
 
   async create(data: NewClient): Promise<Client> {

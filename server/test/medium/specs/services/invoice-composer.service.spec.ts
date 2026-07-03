@@ -30,12 +30,7 @@ async function seedOutgoingTransfer(
   db: Kysely<DB>,
   overrides?: {
     state?:
-      | 'incoming_payment_waiting'
-      | 'processing'
-      | 'funds_converted'
-      | 'outgoing_payment_sent'
-      | 'cancelled'
-      | 'failed';
+      'incoming_payment_waiting' | 'processing' | 'funds_converted' | 'outgoing_payment_sent' | 'cancelled' | 'failed';
     direction?: 'in' | 'out';
   },
 ) {

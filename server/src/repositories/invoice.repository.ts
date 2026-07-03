@@ -18,8 +18,7 @@ export class InvoiceRepository {
 
   async findById(id: string): Promise<InvoiceWithLines | undefined> {
     const invoice = (await this.db.selectFrom('invoice').selectAll().where('id', '=', id).executeTakeFirst()) as
-      | Invoice
-      | undefined;
+      Invoice | undefined;
     if (!invoice) {
       return undefined;
     }
@@ -34,8 +33,7 @@ export class InvoiceRepository {
 
   async findByNumber(number: string): Promise<Invoice | undefined> {
     return (await this.db.selectFrom('invoice').selectAll().where('number', '=', number).executeTakeFirst()) as
-      | Invoice
-      | undefined;
+      Invoice | undefined;
   }
 
   /**
@@ -132,8 +130,7 @@ export class InvoiceRepository {
     }
 
     const totalRow = (await query.select((eb) => eb.fn.countAll<string>().as('count')).executeTakeFirst()) as
-      | { count: string }
-      | undefined;
+      { count: string } | undefined;
     const total = Number(totalRow?.count ?? 0);
 
     const items = (await query
