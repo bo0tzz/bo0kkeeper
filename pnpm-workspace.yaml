@@ -9,10 +9,11 @@ packages:
 # match; then we can flip this on with confidence the two won't fight.
 minimumReleaseAge: 0
 overrides:
-  # Pin cookie to the v1 line ≥0.7.0 — the lower bound fixes CVE-2024-47764,
-  # the upper bound excludes v2 which removed the named `parse`/`serialize`
-  # exports SvelteKit still imports. Revisit when SvelteKit's own bound moves
-  # past cookie v1.
+  # Lower bound (>=0.7.0) fixes CVE-2024-47764. Upper bound is a headroom
+  # cap — bumped to <3 once SvelteKit accepted cookie v2; keeps future
+  # major bumps from silently landing before we've checked SvelteKit
+  # supports them (v2 originally broke `web/build` when it removed the
+  # named `parse`/`serialize` exports SvelteKit was still importing).
   cookie: ">=0.7.0 <3"
 packageExtensions:
   nestjs-kysely:
