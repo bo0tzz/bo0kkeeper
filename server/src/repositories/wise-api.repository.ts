@@ -126,6 +126,24 @@ export class WiseApiRepository {
   }
 
   /**
+   * Standard balance for `currency` on the configured profile, in minor
+   * units. Returns 0n if no balance row exists for that currency (never
+   * received a credit in it). Used at draft time to sweep the full amount
+   * rather than just the amount of the triggering event — small cashbacks
+   * naturally roll into the next larger draft.
+   */
+  async getBalanceMinor(currency: string): Promise<bigint> {
+    const profileId = this.requireProfileId();
+    const response = (await this.request(`/v4/profiles/${profileId}/balances?types=STANDARD`, { method: 'GET' })) as
+      Array<{ currency: string; amount?: { value?: number | string } }> | undefined;
+    const row = response?.find((entry) => entry.currency === currency);
+    if (!row?.amount?.value) {
+      return 0n;
+    }
+    return toMinor(row.amount.value);
+  }
+
+  /**
    * Cheap GET against the configured profile to verify the API token is
    * accepted and the profile id exists. Used by the system health page.
    * Throws on any non-200 — caller's job to translate into a user-facing

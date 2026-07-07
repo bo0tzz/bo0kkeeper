@@ -59,15 +59,31 @@ export class WiseDraftService {
     }
 
     const credit = parseBalanceCreditPayload(event.payload);
+    // Draft from the CURRENT balance, not the event's credit amount. A
+    // Wise draft locks its amount at SCA time — the user can't top up
+    // from the app to include an earlier cashback that's still sitting
+    // in the balance. Sweeping ensures the whole balance moves in one
+    // transfer, and small pending credits naturally roll into the next
+    // larger one.
+    const balanceMinor = await this.wiseApiService.getBalanceMinor(credit.currency);
+    if (balanceMinor < credit.amountMinor) {
+      // Balance is smaller than this event's credit — either the operator
+      // already swept some of it out manually or Wise has held the funds.
+      // Fail loudly; we don't want to silently under-draft.
+      throw new BadRequestException(
+        `Wise ${credit.currency} balance is ${balanceMinor} minor but event #${input.eventId} credited ${credit.amountMinor} — refusing to draft with less than the credit`,
+      );
+    }
     const ourReference = input.ourReference ?? (await this.wiseTransferRepository.allocateTxnReference());
     this.logger.log(
-      `Drafting transfer from event ${event.id}: ${credit.amount} ${credit.currency} → ${TARGET_CURRENCY} as ${ourReference}`,
+      `Drafting transfer from event ${event.id}: sweeping ${balanceMinor} minor ${credit.currency} balance ` +
+        `(event credited ${credit.amountMinor}) → ${TARGET_CURRENCY} as ${ourReference}`,
     );
 
     const quote = await this.wiseApiService.createQuote({
       sourceCurrency: credit.currency,
       targetCurrency: TARGET_CURRENCY,
-      sourceAmountMinor: credit.amountMinor,
+      sourceAmountMinor: balanceMinor,
     });
 
     const transfer = await this.wiseApiService.createTransfer({

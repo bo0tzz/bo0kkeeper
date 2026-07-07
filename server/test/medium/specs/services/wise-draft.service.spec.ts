@@ -35,6 +35,7 @@ describe('WiseDraftService', () => {
   let wiseApi: WiseApiRepository;
   let createQuoteMock: ReturnType<typeof vi.fn>;
   let createTransferMock: ReturnType<typeof vi.fn>;
+  let getBalanceMock: ReturnType<typeof vi.fn>;
   let service: WiseDraftService;
 
   beforeEach(async () => {
@@ -63,12 +64,16 @@ describe('WiseDraftService', () => {
       targetValue: 4045.72,
       created: '2099-01-15T13:30:00Z',
     });
+    // Default: balance matches the credit event amount exactly. Sweep tests
+    // override this to simulate cashback-accrued balances.
+    getBalanceMock = vi.fn().mockResolvedValue(479_100n);
 
     wiseApi = new WiseApiRepository();
     // vitest 4's vi.fn() returns Mock<Procedure | Constructable> which doesn't
     // satisfy concrete method signatures without an assertion.
     wiseApi.createQuote = createQuoteMock as never;
     wiseApi.createTransfer = createTransferMock as never;
+    wiseApi.getBalanceMinor = getBalanceMock as never;
 
     service = new WiseDraftService(eventRepo, transferRepo, wiseApi);
   });
@@ -146,6 +151,62 @@ describe('WiseDraftService', () => {
         ourReference: 'TXN-0044',
       }),
     ).rejects.toThrow(/Event not found/);
+  });
+
+  it('sweeps the full Wise balance, not just the event amount (so cashbacks roll in)', async () => {
+    // Scenario: a 0.41 USD cashback landed earlier and is sitting in the
+    // balance; then a 4791.00 USD paycheck arrives. When the operator drafts
+    // from the paycheck event, the draft should move 4791.41 (the current
+    // balance), not just 4791.00.
+    getBalanceMock.mockResolvedValueOnce(479_141n);
+    createQuoteMock.mockResolvedValueOnce({
+      id: 'quote-uuid-sweep',
+      rate: '0.846991',
+      feeMinor: 1442n,
+      feeCurrency: 'USD',
+      sourceAmountMinor: 479_141n,
+      sourceCurrency: 'USD',
+      targetAmountMinor: 405_878n,
+      targetCurrency: 'EUR',
+    });
+
+    const ingest = await eventRepo.ingest({
+      source: EventSource.Wise,
+      eventType: 'balances#credit',
+      externalId: 'delivery-sweep',
+      occurredAt: new Date('2099-01-15T13:26:00Z'),
+      payload: balanceCreditPayload,
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+    await service.draftFromEvent({ eventId: ingest.event.id, ourReference: 'TXN-0044' });
+
+    expect(getBalanceMock).toHaveBeenCalledWith('USD');
+    expect(createQuoteMock).toHaveBeenCalledWith({
+      sourceCurrency: 'USD',
+      targetCurrency: 'EUR',
+      sourceAmountMinor: 479_141n,
+    });
+  });
+
+  it('refuses to draft when the balance is smaller than the event credit', async () => {
+    // If the balance is less than the event's credit, something already
+    // moved money out — refuse rather than under-draft.
+    getBalanceMock.mockResolvedValueOnce(100n);
+
+    const ingest = await eventRepo.ingest({
+      source: EventSource.Wise,
+      eventType: 'balances#credit',
+      externalId: 'delivery-below',
+      occurredAt: new Date('2099-01-15T13:26:00Z'),
+      payload: balanceCreditPayload,
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+    await expect(service.draftFromEvent({ eventId: ingest.event.id })).rejects.toThrow(/refusing to draft/);
+    expect(createQuoteMock).not.toHaveBeenCalled();
   });
 
   it('auto-allocates a TXN reference from the sequence when omitted', async () => {
