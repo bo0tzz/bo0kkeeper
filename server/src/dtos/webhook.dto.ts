@@ -63,6 +63,22 @@ const PaperlessWebhookSchema = z
   .refine((v) => v.document_id !== undefined || v.id !== undefined || v.doc_pk !== undefined, {
     message: 'paperless webhook body must include one of: document_id, id, doc_pk',
   })
+  .refine(
+    (v) => {
+      // Paperless-ngx workflow templates surface placeholders as literal
+      // `{doc_pk}` / `{document_id}` strings when the workflow's template
+      // engine isn't substituting them (usually a paperless-version /
+      // placeholder-syntax mismatch — some versions want `{{ doc_pk }}`
+      // with double braces, not single). Reject up front rather than
+      // silently trying to fetch a paperless doc with a placeholder as id.
+      const values = [v.document_id, v.id, v.doc_pk, v.correspondent, v.created, v.created_date];
+      return values.every((value) => typeof value !== 'string' || !/^\{[a-z_]+\}$/i.test(value));
+    },
+    {
+      message:
+        'paperless webhook body has unresolved placeholder strings (e.g. `{doc_pk}`); check paperless workflow template syntax — recent versions require `{{ doc_pk }}` with double braces',
+    },
+  )
   .meta({ id: 'PaperlessWebhookDto' });
 
 export class PaperlessWebhookDto extends createZodDto(PaperlessWebhookSchema) {}
