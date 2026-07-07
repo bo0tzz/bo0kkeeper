@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.4](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.3...v0.7.4) (2026-07-07)
+
+
+### Bug Fixes
+
+* **deps:** update dependency eslint-plugin-unicorn to v71 ([#94](https://github.com/bo0tzz/bo0kkeeper/issues/94)) ([a45c91d](https://github.com/bo0tzz/bo0kkeeper/commit/a45c91d8fbeb23af95781bd9746b9649c2a6164c))
+* **deps:** update dependency knip to v6.25.0 ([#100](https://github.com/bo0tzz/bo0kkeeper/issues/100)) ([306b3e6](https://github.com/bo0tzz/bo0kkeeper/commit/306b3e6b5f54a2a000979cabf10211469671e783))
+* **deps:** update svelte ([#101](https://github.com/bo0tzz/bo0kkeeper/issues/101)) ([efe5be6](https://github.com/bo0tzz/bo0kkeeper/commit/efe5be62443d5d1275abdaee251340f4b3c305c2))
+
 ## [0.7.3](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.2...v0.7.3) (2026-07-07)
 
 
