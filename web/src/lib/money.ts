@@ -8,9 +8,13 @@
  * for display.
  */
 
-/** Major-unit input string ("165", "12.34", "-9.9") → minor-unit (cents) string. */
+/** Major-unit input string ("165", "12.34", "12,34", "-9.9") → minor-unit (cents) string. */
 export function majorToMinor(major: string): string {
-  const trimmed = major.trim();
+  // Accept comma decimal separator — Dutch keyboards + local receipts both
+  // use commas, and forcing users to retype confuses the numeric parsing
+  // (a comma silently reads as 0 cents in the fractional half, e.g. 126,97
+  // resolves to 12600 instead of 12697).
+  const trimmed = major.trim().replace(',', '.');
   if (!trimmed) {
     return '0';
   }
@@ -20,6 +24,22 @@ export function majorToMinor(major: string): string {
   const cents = (frac + '00').slice(0, 2);
   const total = BigInt(whole || '0') * 100n + BigInt(cents || '0');
   return (isNegative ? -total : total).toString();
+}
+
+/**
+ * Derive the Dutch gross-inclusive BTW for a gross amount + basis-point
+ * rate, in minor units. Pure integer math: no float, no locale, no
+ * rounding surprises.
+ *
+ *   btwMinor = grossMinor × rateBps / (10000 + rateBps)
+ *
+ * (2100 bps = 21%; 100% is 10000 bps.) Truncates toward zero — the last
+ * cent goes to the base, matching how Belastingdienst rounds gross→base
+ * splits in the sample invoices. Callers pass `0n` / `null` explicitly
+ * when the rate is 0/undefined; this function doesn't guard.
+ */
+export function deriveBtwMinor(grossMinor: bigint, rateBps: number): bigint {
+  return (grossMinor * BigInt(rateBps)) / BigInt(10_000 + rateBps);
 }
 
 /** Minor-unit (cents) string → major-unit string ("1234" → "12.34", "-1234" → "-12.34"). */

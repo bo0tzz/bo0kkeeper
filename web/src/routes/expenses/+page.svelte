@@ -16,7 +16,7 @@
     type ListExpensesResponse,
     type RescanPaperlessResponse,
   } from '$lib/services/expenses.service';
-  import { majorToMinor, minorToMajor } from '$lib/money';
+  import { deriveBtwMinor, majorToMinor, minorToMajor } from '$lib/money';
   import {
     Alert,
     Badge,
@@ -139,19 +139,23 @@
   }
 
   /**
-   * Derive BTW from gross + rate using Dutch convention (gross is VAT-inclusive):
-   *   btw = gross * rate / (100 + rate)
-   * Returns '' when either input is empty/invalid so the field can be cleared
-   * by clearing the rate.
+   * Derive BTW from gross + rate as major-unit strings. Pure integer math
+   * via BigInt so both `126.97` and `126,97` produce the exact same 22.04
+   * (the earlier `parseFloat` path silently dropped everything past a
+   * comma and gave 21.87 — a 17-cent understatement on €126.97). Empty /
+   * unparseable inputs return `''` so clearing the rate blanks the field.
    */
   function deriveBtwMajor(amountMajor: string, btwRatePercent: string): string {
-    const gross = Number.parseFloat(amountMajor);
-    const rate = Number.parseFloat(btwRatePercent);
-    if (!Number.isFinite(gross) || !Number.isFinite(rate) || rate < 0) {
+    if (!amountMajor.trim() || !btwRatePercent.trim()) {
       return '';
     }
-    const btw = (gross * rate) / (100 + rate);
-    return btw.toFixed(2);
+    const rate = Number.parseInt(btwRatePercent, 10);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      return '';
+    }
+    const rateBps = rate * 100;
+    const grossMinor = BigInt(majorToMinor(amountMajor));
+    return minorToMajor(deriveBtwMinor(grossMinor, rateBps).toString());
   }
 
   function recalcBtw(id: string) {
@@ -258,7 +262,7 @@
   }
 
   function buildPatch(draft: DraftFields): ExpensePatch {
-    const btwRateBps = draft.btwRatePercent.trim() === '' ? null : Math.round(Number(draft.btwRatePercent) * 100);
+    const btwRateBps = draft.btwRatePercent.trim() === '' ? null : Number.parseInt(draft.btwRatePercent, 10) * 100;
     const btwMinor = draft.btwMajor.trim() === '' ? null : majorToMinor(draft.btwMajor);
     return {
       vendor: draft.vendor,
@@ -475,6 +479,7 @@
                   <Input
                     bind:value={drafts[expense.id].amountMajor}
                     placeholder="0.00"
+                    inputmode="decimal"
                     oninput={() => recalcBtw(expense.id)}
                   />
                 </Field>
@@ -489,7 +494,7 @@
                   />
                 </Field>
                 <Field label="BTW amount (EUR)" invalid={hasIssue('btwMinor')}>
-                  <Input bind:value={drafts[expense.id].btwMajor} placeholder="0.00" />
+                  <Input bind:value={drafts[expense.id].btwMajor} placeholder="0.00" inputmode="decimal" />
                 </Field>
               </HStack>
               <HStack gap={3}>
