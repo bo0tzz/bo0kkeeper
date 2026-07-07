@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.7.3](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.2...v0.7.3) (2026-07-07)
+
+
+### Bug Fixes
+
+* **deps:** update dependency cookie to v2 ([#93](https://github.com/bo0tzz/bo0kkeeper/issues/93)) ([bc86ed4](https://github.com/bo0tzz/bo0kkeeper/commit/bc86ed4ea1b44e1374e8c687bf6d3d1c4f9c594d))
+* **deps:** update dependency kysely to v0.29.3 ([#97](https://github.com/bo0tzz/bo0kkeeper/issues/97)) ([5d3b757](https://github.com/bo0tzz/bo0kkeeper/commit/5d3b75706bf4ac0256044e35ac491bd145995caa))
+* **deps:** update dependency pg-boss to v12.25.1 ([#95](https://github.com/bo0tzz/bo0kkeeper/issues/95)) ([3787da8](https://github.com/bo0tzz/bo0kkeeper/commit/3787da8bc0ca7ccdcd8d19bc77dc156dd90d7ca3))
+* **deps:** update docker/login-action action to v4.4.0 ([#88](https://github.com/bo0tzz/bo0kkeeper/issues/88)) ([dfa53d0](https://github.com/bo0tzz/bo0kkeeper/commit/dfa53d0bbe6d769344e6f56591891e966e9ea22b))
+* **deps:** update docker/metadata-action action to v6.2.0 ([#89](https://github.com/bo0tzz/bo0kkeeper/issues/89)) ([2c83ecc](https://github.com/bo0tzz/bo0kkeeper/commit/2c83ecc5c3796a812bb3f6c9512db7756ae9eade))
+* **deps:** update docker/setup-buildx-action action to v4.2.0 ([#91](https://github.com/bo0tzz/bo0kkeeper/issues/91)) ([c16dc4a](https://github.com/bo0tzz/bo0kkeeper/commit/c16dc4a57676daeed973ca192e1f630fcbb773a1))
+* **deps:** update eslint ([#92](https://github.com/bo0tzz/bo0kkeeper/issues/92)) ([9dbf332](https://github.com/bo0tzz/bo0kkeeper/commit/9dbf332d4cea24e2f19582e269ab0ed431fe8dc2))
+* **deps:** update pnpm to v11.10.0 ([#96](https://github.com/bo0tzz/bo0kkeeper/issues/96)) ([e9b6c1e](https://github.com/bo0tzz/bo0kkeeper/commit/e9b6c1e809adff20eaa27adaa12f234d9b236d64))
+* **deps:** update vitest to v4.1.10 ([#98](https://github.com/bo0tzz/bo0kkeeper/issues/98)) ([8ac9131](https://github.com/bo0tzz/bo0kkeeper/commit/8ac9131a2556e662fb227a6e2068afed37858039))
+* **invoices:** pass effective FX rate through composeFromWise ([4cd4434](https://github.com/bo0tzz/bo0kkeeper/commit/4cd443429118417823748238d2262032f3cc8360))
+* **paperless:** reject webhook payloads with unresolved placeholder strings ([ada9075](https://github.com/bo0tzz/bo0kkeeper/commit/ada90758054bfcd0e636e8ae6701f3a675d7d022))
+* **web:** derive BTW in BigInt + accept comma decimals at money boundary ([0913542](https://github.com/bo0tzz/bo0kkeeper/commit/0913542784add244c9f51789e9504df0046bb0fc))
+* **wise:** sweep the full balance when drafting, not just the event amount ([b4eab43](https://github.com/bo0tzz/bo0kkeeper/commit/b4eab432fea226372ddf7b45d7d45f295b863d7d))
+
 ## [0.7.2](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.1...v0.7.2) (2026-07-03)
 
 
