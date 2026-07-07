@@ -6,7 +6,7 @@ settings:
   injectWorkspacePackages: true
 
 overrides:
-  cookie: '>=0.7.0 <2'
+  cookie: '>=0.7.0 <3'
 
 packageExtensionsChecksum: sha256-eUwrux8cgTeV4sJHCrYXzXHpK50awuf4eMHgVxmqAks=
 
