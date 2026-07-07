@@ -340,13 +340,24 @@ export class InvoiceComposerService {
    */
   async composeFromWise(input: ComposeFromWiseInput): Promise<ComposeResult> {
     const transfer = await this.requireInvoiceableWiseTransfer(input.wiseTransferId);
+    // Effective rate = target / source. Includes Wise's fee + FX spread, so
+    // it's the rate that actually landed at SNS — better for per-line
+    // display than Wise's quoted `rate` because the per-line EUR values
+    // sum to the invoice total. Rendered via `eurFromMinor` in the
+    // template composition below; without this, that helper falls back
+    // to formatting the USD minor as EUR (source amount reused in the
+    // EUR column).
+    const sourceMinor = BigInt(transfer.sourceAmountMinor as unknown as string);
+    const targetMinor = BigInt(transfer.targetAmountMinor as unknown as string);
+    const effectiveRate = sourceMinor === 0n ? undefined : (Number(targetMinor) / Number(sourceMinor)).toFixed(6);
     return this.composeAndIssue({
       clientId: input.clientId,
       issuedAt: input.issuedAt,
       periodStart: input.periodStart,
       periodEnd: input.periodEnd,
       currency: transfer.sourceCurrency,
-      eurTotalMinor: BigInt(transfer.targetAmountMinor as unknown as string),
+      eurTotalMinor: targetMinor,
+      fxRate: effectiveRate,
       lines: input.lines,
       wiseTransferId: transfer.id,
     });
