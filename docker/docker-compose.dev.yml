@@ -37,13 +37,17 @@ services:
   #       you'd flood the audit log with no-op events.
   #     - Action: "Webhook" → POST http://host.docker.internal:2283/api/webhooks/paperless
   #       Webhook headers: Authorization = "Bearer <PAPERLESS_WEBHOOK_TOKEN from .env>"
-  #       Webhook params (the body — keep "Use parameters for webhook body" + JSON on):
-  #         document_id   → {doc_pk}
-  #         correspondent → {correspondent}
-  #         created       → {created_date}
+  #       Webhook params (the body — keep "Use parameters for webhook body" + JSON on).
+  #       Values are Jinja2 templates — MUST use double braces or paperless
+  #       ships the literal string. `doc_pk` / `created_date` are NOT valid
+  #       paperless placeholders (that's what the old comment recommended and
+  #       what caused this workflow to send literal `{doc_pk}` for months).
+  #         document_id   → {{doc_id}}
+  #         correspondent → {{correspondent}}
+  #         created       → {{created}}
   #       (document_id is the only required field; the others are nice-to-haves
   #       for pre-fill. We re-fetch the doc via REST anyway to read live tags,
-  #       since {doc_tags} isn't a supported placeholder.)
+  #       since there's no `doc_tags` placeholder.)
   paperless-broker:
     container_name: bo0kkeeper_paperless_broker
     image: docker.io/library/redis:8@sha256:2838d5524559494f6f1cd66e97e76b200d64a633a8614200620755ed395daf32

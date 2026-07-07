@@ -65,18 +65,21 @@ const PaperlessWebhookSchema = z
   })
   .refine(
     (v) => {
-      // Paperless-ngx workflow templates surface placeholders as literal
-      // `{doc_pk}` / `{document_id}` strings when the workflow's template
-      // engine isn't substituting them (usually a paperless-version /
-      // placeholder-syntax mismatch — some versions want `{{ doc_pk }}`
-      // with double braces, not single). Reject up front rather than
-      // silently trying to fetch a paperless doc with a placeholder as id.
+      // Paperless-ngx workflow webhook bodies are Jinja2 templates — values
+      // MUST use `{{ doc_id }}` (double braces). Literal `{doc_pk}` or
+      // `{{doc_id}}` arriving un-substituted usually means the workflow was
+      // set up against an older placeholder guide, or paperless couldn't
+      // resolve the variable for that trigger type. Reject up front rather
+      // than silently trying to fetch a paperless doc with a placeholder
+      // where an id should be.
       const values = [v.document_id, v.id, v.doc_pk, v.correspondent, v.created, v.created_date];
-      return values.every((value) => typeof value !== 'string' || !/^\{[a-z_]+\}$/i.test(value));
+      // Match `{name}`, `{{name}}`, `{{ name }}` — any brace-wrapped identifier.
+      const placeholderRe = /^\{\{?\s*[a-z_]+\s*\}?\}$/i;
+      return values.every((value) => typeof value !== 'string' || !placeholderRe.test(value));
     },
     {
       message:
-        'paperless webhook body has unresolved placeholder strings (e.g. `{doc_pk}`); check paperless workflow template syntax — recent versions require `{{ doc_pk }}` with double braces',
+        'paperless webhook body has unresolved placeholder strings (e.g. `{doc_pk}` or literal `{{doc_id}}`); check the workflow webhook params — values must be Jinja2 (`{{doc_id}}`, `{{correspondent}}`, `{{created}}`) and `doc_pk` / `created_date` are not valid paperless placeholders',
     },
   )
   .meta({ id: 'PaperlessWebhookDto' });
