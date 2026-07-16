@@ -41,6 +41,10 @@ export class WiseWebhookDto extends createZodDto(WiseWebhookSchema) {}
  * requirement here is that *some* document identifier reaches us. Fields are
  * accepted as either strings or numbers because users wire workflow templates
  * with mixed types (`{doc_pk}` is numeric, `{document_id}` is string-ish).
+ *
+ * paperless v2.20.x has no id-shaped placeholder (upstream PR #11847 landed on
+ * `dev` but was never backported), so on that line the only viable id source
+ * is `{{doc_url}}` — the service extracts the numeric id from its tail.
  */
 const PaperlessWebhookSchema = z
   .object({
@@ -50,6 +54,13 @@ const PaperlessWebhookSchema = z
     id: z.union([z.string(), z.number()]).optional(),
     /** Alias used in some workflow templates ({doc_pk}). */
     doc_pk: z.union([z.string(), z.number()]).optional(),
+    /**
+     * Full paperless document URL — the only id-carrying variable available
+     * on paperless v2.20.x. Format: `<base>/documents/<id>/`. The service
+     * peels the id off the last numeric path segment when no direct id
+     * field is present.
+     */
+    document_url: z.string().optional(),
     /** Vendor / correspondent name as plain text. */
     correspondent: z.string().optional(),
     correspondent_name: z.string().optional(),
@@ -60,26 +71,29 @@ const PaperlessWebhookSchema = z
     event_type: z.string().optional(),
   })
   .passthrough()
-  .refine((v) => v.document_id !== undefined || v.id !== undefined || v.doc_pk !== undefined, {
-    message: 'paperless webhook body must include one of: document_id, id, doc_pk',
-  })
+  .refine(
+    (v) => v.document_id !== undefined || v.id !== undefined || v.doc_pk !== undefined || v.document_url !== undefined,
+    {
+      message: 'paperless webhook body must include one of: document_id, id, doc_pk, document_url',
+    },
+  )
   .refine(
     (v) => {
       // Paperless-ngx workflow webhook bodies are Jinja2 templates — values
-      // MUST use `{{ doc_id }}` (double braces). Literal `{doc_pk}` or
+      // MUST use `{{ doc_url }}` (double braces). Literal `{doc_pk}` or
       // `{{doc_id}}` arriving un-substituted usually means the workflow was
       // set up against an older placeholder guide, or paperless couldn't
       // resolve the variable for that trigger type. Reject up front rather
       // than silently trying to fetch a paperless doc with a placeholder
       // where an id should be.
-      const values = [v.document_id, v.id, v.doc_pk, v.correspondent, v.created, v.created_date];
+      const values = [v.document_id, v.id, v.doc_pk, v.document_url, v.correspondent, v.created, v.created_date];
       // Match `{name}`, `{{name}}`, `{{ name }}` — any brace-wrapped identifier.
       const placeholderRe = /^\{\{?\s*[a-z_]+\s*\}?\}$/i;
       return values.every((value) => typeof value !== 'string' || !placeholderRe.test(value));
     },
     {
       message:
-        'paperless webhook body has unresolved placeholder strings (e.g. `{doc_pk}` or literal `{{doc_id}}`); check the workflow webhook params — values must be Jinja2 (`{{doc_id}}`, `{{correspondent}}`, `{{created}}`) and `doc_pk` / `created_date` are not valid paperless placeholders',
+        'paperless webhook body has unresolved placeholder strings (e.g. `{doc_pk}` or literal `{{doc_id}}`); check the workflow webhook params — values must be Jinja2 (`{{doc_url}}`, `{{correspondent}}`, `{{created}}`). `doc_id` is only available on paperless ≥ v3.0.0-beta; on v2.20.x use `{{doc_url}}` (we peel the id off the URL).',
     },
   )
   .meta({ id: 'PaperlessWebhookDto' });

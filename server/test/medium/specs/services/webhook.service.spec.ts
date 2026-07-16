@@ -276,6 +276,21 @@ describe('WebhookService — Paperless ingestion', () => {
     }
   });
 
+  // paperless v2.20.x exposes no id-shaped placeholder — the workflow can
+  // only supply `{{doc_url}}`. The service peels the id off the URL tail
+  // so the ingest path stays identical to the id-provided case.
+  it('extracts the document id from document_url when no direct id field is present', async () => {
+    const { parsed } = await loadFixture('document-consumed.example.json', PAPERLESS_FIXTURES);
+    const { document_id: _omit, ...withoutId } = parsed;
+    const urlOnly = { ...withoutId, document_url: 'https://paperless.test/documents/7777/' };
+
+    const result = await service.ingestPaperlessEvent(urlOnly);
+    expect(result.ingested).toBe(true);
+    if (result.ingested) {
+      expect(result.event.externalId).toBe('paperless:7777');
+    }
+  });
+
   it('is idempotent on retry of the same paperless delivery', async () => {
     const { parsed } = await loadFixture('document-consumed.example.json', PAPERLESS_FIXTURES);
 

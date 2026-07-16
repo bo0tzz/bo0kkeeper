@@ -146,7 +146,8 @@ export class WebhookService {
    * document id — paperless guarantees one consume callback per document.
    */
   async ingestPaperlessEvent(payload: PaperlessWebhookDto, deliveryId?: string): Promise<WebhookIngestResult> {
-    const documentId = payload.document_id ?? payload.id ?? payload.doc_pk;
+    const documentId =
+      payload.document_id ?? payload.id ?? payload.doc_pk ?? extractDocumentIdFromUrl(payload.document_url);
     if (documentId === undefined) {
       // Schema-level refine catches this; defensive guard for direct callers.
       throw new Error('paperless webhook body has no document id');
@@ -195,6 +196,29 @@ function isConstantTimeEqual(a: string, b: string): boolean {
 function parseDateOrNow(value: string): Date {
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? new Date() : d;
+}
+
+// paperless `{{doc_url}}` resolves to `<base>/documents/<id>/`. Parse the
+// URL, walk to the segment after "documents", and read the id there.
+// Returns undefined for anything unparseable so the caller's `??` chain
+// keeps flowing to the "no id" error.
+function extractDocumentIdFromUrl(url: string | undefined): number | undefined {
+  if (!url) {
+    return undefined;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return undefined;
+  }
+  const segments = parsed.pathname.split('/').filter(Boolean);
+  const documentsAt = segments.indexOf('documents');
+  if (documentsAt === -1 || documentsAt === segments.length - 1) {
+    return undefined;
+  }
+  const id = Number(segments[documentsAt + 1]);
+  return Number.isSafeInteger(id) && id > 0 ? id : undefined;
 }
 
 function deriveWiseExternalId(payload: WiseWebhookDto): string {

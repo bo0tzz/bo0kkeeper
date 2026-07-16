@@ -39,13 +39,14 @@ services:
   #       Webhook headers: Authorization = "Bearer <PAPERLESS_WEBHOOK_TOKEN from .env>"
   #       Webhook params (the body — keep "Use parameters for webhook body" + JSON on).
   #       Values are Jinja2 templates — MUST use double braces or paperless
-  #       ships the literal string. `doc_pk` / `created_date` are NOT valid
-  #       paperless placeholders (that's what the old comment recommended and
-  #       what caused this workflow to send literal `{doc_pk}` for months).
-  #         document_id   → {{doc_id}}
+  #       ships the literal string. paperless v2.20.x has no id-shaped
+  #       placeholder (`doc_id` is dev-branch only, and `doc_pk` /
+  #       `created_date` were never valid), so we take `{{doc_url}}` and
+  #       peel the id off the URL server-side.
+  #         document_url  → {{doc_url}}
   #         correspondent → {{correspondent}}
   #         created       → {{created}}
-  #       (document_id is the only required field; the others are nice-to-haves
+  #       (document_url is the only required field; the others are nice-to-haves
   #       for pre-fill. We re-fetch the doc via REST anyway to read live tags,
   #       since there's no `doc_tags` placeholder.)
   paperless-broker:
