@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.6](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.5...v0.7.6) (2026-07-16)
+
+
+### Bug Fixes
+
+* **deps:** narrow cookie override back to &lt;2 ([5def3dd](https://github.com/bo0tzz/bo0kkeeper/commit/5def3ddc02f3f22cd70bc630587b73911707dcf9))
+* **deps:** update svelte ([#105](https://github.com/bo0tzz/bo0kkeeper/issues/105)) ([0fa8c06](https://github.com/bo0tzz/bo0kkeeper/commit/0fa8c06759619f6b8360235d5a0ea0ea56a3d5e8))
+
 ## [0.7.5](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.4...v0.7.5) (2026-07-16)
 
 
