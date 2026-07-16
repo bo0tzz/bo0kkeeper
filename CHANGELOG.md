@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.5](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.4...v0.7.5) (2026-07-16)
+
+
+### Bug Fixes
+
+* **deps:** update debian:13-slim docker digest to 020c0d2 ([#114](https://github.com/bo0tzz/bo0kkeeper/issues/114)) ([ec89d2e](https://github.com/bo0tzz/bo0kkeeper/commit/ec89d2e1d5453413433f5ec4282033dfd1c605bd))
+* **deps:** update dependency @types/node to v24.13.3 ([#106](https://github.com/bo0tzz/bo0kkeeper/issues/106)) ([cf28dc5](https://github.com/bo0tzz/bo0kkeeper/commit/cf28dc52c50277105a891f036ecb98afc04ddf5f))
+* **deps:** update dependency knip to v6.27.0 ([#112](https://github.com/bo0tzz/bo0kkeeper/issues/112)) ([38ede04](https://github.com/bo0tzz/bo0kkeeper/commit/38ede0465dcdd1aece94a16a5508e2a85d232ab6))
+* **deps:** update dependency prettier to v3.9.5 ([#110](https://github.com/bo0tzz/bo0kkeeper/issues/110)) ([c5a00d9](https://github.com/bo0tzz/bo0kkeeper/commit/c5a00d97ba3dee84e1580184c7d45bdf412fa272))
+* **deps:** update dependency vite to v8.1.5 ([#109](https://github.com/bo0tzz/bo0kkeeper/issues/109)) ([12db3f2](https://github.com/bo0tzz/bo0kkeeper/commit/12db3f2d98541dcf4bd9d3cd45113d2a7a717b25))
+* **deps:** update docker.io/library/redis:8 docker digest to 0b13f54 ([#115](https://github.com/bo0tzz/bo0kkeeper/issues/115)) ([2ca9dd4](https://github.com/bo0tzz/bo0kkeeper/commit/2ca9dd484b5c76c3a2312e7f4fe1a6ad4a74b2d4))
+* **deps:** update nestjs ([#107](https://github.com/bo0tzz/bo0kkeeper/issues/107)) ([007d1cc](https://github.com/bo0tzz/bo0kkeeper/commit/007d1cc5c7757f004cd5a12013b3254ce7f82f73))
+* **deps:** update node.js to 6f7b03f ([#103](https://github.com/bo0tzz/bo0kkeeper/issues/103)) ([0930395](https://github.com/bo0tzz/bo0kkeeper/commit/093039552f8481ab40d8f0f7fb59a5ba9384f097))
+* **deps:** update pnpm to v11.13.1 ([#111](https://github.com/bo0tzz/bo0kkeeper/issues/111)) ([829b8d4](https://github.com/bo0tzz/bo0kkeeper/commit/829b8d445ac79c40c53b2f03c1057344f066faec))
+* **deps:** update postgres:18 docker digest to c2d42a1 ([#104](https://github.com/bo0tzz/bo0kkeeper/issues/104)) ([a2c1cac](https://github.com/bo0tzz/bo0kkeeper/commit/a2c1cac88a902b5793fb5b25bf469b6f304b9377))
+* **paperless:** accept `{{doc_url}}` and peel the id off the URL ([736f6ad](https://github.com/bo0tzz/bo0kkeeper/commit/736f6ad8ddfa724bd8680b80d3074f11c0eacacc))
+
 ## [0.7.4](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.3...v0.7.4) (2026-07-07)
 
 
