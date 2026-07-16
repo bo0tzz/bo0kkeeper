@@ -71,6 +71,15 @@
       groupName: "nestjs",
       matchPackageNames: ["/^@nestjs//"],
     },
+    // Cap cookie at <2 — SvelteKit still imports the named `parse` /
+    // `serialize` exports that cookie v2 removed. Matches the pnpm
+    // `overrides.cookie` upper bound in pnpm-workspace.yaml. Revisit
+    // when SvelteKit switches to the default export.
+    {
+      description: "Cookie stays on v1 until SvelteKit drops named imports",
+      matchPackageNames: ["cookie"],
+      allowedVersions: "<2",
+    },
     // mise tool bumps (node, pnpm, etc.) get their own commit scope so
     // they're obvious in the changelog and easy to skim.
     {
