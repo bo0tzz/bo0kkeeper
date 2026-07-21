@@ -101,13 +101,69 @@ describe('ExpensePipelineService', () => {
     expect(eventAfter?.status).toBe(EventStatus.Processed);
   });
 
+  // paperless v2.20.x has no id-shaped placeholder, so the workflow can only
+  // supply `{{doc_url}}` under our current setup docs. Before this test
+  // existed, the webhook DTO accepted document_url but parsePaperlessPayload
+  // still only looked at document_id/id — so expenses silently stopped being
+  // created for every properly-configured v2.20.x workflow.
+  it('creates an expense from a document_url-only payload (v2.20.x fix path)', async () => {
+    const ingest = await eventRepo.ingest({
+      source: EventSource.Paperless,
+      eventType: 'document.consumed',
+      externalId: 'paperless:679',
+      occurredAt: new Date('2026-07-15'),
+      payload: {
+        document_url: 'https://paperless.example/documents/679/',
+        correspondent: 'Acme Cables',
+        created: '2026-07-15',
+      },
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+
+    await service.handleProcessPaperlessDocument({ eventId: ingest.event.id });
+
+    const pending = await expenseRepo.findPendingReview();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].paperlessDocId).toBe('679');
+    expect(pending[0].vendor).toBe('Acme Cables');
+  });
+
+  // The actual prod incident shape: user's workflow JSON key was
+  // `document_id` but the value template was `{{doc_url}}`, so the URL
+  // landed in an id field and was stored verbatim as the expense's
+  // paperlessDocId — breaking the paperless-redirect link with /NaN/.
+  it('normalizes a URL that landed in the document_id field', async () => {
+    const ingest = await eventRepo.ingest({
+      source: EventSource.Paperless,
+      eventType: 'document.consumed',
+      externalId: 'paperless:mis-mapped-1',
+      occurredAt: new Date('2026-07-15'),
+      payload: {
+        document_id: 'https://paperless.example/documents/679/',
+        correspondent: '',
+        created: '2026-07-15',
+      },
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+
+    await service.handleProcessPaperlessDocument({ eventId: ingest.event.id });
+
+    const pending = await expenseRepo.findPendingReview();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].paperlessDocId).toBe('679');
+  });
+
   it('idempotent on duplicate paperless documents', async () => {
     const first = await eventRepo.ingest({
       source: EventSource.Paperless,
       eventType: 'document.consumed',
       externalId: 'paperless-2',
       occurredAt: new Date(),
-      payload: { document_id: 'doc-99', correspondent: 'Vendor', created: '2099-01-01' },
+      payload: { document_id: 99, correspondent: 'Vendor', created: '2099-01-01' },
     });
     if (!first.ingested) {
       throw new Error('precondition');
@@ -120,7 +176,7 @@ describe('ExpensePipelineService', () => {
       eventType: 'document.consumed',
       externalId: 'paperless-2-retry',
       occurredAt: new Date(),
-      payload: { document_id: 'doc-99', correspondent: 'Vendor 2.0', created: '2099-01-02' },
+      payload: { document_id: 99, correspondent: 'Vendor 2.0', created: '2099-01-02' },
     });
     if (!second.ingested) {
       throw new Error('precondition');

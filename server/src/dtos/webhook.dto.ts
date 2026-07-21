@@ -1,4 +1,5 @@
 import { createZodDto } from 'nestjs-zod';
+import { paperlessPayloadShape } from 'src/utils/paperless-payload';
 import z from 'zod';
 
 /**
@@ -36,41 +37,13 @@ const WiseWebhookSchema = z
 export class WiseWebhookDto extends createZodDto(WiseWebhookSchema) {}
 
 /**
- * Paperless-ngx workflow webhook envelope. paperless-ngx workflow actions of
- * type "Webhook" send an arbitrary user-defined JSON body — the only firm
- * requirement here is that *some* document identifier reaches us. Fields are
- * accepted as either strings or numbers because users wire workflow templates
- * with mixed types (`{doc_pk}` is numeric, `{document_id}` is string-ish).
- *
- * paperless v2.20.x has no id-shaped placeholder (upstream PR #11847 landed on
- * `dev` but was never backported), so on that line the only viable id source
- * is `{{doc_url}}` — the service extracts the numeric id from its tail.
+ * Paperless-ngx workflow webhook envelope. The field shape lives in
+ * `utils/paperless-payload.ts` because it's shared with the read-time
+ * parser inside job handlers — see that file for the full explanation.
+ * This DTO adds inbound-only refines (must-have-id, no-placeholders)
+ * that we don't want to re-run against historical events on read.
  */
-const PaperlessWebhookSchema = z
-  .object({
-    /** Numeric paperless document id; canonical name in our pipeline. */
-    document_id: z.union([z.string(), z.number()]).optional(),
-    /** Alias paperless workflow templates use for the same field. */
-    id: z.union([z.string(), z.number()]).optional(),
-    /** Alias used in some workflow templates ({doc_pk}). */
-    doc_pk: z.union([z.string(), z.number()]).optional(),
-    /**
-     * Full paperless document URL — the only id-carrying variable available
-     * on paperless v2.20.x. Format: `<base>/documents/<id>/`. The service
-     * peels the id off the last numeric path segment when no direct id
-     * field is present.
-     */
-    document_url: z.string().optional(),
-    /** Vendor / correspondent name as plain text. */
-    correspondent: z.string().optional(),
-    correspondent_name: z.string().optional(),
-    /** Document date — ISO-ish string from paperless OCR. */
-    created: z.string().optional(),
-    created_date: z.string().optional(),
-    /** Optional event type when the workflow sets one ("document.consumed", etc). */
-    event_type: z.string().optional(),
-  })
-  .passthrough()
+const PaperlessWebhookSchema = paperlessPayloadShape
   .refine(
     (v) => v.document_id !== undefined || v.id !== undefined || v.doc_pk !== undefined || v.document_url !== undefined,
     {

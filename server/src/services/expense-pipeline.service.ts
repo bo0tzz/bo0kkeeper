@@ -7,6 +7,7 @@ import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { JobOf } from 'src/types';
+import { PaperlessPayload, readPaperlessEventPayload, resolvePaperlessDocId } from 'src/utils/paperless-payload';
 
 /**
  * Consumes paperless `document.consumed` events and creates `pending_review`
@@ -39,7 +40,8 @@ export class ExpensePipelineService {
       return;
     }
 
-    const parsed = parsePaperlessPayload(event.payload);
+    const payload = readPaperlessEventPayload(event);
+    const parsed = parsePaperlessPayload(payload);
     if (!parsed) {
       this.logger.warn(`Paperless payload had no document_id; skipping event ${event.id}`);
       await this.eventRepository.markProcessed(event.id);
@@ -117,37 +119,17 @@ type ParsedPaperless = {
   locationClassGuess: ExpenseLocationClass;
 };
 
-function parsePaperlessPayload(payload: Record<string, unknown>): ParsedPaperless | null {
-  const documentId = pickStringOrNumber(payload, ['document_id', 'id']);
-  if (documentId === null) {
+function parsePaperlessPayload(payload: PaperlessPayload): ParsedPaperless | null {
+  const documentId = resolvePaperlessDocId(payload);
+  if (documentId === undefined) {
     return null;
   }
-  const vendor = pickString(payload, ['correspondent', 'correspondent_name']);
-  const created = pickString(payload, ['created', 'created_date']);
+  const vendor = payload.correspondent?.length ? payload.correspondent : (payload.correspondent_name ?? null);
+  const created = payload.created?.length ? payload.created : payload.created_date;
   return {
-    documentId: String(documentId),
-    vendor,
+    documentId,
+    vendor: vendor ?? null,
     expenseDate: created ? new Date(created) : null,
     locationClassGuess: ExpenseLocationClass.Domestic,
   };
-}
-
-function pickStringOrNumber(payload: Record<string, unknown>, keys: string[]): string | number | null {
-  for (const key of keys) {
-    const v = payload[key];
-    if (typeof v === 'string' || typeof v === 'number') {
-      return v;
-    }
-  }
-  return null;
-}
-
-function pickString(payload: Record<string, unknown>, keys: string[]): string | null {
-  for (const key of keys) {
-    const v = payload[key];
-    if (typeof v === 'string' && v.length > 0) {
-      return v;
-    }
-  }
-  return null;
 }
