@@ -172,7 +172,7 @@ async function parse<T>(res: Response): Promise<T> {
     // 401 reaching here means either the original request 401'd AND silent
     // refresh failed, OR we're inside an auth flow already. Bounce the user
     // through the login redirect so they end up back where they started.
-    if (res.status === 401 && location && !location.pathname.startsWith('/api/auth/')) {
+    if (location && res.status === 401 && !location.pathname.startsWith('/api/auth/')) {
       const returnTo = location.pathname + location.search;
       location.replace(`/api/auth/login?return_to=${encodeURIComponent(returnTo)}`);
       // Halt the in-flight Promise rather than throwing — SvelteKit's

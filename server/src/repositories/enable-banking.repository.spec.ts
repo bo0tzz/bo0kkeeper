@@ -37,7 +37,7 @@ function decodeJwt(jwt: string): {
   signingInput: string;
   signatureB64Url: string;
 } {
-  const [headerB64, claimsB64, sigB64] = jwt.split('.');
+  const [headerB64, claimsB64, sigB64] = jwt.split('.', 3);
   const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString('utf8'));
   const claims = JSON.parse(Buffer.from(claimsB64, 'base64url').toString('utf8'));
   return { header, claims, signingInput: `${headerB64}.${claimsB64}`, signatureB64Url: sigB64 };

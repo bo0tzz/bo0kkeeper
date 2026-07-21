@@ -142,7 +142,7 @@ export const dutchDateToDate = z
     z.date(),
     {
       decode: (s) => {
-        const [dd, mm, yyyy] = s.split('-');
+        const [dd, mm, yyyy] = s.split('-', 3);
         return new Date(`${yyyy}-${mm}-${dd}T00:00:00.000Z`);
       },
       encode: (date) => {

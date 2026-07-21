@@ -20,7 +20,7 @@ export function majorToMinor(major: string): string {
   }
   const isNegative = trimmed.startsWith('-');
   const body = isNegative ? trimmed.slice(1) : trimmed;
-  const [whole, frac = ''] = body.split('.');
+  const [whole, frac = ''] = body.split('.', 2);
   const cents = (frac + '00').slice(0, 2);
   const total = BigInt(whole || '0') * 100n + BigInt(cents || '0');
   return (isNegative ? -total : total).toString();

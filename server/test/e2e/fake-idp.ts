@@ -284,7 +284,7 @@ export class CookieJar {
   store_set(setCookie: string | string[]): void {
     const headers = Array.isArray(setCookie) ? setCookie : [setCookie];
     for (const header of headers) {
-      const [first] = header.split(';');
+      const [first] = header.split(';', 1);
       const eq = first.indexOf('=');
       if (eq <= 0) {
         continue;
