@@ -231,6 +231,186 @@ describe('QuarterlyAggregatorService', () => {
     expect(result.netBtwEurMinor).toBe(-2100n);
   });
 
+  // Kasstelsel: paid-in-Q2, receipt-arrived-in-Q3 belongs in the Q2 rollup
+  // even though the paperless doc (expenseDate) is dated Q3. Regression: the
+  // aggregator used to filter approved expenses by expenseDate directly, so
+  // this class of expense silently dropped out of the paying quarter's
+  // deductible-BTW total.
+  it('counts an approved expense in the quarter of its matched bank-tx date (not expenseDate)', async () => {
+    const ingest = await expenseRepo.ingest({
+      paperlessDocId: 'doc-cross-quarter',
+      vendor: 'Late-Arriving Vendor',
+      // Receipt date is in Q3 — the paperless doc came in weeks after payment.
+      expenseDate: new Date('2099-08-15'),
+      amountMinor: 12_100n,
+      currency: 'EUR',
+      btwRateBps: 2100,
+      btwMinor: 2100n,
+      locationClass: ExpenseLocationClass.Domestic,
+      category: 'hardware',
+      notes: null,
+      sourceEventId: null,
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+    await expenseRepo.approve(ingest.row.id);
+    // Bank transaction cleared in Q2 — this is the payment.
+    await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'cross-quarter-payment',
+      txDate: new Date('2099-05-15'),
+      amountMinor: -12_100n,
+      currency: 'EUR',
+      counterpartyName: 'Late-Arriving Vendor',
+      counterpartyIban: null,
+      description: 'Hardware invoice',
+      rawPayload: {},
+      matchedExpenseId: ingest.row.id,
+      matchedAt: new Date('2099-05-15'),
+    });
+
+    const q2 = await aggregator.aggregate(2099, 2);
+    expect(q2.expenses.grossEurMinor).toBe(12_100n);
+    expect(q2.expenses.deductibleBtwEurMinor).toBe(2100n);
+
+    // And absent from Q3 — receipt date lives there but payment doesn't.
+    const q3 = await aggregator.aggregate(2099, 3);
+    expect(q3.expenses.grossEurMinor).toBe(0n);
+    expect(q3.expenses.deductibleBtwEurMinor).toBe(0n);
+  });
+
+  // Opposite-direction cross-quarter case: receipt arrived early but the
+  // payment didn't clear until the next quarter (e.g. invoice terms of
+  // net-30, or a vendor delay). The expense belongs in the quarter the
+  // money actually left the account.
+  it('counts an approved expense in the payment quarter when receipt predates payment', async () => {
+    const ingest = await expenseRepo.ingest({
+      paperlessDocId: 'doc-early-receipt',
+      vendor: 'Slow-Pay Vendor',
+      // Receipt in Q2 — invoice arrived early, sat in the queue.
+      expenseDate: new Date('2099-05-25'),
+      amountMinor: 8000n,
+      currency: 'EUR',
+      btwRateBps: 2100,
+      btwMinor: 1388n,
+      locationClass: ExpenseLocationClass.Domestic,
+      category: 'services',
+      notes: null,
+      sourceEventId: null,
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+    await expenseRepo.approve(ingest.row.id);
+    // Payment cleared in Q3.
+    await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'slow-pay-payment',
+      txDate: new Date('2099-08-05'),
+      amountMinor: -8000n,
+      currency: 'EUR',
+      counterpartyName: 'Slow-Pay Vendor',
+      counterpartyIban: null,
+      description: 'Consulting fee',
+      rawPayload: {},
+      matchedExpenseId: ingest.row.id,
+      matchedAt: new Date('2099-08-05'),
+    });
+
+    const q2 = await aggregator.aggregate(2099, 2);
+    expect(q2.expenses.grossEurMinor).toBe(0n);
+    expect(q2.expenses.deductibleBtwEurMinor).toBe(0n);
+
+    const q3 = await aggregator.aggregate(2099, 3);
+    expect(q3.expenses.grossEurMinor).toBe(8000n);
+    expect(q3.expenses.deductibleBtwEurMinor).toBe(1388n);
+  });
+
+  // Partial-payment case: if one expense is settled by multiple bank_txs
+  // across quarters, the latest txDate wins — the expense is only fully
+  // paid on the last transaction. Partial-payment attribution per quarter
+  // would need per-payment amounts, which we don't model today.
+  it('uses the latest bank-tx date when multiple payments match one expense across quarters', async () => {
+    const ingest = await expenseRepo.ingest({
+      paperlessDocId: 'doc-partial-pay',
+      vendor: 'Split-Pay Vendor',
+      expenseDate: new Date('2099-05-01'),
+      amountMinor: 20_000n,
+      currency: 'EUR',
+      btwRateBps: 2100,
+      btwMinor: 3471n,
+      locationClass: ExpenseLocationClass.Domestic,
+      category: 'services',
+      notes: null,
+      sourceEventId: null,
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+    await expenseRepo.approve(ingest.row.id);
+    // First half paid in Q2, second half in Q3.
+    await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'partial-pay-1',
+      txDate: new Date('2099-05-20'),
+      amountMinor: -10_000n,
+      currency: 'EUR',
+      counterpartyName: 'Split-Pay Vendor',
+      counterpartyIban: null,
+      description: 'Partial 1/2',
+      rawPayload: {},
+      matchedExpenseId: ingest.row.id,
+      matchedAt: new Date('2099-05-20'),
+    });
+    await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'partial-pay-2',
+      txDate: new Date('2099-07-10'),
+      amountMinor: -10_000n,
+      currency: 'EUR',
+      counterpartyName: 'Split-Pay Vendor',
+      counterpartyIban: null,
+      description: 'Partial 2/2',
+      rawPayload: {},
+      matchedExpenseId: ingest.row.id,
+      matchedAt: new Date('2099-07-10'),
+    });
+
+    const q2 = await aggregator.aggregate(2099, 2);
+    expect(q2.expenses.grossEurMinor).toBe(0n);
+
+    const q3 = await aggregator.aggregate(2099, 3);
+    expect(q3.expenses.grossEurMinor).toBe(20_000n);
+    expect(q3.expenses.deductibleBtwEurMinor).toBe(3471n);
+  });
+
+  // Fallback path: an approved expense with no matched bank_tx (cash purchase
+  // or manual entry) still counts by expenseDate. Confirms the coalesce works.
+  it('falls back to expenseDate when the approved expense has no matched bank-tx', async () => {
+    const ingest = await expenseRepo.ingest({
+      paperlessDocId: 'doc-unmatched',
+      vendor: 'Cash Purchase',
+      expenseDate: new Date('2099-02-10'),
+      amountMinor: 5000n,
+      currency: 'EUR',
+      btwRateBps: 2100,
+      btwMinor: 868n,
+      locationClass: ExpenseLocationClass.Domestic,
+      category: 'supplies',
+      notes: null,
+      sourceEventId: null,
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+    await expenseRepo.approve(ingest.row.id);
+
+    const q1 = await aggregator.aggregate(2099, 1);
+    expect(q1.expenses.grossEurMinor).toBe(5000n);
+    expect(q1.expenses.deductibleBtwEurMinor).toBe(868n);
+  });
+
   it('warning count matches the sample (regression: count was filtered to period-only)', async () => {
     // Invoice issued in Q1, viewed from Q2's rollup. The sample query picks it
     // up (issued before Q2 end, unmatched). The count must too — a previous

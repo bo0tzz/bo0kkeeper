@@ -318,17 +318,33 @@ export class ExpenseRepository {
   }
 
   /**
-   * Approved expenses whose `expenseDate` falls in `[start, end)`. Drives
-   * the per-quarter accountant export.
+   * Approved expenses whose *payment date* falls in `[start, end)`.
+   *
+   * Kasstelsel (cash basis) counts an expense in the quarter it was paid,
+   * not the quarter its receipt is dated — so we look at the matched
+   * bank_transaction's `txDate` first, and only fall back to
+   * `expense.expenseDate` when nothing is matched yet (rare: cash purchases
+   * or manual entries). If multiple bank_transactions point at the same
+   * expense (partial payments), the latest one wins.
+   *
+   * This aligns the aggregator with the sheet-sync path, which already
+   * places expense rows on the tab of `bankTx.txDate`.
    */
   async findApprovedInPeriod(start: Date, end: Date): Promise<Expense[]> {
+    // COALESCE(latest bt.txDate matched to this expense, expense.expenseDate)
+    // as the effective period date. Kysely's typed `fn.coalesce` doesn't
+    // accept a subquery scalar in this position, so build it via `sql`.
+    const effectiveDate = sql<Date>`COALESCE(
+      (SELECT MAX(bt."txDate") FROM bank_transaction bt WHERE bt."matchedExpenseId" = expense.id),
+      expense."expenseDate"
+    )`;
     return (await this.db
       .selectFrom('expense')
-      .selectAll()
+      .selectAll('expense')
       .where('status', '=', ExpenseStatus.Approved)
-      .where('expenseDate', '>=', start)
-      .where('expenseDate', '<', end)
-      .orderBy('expenseDate', 'asc')
+      .where(effectiveDate, '>=', start)
+      .where(effectiveDate, '<', end)
+      .orderBy('expense.expenseDate', 'asc')
       .execute()) as Expense[];
   }
 

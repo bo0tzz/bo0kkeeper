@@ -28,8 +28,8 @@ export type QuarterlyAggregate = {
   };
   expenses: {
     /**
-     * Approved-only. The quarter's expense_date is the proxy for "when the
-     * expense was paid"; refinement to use bank-match dates can come later.
+     * Approved-only, counted in the quarter of the matched bank_tx.txDate
+     * (kasstelsel). Unmatched approved expenses fall back to expenseDate.
      */
     grossEurMinor: bigint;
     /** Deductible BTW (vooraftrek) — only for domestic + EU-VAT-charged expenses. */
@@ -65,9 +65,11 @@ export type AggregatorWarning =
  * on the date it cleared. Invoices issued in the quarter but not yet paid
  * surface as `invoice_unmatched` warnings, not as income.
  *
- * Expenses are counted by `expenseDate` (the receipt date). For credit-card
- * purchases this is close to the cash-basis date but not exactly it; a
- * follow-up could read bank-tx dates for paid expenses.
+ * Expenses use the same kasstelsel rule: the matched `bank_transaction.txDate`
+ * (latest, if multiple) is the effective period date. Expenses with no
+ * matched bank_tx fall back to `expenseDate` — that path only fires for
+ * cash purchases and manual entries. This keeps the aggregator consistent
+ * with sheet-sync, which places expense rows on the tab of the payment date.
  */
 @Injectable()
 export class QuarterlyAggregatorService {
