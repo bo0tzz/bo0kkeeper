@@ -16,6 +16,7 @@
 * **deps:** update postgres:18 docker digest to 3a82e1f ([#123](https://github.com/bo0tzz/bo0kkeeper/issues/123)) ([dbc05b7](https://github.com/bo0tzz/bo0kkeeper/commit/dbc05b737bae58d756bd353840322846dfe9e2e2))
 * **deps:** update svelte ([#121](https://github.com/bo0tzz/bo0kkeeper/issues/121)) ([f1600e1](https://github.com/bo0tzz/bo0kkeeper/commit/f1600e11c90ae2804908cb84c415eb43d8469a53))
 * **deps:** update tailwindcss monorepo to v4.3.3 ([#117](https://github.com/bo0tzz/bo0kkeeper/issues/117)) ([0ca729c](https://github.com/bo0tzz/bo0kkeeper/commit/0ca729c010201b1bbe7bfd99eff8e1d5453dcd93))
+* **aggregator:** count expenses by payment date, not receipt date ([ed54391](https://github.com/bo0tzz/bo0kkeeper/commit/ed5439169e62b12983804ada8963cbd000e043ad))
 * **paperless:** normalize document ids at every entry point ([3d50ee2](https://github.com/bo0tzz/bo0kkeeper/commit/3d50ee2de3e9658d5436ae30c8d75901ec7bde86))
 
 ## [0.7.6](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.5...v0.7.6) (2026-07-16)
