@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.7](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.6...v0.7.7) (2026-07-21)
+
+
+### Bug Fixes
+
+* **deps:** update actions/checkout action to v7.0.1 ([#127](https://github.com/bo0tzz/bo0kkeeper/issues/127)) ([c17ac96](https://github.com/bo0tzz/bo0kkeeper/commit/c17ac96d46b37a7b3c2b6f7b06fd518d45df5309))
+* **deps:** update dependency @nestjs/swagger to v11.4.6 ([#124](https://github.com/bo0tzz/bo0kkeeper/issues/124)) ([bb90d62](https://github.com/bo0tzz/bo0kkeeper/commit/bb90d629109faee0011857b42c9d530ae447cc30))
+* **deps:** update dependency @swc/core to v1.15.46 ([#128](https://github.com/bo0tzz/bo0kkeeper/issues/128)) ([868c779](https://github.com/bo0tzz/bo0kkeeper/commit/868c779f34c1a12d07b91ac322752563c24e6c86))
+* **deps:** update dependency helmet to v8.3.0 ([#118](https://github.com/bo0tzz/bo0kkeeper/issues/118)) ([0afc175](https://github.com/bo0tzz/bo0kkeeper/commit/0afc175943e99b8eeeba788c43b93f8512eb81a1))
+* **deps:** update dependency pg-boss to v12.26.1 ([#120](https://github.com/bo0tzz/bo0kkeeper/issues/120)) ([5ebc3a4](https://github.com/bo0tzz/bo0kkeeper/commit/5ebc3a45ff5bc77f54dbd13e03d233e0b251307f))
+* **deps:** update docker.io/library/redis:8 docker digest to 234c902 ([#119](https://github.com/bo0tzz/bo0kkeeper/issues/119)) ([ee58ee4](https://github.com/bo0tzz/bo0kkeeper/commit/ee58ee4091136c088f8e809ad60beb721b0bf632))
+* **deps:** update eslint ([#122](https://github.com/bo0tzz/bo0kkeeper/issues/122)) ([4490892](https://github.com/bo0tzz/bo0kkeeper/commit/449089299def0949b299c622a130cc6a87efb336))
+* **deps:** update eslint-plugin-unicorn to v72 ([a5be287](https://github.com/bo0tzz/bo0kkeeper/commit/a5be2874b46f31b0d975a6165303b9ac5d519856))
+* **deps:** update postgres:18 docker digest to 3a82e1f ([#123](https://github.com/bo0tzz/bo0kkeeper/issues/123)) ([dbc05b7](https://github.com/bo0tzz/bo0kkeeper/commit/dbc05b737bae58d756bd353840322846dfe9e2e2))
+* **deps:** update svelte ([#121](https://github.com/bo0tzz/bo0kkeeper/issues/121)) ([f1600e1](https://github.com/bo0tzz/bo0kkeeper/commit/f1600e11c90ae2804908cb84c415eb43d8469a53))
+* **deps:** update tailwindcss monorepo to v4.3.3 ([#117](https://github.com/bo0tzz/bo0kkeeper/issues/117)) ([0ca729c](https://github.com/bo0tzz/bo0kkeeper/commit/0ca729c010201b1bbe7bfd99eff8e1d5453dcd93))
+* **paperless:** normalize document ids at every entry point ([3d50ee2](https://github.com/bo0tzz/bo0kkeeper/commit/3d50ee2de3e9658d5436ae30c8d75901ec7bde86))
+
 ## [0.7.6](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.5...v0.7.6) (2026-07-16)
 
 
