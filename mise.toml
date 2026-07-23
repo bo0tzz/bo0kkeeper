@@ -24,6 +24,10 @@ description = "Start dev services (Postgres, etc.)"
 run = "docker compose -f ./docker/docker-compose.dev.yml down --remove-orphans"
 description = "Stop dev services"
 
+[tasks."dev-oidc"]
+run = "node --experimental-strip-types scripts/dev-oidc.mjs"
+description = "In-process fake OIDC IDP on :4444, for when the real Authentik client isn't available (offline / rotated / sandboxed). Point OIDC_ISSUER/CLIENT_ID/etc at it — see the script header."
+
 [tasks."build-server"]
 run = "pnpm --filter bo0kkeeper build"
 description = "Build the NestJS server"
