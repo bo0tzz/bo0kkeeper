@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.8](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.7...v0.7.8) (2026-07-23)
+
+
+### Bug Fixes
+
+* **ui:** surface matched entity labels and hide stale link affordances ([236a29f](https://github.com/bo0tzz/bo0kkeeper/commit/236a29fc4a819f914e28bd1e19e5d85dd53bffaf))
+
 ## [0.7.7](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.6...v0.7.7) (2026-07-21)
 
 
