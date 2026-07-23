@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.9](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.8...v0.7.9) (2026-07-23)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @nestjs/swagger to v11.4.6 ([#129](https://github.com/bo0tzz/bo0kkeeper/issues/129)) ([8a2edc4](https://github.com/bo0tzz/bo0kkeeper/commit/8a2edc4b6c407d53c904c7a493aafa17a140caa7))
+* **deps:** update dependency happy-dom to v20.11.1 ([#134](https://github.com/bo0tzz/bo0kkeeper/issues/134)) ([21f6966](https://github.com/bo0tzz/bo0kkeeper/commit/21f696613945ee8351af1e1c03ec519b04c6f575))
+* **deps:** update dependency helmet to v8.3.0 ([#135](https://github.com/bo0tzz/bo0kkeeper/issues/135)) ([db4b134](https://github.com/bo0tzz/bo0kkeeper/commit/db4b1345c57bf108e71aadea9c3e4cbc289fd4f0))
+* **deps:** update dependency jose to v6.2.4 ([#131](https://github.com/bo0tzz/bo0kkeeper/issues/131)) ([2d6ba08](https://github.com/bo0tzz/bo0kkeeper/commit/2d6ba085272c2ba2f56b314cc3841a780b1252ee))
+* **deps:** update dependency kysely to v0.29.4 ([#130](https://github.com/bo0tzz/bo0kkeeper/issues/130)) ([44151d0](https://github.com/bo0tzz/bo0kkeeper/commit/44151d08c1559dc7a49a5016dfeca1ac85f361ea))
+* **deps:** update dependency pg-boss to v12.26.2 ([#136](https://github.com/bo0tzz/bo0kkeeper/issues/136)) ([58cb4ca](https://github.com/bo0tzz/bo0kkeeper/commit/58cb4cabdb37fcce054d63656c30966df185245f))
+* **deps:** update dependency prettier to v3.9.6 ([#132](https://github.com/bo0tzz/bo0kkeeper/issues/132)) ([ac5ee29](https://github.com/bo0tzz/bo0kkeeper/commit/ac5ee29a08a6df92572f4202eadfbea194159d2a))
+* **deps:** update ghcr.io/paperless-ngx/paperless-ngx:latest docker digest to 80f96a3 ([#140](https://github.com/bo0tzz/bo0kkeeper/issues/140)) ([bd9f2e4](https://github.com/bo0tzz/bo0kkeeper/commit/bd9f2e4cd7789e016dab196a6fb757efd5e1922d))
+* **deps:** update pnpm to v11.16.0 ([#137](https://github.com/bo0tzz/bo0kkeeper/issues/137)) ([9845e19](https://github.com/bo0tzz/bo0kkeeper/commit/9845e19993e838b8fa4f34aec1f7119ced6fc737))
+* **deps:** update tailwindcss monorepo to v4.3.3 ([#133](https://github.com/bo0tzz/bo0kkeeper/issues/133)) ([0b1e1da](https://github.com/bo0tzz/bo0kkeeper/commit/0b1e1da9072ab9559eaa1ce077b1945644884cfd))
+
 ## [0.7.8](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.7...v0.7.8) (2026-07-23)
 
 
