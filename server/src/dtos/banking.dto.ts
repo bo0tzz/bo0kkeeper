@@ -136,6 +136,12 @@ const BankTransactionResponseSchema = z
     matchedTransferId: z.uuid().nullable(),
     matchedInvoiceId: z.uuid().nullable(),
     matchedExpenseId: z.uuid().nullable(),
+    /** Wise transfer's `ourReference` (e.g. TXN-0044), when matchedTransferId is set. */
+    matchedTransferLabel: z.string().nullable(),
+    /** Invoice number (e.g. 2099/007), when matchedInvoiceId is set. */
+    matchedInvoiceLabel: z.string().nullable(),
+    /** Expense vendor name, when matchedExpenseId is set. */
+    matchedExpenseLabel: z.string().nullable(),
     matchedAt: z.string().nullable(),
     matchConfidence: z.string().nullable(),
     category: BankTxCategoryEnum.nullable(),

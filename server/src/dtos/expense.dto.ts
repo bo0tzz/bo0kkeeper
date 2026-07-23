@@ -1,6 +1,6 @@
 import { createZodDto } from 'nestjs-zod';
 import { ExpenseLocationClass, ExpenseStatus } from 'src/enum';
-import { Expense } from 'src/repositories/expense.repository';
+import { Expense, ExpenseWithMatch } from 'src/repositories/expense.repository';
 import { currencyCode, isoDateToDate, moneyMinor, nonEmptyPartial } from 'src/validation';
 import z from 'zod';
 
@@ -68,6 +68,13 @@ const ExpenseResponseSchema = z
     reviewedAt: z.iso.datetime().nullable(),
     notes: z.string().nullable(),
     sourceEventId: z.string().nullable(),
+    /**
+     * ID of the bank_transaction that matched this expense, if any. Populated
+     * on list responses (joined from bank_transaction) so the UI can hide the
+     * "Link bank tx" affordance for already-matched rows. Individual expense
+     * endpoints return null — callers there don't need the state.
+     */
+    matchedBankTxId: z.string().nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
@@ -97,7 +104,8 @@ const RescanPaperlessResponseSchema = z
   .meta({ id: 'RescanPaperlessResponseDto' });
 export class RescanPaperlessResponseDto extends createZodDto(RescanPaperlessResponseSchema) {}
 
-export function mapExpense(row: Expense): ExpenseResponseDto {
+export function mapExpense(row: Expense | ExpenseWithMatch): ExpenseResponseDto {
+  const withMatch = row as Partial<ExpenseWithMatch>;
   return {
     id: row.id,
     paperlessDocId: row.paperlessDocId,
@@ -113,6 +121,7 @@ export function mapExpense(row: Expense): ExpenseResponseDto {
     reviewedAt: row.reviewedAt ? toIso(row.reviewedAt) : null,
     notes: row.notes,
     sourceEventId: row.sourceEventId,
+    matchedBankTxId: withMatch.matchedBankTxId ?? null,
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
   } as ExpenseResponseDto;

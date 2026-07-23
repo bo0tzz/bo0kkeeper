@@ -18,6 +18,11 @@ export type ExpenseResponse = {
   reviewedAt: string | null;
   notes: string | null;
   sourceEventId: string | null;
+  /**
+   * ID of the bank_transaction matched to this expense, if any. Populated on
+   * list responses; individual mutation endpoints return null.
+   */
+  matchedBankTxId: string | null;
   createdAt: string;
   updatedAt: string;
 };

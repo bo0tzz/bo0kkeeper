@@ -30,7 +30,11 @@ import {
   ListBankTransactionsResponseDto,
 } from 'src/dtos/banking.dto';
 import { BankTxCategory, EventSource, JobName } from 'src/enum';
-import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
+import {
+  BankTransaction,
+  BankTransactionRepository,
+  BankTransactionWithLabels,
+} from 'src/repositories/bank-transaction.repository';
 import { BankingSession, BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { EnableBankingRepository } from 'src/repositories/enable-banking.repository';
 import { EventRepository } from 'src/repositories/event.repository';
@@ -270,7 +274,8 @@ export class BankingController {
   }
 }
 
-function toBankTransactionDto(row: BankTransaction): BankTransactionResponseDto {
+function toBankTransactionDto(row: BankTransaction | BankTransactionWithLabels): BankTransactionResponseDto {
+  const withLabels = row as Partial<BankTransactionWithLabels>;
   return {
     id: row.id,
     source: row.source,
@@ -284,6 +289,9 @@ function toBankTransactionDto(row: BankTransaction): BankTransactionResponseDto 
     matchedTransferId: row.matchedTransferId,
     matchedInvoiceId: row.matchedInvoiceId,
     matchedExpenseId: row.matchedExpenseId,
+    matchedTransferLabel: withLabels.matchedTransferLabel ?? null,
+    matchedInvoiceLabel: withLabels.matchedInvoiceLabel ?? null,
+    matchedExpenseLabel: withLabels.matchedExpenseLabel ?? null,
     matchedAt: row.matchedAt ? new Date(row.matchedAt).toISOString() : null,
     matchConfidence: row.matchConfidence,
     category: row.category,

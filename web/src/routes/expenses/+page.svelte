@@ -442,8 +442,8 @@
                   >
                     {expense.status === 'pending_review' ? 'Review' : 'Edit'}
                   </Button>
-                  {#if expense.status === 'approved'}
-                    <Button size="small" variant="ghost" onclick={() => openLinkModal(expense)}>Link bank tx</Button>
+                  {#if expense.status === 'approved' && !expense.matchedBankTxId}
+                    <Button size="small" variant="ghost" onclick={() => openLinkModal(expense)}>Link</Button>
                   {/if}
                 </HStack>
               </TableCell>

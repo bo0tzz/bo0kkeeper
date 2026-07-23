@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { formatDate, formatDateTime } from '$lib/format';
   import {
@@ -187,11 +188,42 @@
     syncing = true;
     error = null;
     info = null;
+    // Snapshot the current list so we can detect the sync job's effect —
+    // a new tx appearing, or a category/match landing on an existing row.
+    // Enable Banking sync latency varies (sub-second to ~30s depending on
+    // ASPSP), so a fixed setTimeout used to fire too early and looked like
+    // "nothing happened". Poll until we see a change or the budget runs out.
+    const beforeTotal = txData?.total ?? 0;
+    const beforeSignature = new Set(
+      (txData?.items ?? []).map((t) => `${t.id}:${t.matchedAt ?? ''}:${t.category ?? ''}`),
+    );
     try {
       await syncBankingNow();
-      info = 'Sync queued. Refreshing in a moment…';
-      // Give the worker a beat to pull, then re-pull the list.
-      setTimeout(() => void load(), 2500);
+      info = 'Sync running…';
+      const pollIntervalMs = 1500;
+      const pollBudgetMs = 45_000;
+      const deadline = Date.now() + pollBudgetMs;
+      let changed = false;
+      while (Date.now() < deadline) {
+        await new Promise((wake) => setTimeout(wake, pollIntervalMs));
+        await loadTx();
+        const currentTotal = txData?.total ?? 0;
+        const currentSignature = new Set(
+          (txData?.items ?? []).map((t) => `${t.id}:${t.matchedAt ?? ''}:${t.category ?? ''}`),
+        );
+        const grew = currentTotal !== beforeTotal;
+        const rowChanged = [...currentSignature].some((s) => !beforeSignature.has(s));
+        if (grew || rowChanged) {
+          changed = true;
+          break;
+        }
+      }
+      const added = (txData?.total ?? 0) - beforeTotal;
+      info = changed
+        ? added > 0
+          ? `Sync done — ${added} new transaction${added === 1 ? '' : 's'}.`
+          : 'Sync done — updated existing rows.'
+        : 'Sync ran but no new activity in the polling window; try refreshing manually.';
     } catch (error_) {
       error = (error_ as Error).message;
     } finally {
@@ -225,6 +257,23 @@
       return { color: 'secondary', text: tx.category.replace('_', ' ') };
     }
     return { color: 'warning', text: 'unmatched' };
+  }
+
+  /** The human-readable identifier + deep-link for whichever counterpart matched, or null if unmatched. */
+  function matchTarget(tx: BankTransaction): { label: string; href: string } | null {
+    if (tx.matchedTransferId) {
+      return { label: tx.matchedTransferLabel ?? tx.matchedTransferId, href: resolve('/wise/transfers') };
+    }
+    if (tx.matchedInvoiceId) {
+      return { label: tx.matchedInvoiceLabel ?? tx.matchedInvoiceId, href: resolve('/invoices') };
+    }
+    if (tx.matchedExpenseId) {
+      return {
+        label: tx.matchedExpenseLabel?.length ? tx.matchedExpenseLabel : '(unnamed expense)',
+        href: resolve('/expenses'),
+      };
+    }
+    return null;
   }
 
   function isMatched(tx: BankTransaction): boolean {
@@ -603,7 +652,18 @@
                   {/if}
                 </TableCell>
                 <TableCell class="whitespace-normal break-words">{tx.description || '—'}</TableCell>
-                <TableCell><Badge color={label.color}>{label.text}</Badge></TableCell>
+                <TableCell>
+                  <Badge color={label.color}>{label.text}</Badge>
+                  {#if matchTarget(tx)}
+                    {@const target = matchTarget(tx)}
+                    {#if target}
+                      <div class="text-xs text-muted-foreground">
+                        <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- href built via resolve() in matchTarget() -->
+                        <a href={target.href} class="underline">{target.label}</a>
+                      </div>
+                    {/if}
+                  {/if}
+                </TableCell>
                 <TableCell>
                   {#if matched && tx.matchConfidence === 'auto_low'}
                     <div class="flex flex-wrap items-center gap-2">

@@ -239,7 +239,7 @@ export class BankTransactionRepository {
     status?: 'matched' | 'categorized' | 'unmatched';
     offset: number;
     limit: number;
-  }): Promise<{ items: BankTransaction[]; total: number }> {
+  }): Promise<{ items: BankTransactionWithLabels[]; total: number }> {
     let query = this.db.selectFrom('bank_transaction');
     if (input.dateFrom) {
       query = query.where('txDate', '>=', new Date(input.dateFrom));
@@ -249,15 +249,15 @@ export class BankTransactionRepository {
     }
     switch (input.status) {
       case 'matched': {
-        query = query.where('matchedAt', 'is not', null);
+        query = query.where('bank_transaction.matchedAt', 'is not', null);
         break;
       }
       case 'categorized': {
-        query = query.where('category', 'is not', null);
+        query = query.where('bank_transaction.category', 'is not', null);
         break;
       }
       case 'unmatched': {
-        query = query.where('matchedAt', 'is', null).where('category', 'is', null);
+        query = query.where('bank_transaction.matchedAt', 'is', null).where('bank_transaction.category', 'is', null);
         break;
       }
       default: {
@@ -269,14 +269,32 @@ export class BankTransactionRepository {
       { count: string } | undefined;
     const total = Number(totalRow?.count ?? 0);
 
+    // Left-join each matched-entity table just to pull one label per row —
+    // the /banking view needs "Expense · Acme Cables" not just the FK.
+    // Each row has at most one match, so the three joins never fan out.
     const items = (await query
-      .selectAll()
+      .leftJoin('wise_transfer', 'wise_transfer.id', 'bank_transaction.matchedTransferId')
+      .leftJoin('invoice', 'invoice.id', 'bank_transaction.matchedInvoiceId')
+      .leftJoin('expense', 'expense.id', 'bank_transaction.matchedExpenseId')
+      .selectAll('bank_transaction')
+      .select([
+        'wise_transfer.ourReference as matchedTransferLabel',
+        'invoice.number as matchedInvoiceLabel',
+        'expense.vendor as matchedExpenseLabel',
+      ])
       .orderBy('txDate', 'desc')
       .orderBy('createdAt', 'desc')
       .limit(input.limit)
       .offset(input.offset)
-      .execute()) as BankTransaction[];
+      .execute()) as BankTransactionWithLabels[];
 
     return { items, total };
   }
 }
+
+/** BankTransaction plus the identifier of whichever counterpart it matched. */
+export type BankTransactionWithLabels = BankTransaction & {
+  matchedTransferLabel: string | null;
+  matchedInvoiceLabel: string | null;
+  matchedExpenseLabel: string | null;
+};

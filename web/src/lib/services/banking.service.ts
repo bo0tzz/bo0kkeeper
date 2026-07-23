@@ -71,6 +71,12 @@ export type BankTransaction = {
   matchedTransferId: string | null;
   matchedInvoiceId: string | null;
   matchedExpenseId: string | null;
+  /** Wise transfer's ourReference; populated when matchedTransferId is set. */
+  matchedTransferLabel: string | null;
+  /** Invoice number (YYYY/NNN); populated when matchedInvoiceId is set. */
+  matchedInvoiceLabel: string | null;
+  /** Expense vendor name; populated when matchedExpenseId is set. */
+  matchedExpenseLabel: string | null;
   matchedAt: string | null;
   matchConfidence: string | null;
   category: BankTxCategory | null;

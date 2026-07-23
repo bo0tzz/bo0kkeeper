@@ -148,10 +148,17 @@ export class ExpenseRepository {
       );
 
     const [items, totalRow] = await Promise.all([
+      // Left-join bank_transaction to surface matchedBankTxId — the UI needs
+      // to hide the "Link bank tx" affordance for expenses already matched.
+      // One-row-per-expense holds by construction: bank_transaction.matchedExpenseId
+      // is written by setMatch, which clears any prior match on that bank_tx,
+      // and app-level uniqueness ensures at most one bank_tx per expense.
       baseQuery
-        .selectAll()
-        .orderBy(({ ref }) => sql`CASE ${ref('status')} WHEN ${ExpenseStatus.PendingReview} THEN 0 ELSE 1 END`)
-        .orderBy('expenseDate', 'desc')
+        .leftJoin('bank_transaction', 'bank_transaction.matchedExpenseId', 'expense.id')
+        .selectAll('expense')
+        .select('bank_transaction.id as matchedBankTxId')
+        .orderBy(({ ref }) => sql`CASE ${ref('expense.status')} WHEN ${ExpenseStatus.PendingReview} THEN 0 ELSE 1 END`)
+        .orderBy('expense.expenseDate', 'desc')
         .limit(filter.limit)
         .offset(filter.offset)
         .execute(),
@@ -160,7 +167,7 @@ export class ExpenseRepository {
 
     const total = Number(totalRow.total);
     return {
-      items: items as Expense[],
+      items: items as ExpenseWithMatch[],
       total,
       hasMore: filter.offset + items.length < total,
     };
@@ -383,8 +390,11 @@ export type ExpenseListFilter = {
   offset: number;
 };
 
+/** Expense row joined with its matched bank_transaction id (if any). */
+export type ExpenseWithMatch = Expense & { matchedBankTxId: string | null };
+
 export type ExpenseListPage = {
-  items: Expense[];
+  items: ExpenseWithMatch[];
   total: number;
   hasMore: boolean;
 };

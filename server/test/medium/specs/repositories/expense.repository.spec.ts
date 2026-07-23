@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import { BankSource, ExpenseLocationClass, ExpenseStatus } from 'src/enum';
+import { BankSource, ExpenseLocationClass, ExpenseStatus, MatchConfidence } from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ExpenseRepository, NewExpense } from 'src/repositories/expense.repository';
 import { DB } from 'src/schema';
@@ -96,6 +96,27 @@ describe('ExpenseRepository', () => {
 
     const pending = await repo.findPendingReview();
     expect(pending).toHaveLength(0);
+  });
+
+  // Regression: /expenses UI needs to know which rows already have a matched
+  // bank_transaction so it can hide the "Link bank tx" button. Before this,
+  // the list endpoint didn't expose that state.
+  it('findMany surfaces matchedBankTxId for rows a bank_transaction points at', async () => {
+    const bankRepo = new BankTransactionRepository(db);
+    const linked = await repo.ingest(fakeExpense({ paperlessDocId: 'linked', vendor: 'Linked Vendor' }));
+    const unlinked = await repo.ingest(fakeExpense({ paperlessDocId: 'unlinked', vendor: 'Unlinked Vendor' }));
+    if (!linked.ingested || !unlinked.ingested) {
+      throw new Error('precondition');
+    }
+    await repo.approve(linked.row.id);
+    await repo.approve(unlinked.row.id);
+    const tx = await ingestBankTx(db);
+    await bankRepo.setMatch(tx.id, { type: 'expense', id: linked.row.id }, MatchConfidence.Manual);
+
+    const page = await repo.findMany({ offset: 0, limit: 50 });
+    const byVendor = Object.fromEntries(page.items.map((row) => [row.vendor, row]));
+    expect(byVendor['Linked Vendor'].matchedBankTxId).toBe(tx.id);
+    expect(byVendor['Unlinked Vendor'].matchedBankTxId).toBeNull();
   });
 
   it('reject flips status with optional notes', async () => {
