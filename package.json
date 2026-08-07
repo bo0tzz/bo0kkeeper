@@ -1,6 +1,6 @@
 {
   "name": "bo0kkeeper-monorepo",
-  "version": "0.7.9",
+  "version": "0.8.0",
   "description": "Bookkeeping automation for a Dutch zzp",
   "private": true,
   "packageManager": "pnpm@11.20.0",
