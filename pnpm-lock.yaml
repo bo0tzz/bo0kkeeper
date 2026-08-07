@@ -89,7 +89,7 @@ importers:
         version: 6.8.4
       pg-boss:
         specifier: ^12.0.0
-        version: 12.26.2
+        version: 12.27.0
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
@@ -786,12 +786,6 @@ packages:
 
   '@microsoft/tsdoc@0.16.0':
     resolution: {integrity: sha512-xgAyonlVVS+q7Vc7qLW0UrJU7rSFcETRWsqdXZtjzRU8dF+6CkozTK4V4y1LwOX7j8r/vHphjDeMeGI4tNGeGA==}
-
-  '@napi-rs/wasm-runtime@1.1.6':
-    resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
-    peerDependencies:
-      '@emnapi/core': ^1.7.1
-      '@emnapi/runtime': ^1.7.1
 
   '@napi-rs/wasm-runtime@1.2.2':
     resolution: {integrity: sha512-JfB4kuJQjaoHuCTseIINHtHWeJnvgEcxjwA5t/Y00ZgaOO1Crz3fjT/p8kT28zA/Caz7oiUMn3d6H2yOVCVwuw==}
@@ -2378,10 +2372,9 @@ packages:
     resolution: {integrity: sha512-piICUB6ei4IlTv1+653yq5+KoqfBYmj9bw6LqXoOneTMDXk5nM1qt12mFW1caG3LlJXEKW1Bp0WggEmIfQB34g==}
     engines: {node: '>= 14'}
 
-  cron-parser@5.6.2:
-    resolution: {integrity: sha512-yJ/G1LVir6CnlkLI40CsampPLKl1SprGGlUagWtGJxewytRVYezv5xVyzzbT+Pvzx+VIRvZVF7/a0eEMTxdnTA==}
+  cron-parser@5.7.0:
+    resolution: {integrity: sha512-iSpDHpwwW/GhIg4JVODYlWUEpMNSimaHvqOhHpOz1W+Y97z1lL1nf+dpcF17cNwFRpTtKN9devgi1fxflp3Phw==}
     engines: {node: '>=18'}
-    deprecated: 'Published tarball was built from a stale dist/ and is missing the fixes from #414 and #415 — its contents are effectively v5.6.1. Upgrade to v5.7.0.'
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -3592,8 +3585,8 @@ packages:
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
-  pg-boss@12.26.2:
-    resolution: {integrity: sha512-ErbfHaZIzpXNnzmm17Qlu1Eyh1fpbMI7zK5YTFcQVJfAVVKRrjdmiEGFXWyVETRntcBvzNiUzlvu3GFBvVuYIQ==}
+  pg-boss@12.27.0:
+    resolution: {integrity: sha512-DawcUffyDVJvxGYvaoc7B+G1yY86dJtvugVYMAt+CtO6Lg+RSyQuAU7IRfNyhqi0Bo/JeaxLqhqIy5+twpmYlg==}
     engines: {node: '>=22.12.0'}
     hasBin: true
 
@@ -5134,7 +5127,7 @@ snapshots:
 
   '@microsoft/tsdoc@0.16.0': {}
 
-  '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
+  '@napi-rs/wasm-runtime@1.2.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)':
     dependencies:
       '@emnapi/core': 1.11.1
       '@emnapi/runtime': 1.11.1
@@ -5468,7 +5461,7 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.11.1
       '@emnapi/runtime': 1.11.1
-      '@napi-rs/wasm-runtime': 1.1.6(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
+      '@napi-rs/wasm-runtime': 1.2.2(@emnapi/core@1.11.1)(@emnapi/runtime@1.11.1)
     optional: true
 
   '@rolldown/binding-win32-arm64-msvc@1.1.5':
@@ -6574,7 +6567,7 @@ snapshots:
       crc-32: 1.2.2
       readable-stream: 4.7.0
 
-  cron-parser@5.6.2:
+  cron-parser@5.7.0:
     dependencies:
       luxon: 3.7.2
 
@@ -7788,9 +7781,9 @@ snapshots:
 
   pathe@2.0.3: {}
 
-  pg-boss@12.26.2:
+  pg-boss@12.27.0:
     dependencies:
-      cron-parser: 5.6.2
+      cron-parser: 5.7.0
       pg: 8.22.0
       serialize-error: 13.0.1
     transitivePeerDependencies:
