@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.8.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.9...v0.8.0) (2026-08-07)
+
+
+### Features
+
+* **wise:** allowUnderCredit override for drafts after Wise-side spends ([3df1893](https://github.com/bo0tzz/bo0kkeeper/commit/3df1893824084a6b0d27b50ddc54fda558968c75))
+
+
+### Bug Fixes
+
+* **deps:** update debian:13-slim docker digest to 3a39a05 ([#151](https://github.com/bo0tzz/bo0kkeeper/issues/151)) ([29a2d2a](https://github.com/bo0tzz/bo0kkeeper/commit/29a2d2a8f1141b7d71710151a284d2013e158225))
+* **deps:** update dependency knip to v6.32.0 ([#141](https://github.com/bo0tzz/bo0kkeeper/issues/141)) ([7a68669](https://github.com/bo0tzz/bo0kkeeper/commit/7a68669d6ae6564f8aa9e633bd2691547bd9521f))
+* **deps:** update dependency pg-boss to v12.27.0 ([#147](https://github.com/bo0tzz/bo0kkeeper/issues/147)) ([8ef4c6f](https://github.com/bo0tzz/bo0kkeeper/commit/8ef4c6f6a6544483c4ce4671c5f942efbf0247b1))
+* **deps:** update docker.io/library/redis:8 docker digest to 344e394 ([#146](https://github.com/bo0tzz/bo0kkeeper/issues/146)) ([20090b0](https://github.com/bo0tzz/bo0kkeeper/commit/20090b0b6160a4d4e385b7cb730d5b3ee9c12a35))
+* **deps:** update docker/login-action action to v4.6.0 ([#143](https://github.com/bo0tzz/bo0kkeeper/issues/143)) ([3abd41d](https://github.com/bo0tzz/bo0kkeeper/commit/3abd41de3e7f159ffb260ee9f4120caaf7334dff))
+* **deps:** update eslint ([#148](https://github.com/bo0tzz/bo0kkeeper/issues/148)) ([8109d88](https://github.com/bo0tzz/bo0kkeeper/commit/8109d8867cf870a92870a05876f4ae4ef304ae8f))
+* **deps:** update ghcr.io/paperless-ngx/paperless-ngx:latest docker digest to 65a4cab ([#144](https://github.com/bo0tzz/bo0kkeeper/issues/144)) ([e3dfdec](https://github.com/bo0tzz/bo0kkeeper/commit/e3dfdeca136b6e58ebda097324beaa14ee0fdd39))
+* **deps:** update node.js to 3638d9a ([#152](https://github.com/bo0tzz/bo0kkeeper/issues/152)) ([db5afa0](https://github.com/bo0tzz/bo0kkeeper/commit/db5afa03a0637a6d81be8c0d7518d4755032cb40))
+* **deps:** update playwright monorepo to v1.62.1 ([#149](https://github.com/bo0tzz/bo0kkeeper/issues/149)) ([bf95664](https://github.com/bo0tzz/bo0kkeeper/commit/bf95664e80563161ae52abeaad58a12fb8529826))
+* **deps:** update pnpm to v11.20.0 ([#145](https://github.com/bo0tzz/bo0kkeeper/issues/145)) ([906063d](https://github.com/bo0tzz/bo0kkeeper/commit/906063de5823b150dd72c12df978f7e4d4e3217e))
+* **deps:** update svelte ([#142](https://github.com/bo0tzz/bo0kkeeper/issues/142)) ([4e43f4f](https://github.com/bo0tzz/bo0kkeeper/commit/4e43f4f8a4504d7d61196820366376335631a465))
+
 ## [0.7.9](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.8...v0.7.9) (2026-07-23)
 
 
