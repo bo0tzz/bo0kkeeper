@@ -205,7 +205,67 @@ describe('WiseDraftService', () => {
     if (!ingest.ingested) {
       throw new Error('precondition');
     }
-    await expect(service.draftFromEvent({ eventId: ingest.event.id })).rejects.toThrow(/refusing to draft/);
+    await expect(service.draftFromEvent({ eventId: ingest.event.id })).rejects.toThrow(/allowUnderCredit/);
+    expect(createQuoteMock).not.toHaveBeenCalled();
+  });
+
+  // Operator escape hatch: they spent from the balance on purpose (Wise card
+  // charge, direct payment to a vendor's Wise account, etc.) and want the
+  // remaining balance to sweep as usual. Passing `allowUnderCredit` skips the
+  // shortfall guard.
+  it('drafts against the reduced balance when allowUnderCredit=true', async () => {
+    // Credit was 4791.00; operator spent 200.00 on the card; balance is 4591.00.
+    getBalanceMock.mockResolvedValueOnce(459_100n);
+    createQuoteMock.mockResolvedValueOnce({
+      id: 'quote-uuid-under',
+      rate: '0.846991',
+      feeMinor: 1400n,
+      feeCurrency: 'USD',
+      sourceAmountMinor: 459_100n,
+      sourceCurrency: 'USD',
+      targetAmountMinor: 388_954n,
+      targetCurrency: 'EUR',
+    });
+
+    const ingest = await eventRepo.ingest({
+      source: EventSource.Wise,
+      eventType: 'balances#credit',
+      externalId: 'delivery-under-credit',
+      occurredAt: new Date('2099-01-15T13:26:00Z'),
+      payload: balanceCreditPayload,
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+
+    const row = await service.draftFromEvent({ eventId: ingest.event.id, allowUnderCredit: true });
+
+    expect(createQuoteMock).toHaveBeenCalledWith({
+      sourceCurrency: 'USD',
+      targetCurrency: 'EUR',
+      sourceAmountMinor: 459_100n,
+    });
+    expect(Number(row.sourceAmountMinor)).toBe(459_100);
+  });
+
+  // Even with allowUnderCredit, a zero balance is still an error — there's
+  // nothing to sweep and drafting a 0-amount transfer would fail at Wise.
+  it('refuses to draft on a zero balance even with allowUnderCredit=true', async () => {
+    getBalanceMock.mockResolvedValueOnce(0n);
+
+    const ingest = await eventRepo.ingest({
+      source: EventSource.Wise,
+      eventType: 'balances#credit',
+      externalId: 'delivery-zero',
+      occurredAt: new Date('2099-01-15T13:26:00Z'),
+      payload: balanceCreditPayload,
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+    await expect(service.draftFromEvent({ eventId: ingest.event.id, allowUnderCredit: true })).rejects.toThrow(
+      /balance is zero/,
+    );
     expect(createQuoteMock).not.toHaveBeenCalled();
   });
 

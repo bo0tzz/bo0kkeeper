@@ -16,6 +16,13 @@ export type DraftFromEventInput = {
    * `wise_txn_sequence` Postgres sequence.
    */
   ourReference?: string;
+  /**
+   * Skip the "balance ≥ credit" guard. See DraftFromEventDto for context —
+   * the operator has intentionally drained part of the balance (typically a
+   * Wise card charge) and wants the sweep to run against what's left rather
+   * than fail.
+   */
+  allowUnderCredit?: boolean;
 };
 
 /**
@@ -66,12 +73,19 @@ export class WiseDraftService {
     // transfer, and small pending credits naturally roll into the next
     // larger one.
     const balanceMinor = await this.wiseApiService.getBalanceMinor(credit.currency);
-    if (balanceMinor < credit.amountMinor) {
+    if (balanceMinor < credit.amountMinor && !input.allowUnderCredit) {
       // Balance is smaller than this event's credit — either the operator
-      // already swept some of it out manually or Wise has held the funds.
-      // Fail loudly; we don't want to silently under-draft.
+      // already spent some of it (Wise card charge, direct payment) or Wise
+      // has held the funds. Fail loudly rather than silently under-draft.
+      // Set `allowUnderCredit` on the request when the shortfall is
+      // intentional (e.g. "spent $200 on the card, sweep the rest").
       throw new BadRequestException(
-        `Wise ${credit.currency} balance is ${balanceMinor} minor but event #${input.eventId} credited ${credit.amountMinor} — refusing to draft with less than the credit`,
+        `Wise ${credit.currency} balance is ${balanceMinor} minor but event #${input.eventId} credited ${credit.amountMinor} — pass allowUnderCredit=true if this shortfall is intentional`,
+      );
+    }
+    if (balanceMinor === 0n) {
+      throw new BadRequestException(
+        `Wise ${credit.currency} balance is zero for event #${input.eventId}; nothing to draft`,
       );
     }
     const ourReference = input.ourReference ?? (await this.wiseTransferRepository.allocateTxnReference());

@@ -6,6 +6,7 @@
     Alert,
     Badge,
     Button,
+    Checkbox,
     Field,
     Heading,
     Input,
@@ -27,6 +28,9 @@
   let drafting = $state<string | null>(null);
   let dismissing = $state<string | null>(null);
   let drafts = $state<Record<string, string>>({});
+  // Per-event "I spent from this Wise balance already; sweep the remainder"
+  // toggle. Bypasses the balance-≥-credit guard in wise-draft.service.ts.
+  let underCredit = $state<Record<string, boolean>>({});
   let lastDrafted = $state<WiseTransferResponse | null>(null);
   let reconciling = $state(false);
   let reconcileInfo = $state<string | null>(null);
@@ -67,8 +71,12 @@
     error = null;
     try {
       const reference = drafts[event.id]?.trim() || undefined;
-      lastDrafted = await draftFromEvent(event.id, reference);
+      lastDrafted = await draftFromEvent(event.id, {
+        ourReference: reference,
+        allowUnderCredit: underCredit[event.id] || undefined,
+      });
       delete drafts[event.id];
+      delete underCredit[event.id];
       await load();
     } catch (error_) {
       error = (error_ as Error).message;
@@ -169,6 +177,14 @@
                   <Field label="">
                     <Input bind:value={drafts[event.id]} placeholder="auto-allocated" />
                   </Field>
+                  <label class="mt-2 flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                    <Checkbox
+                      checked={underCredit[event.id] ?? false}
+                      onCheckedChange={(v) => (underCredit[event.id] = Boolean(v))}
+                      size="small"
+                    />
+                    <span>Spent from this balance already (sweep remainder)</span>
+                  </label>
                 </TableCell>
                 <TableCell>
                   <div class="flex gap-2">

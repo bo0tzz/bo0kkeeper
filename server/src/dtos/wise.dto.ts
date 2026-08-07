@@ -12,6 +12,13 @@ const DraftFromEventBodySchema = z
       .string()
       .regex(/^TXN-\d{4,}$/, { error: 'Expected TXN-NNNN format' })
       .optional(),
+    /**
+     * Bypass the "balance ≥ credit" guard. Used when the operator has
+     * intentionally spent some of the Wise balance (card charge, etc.)
+     * before drafting the sweep — the current balance is authoritative
+     * and the shortfall is expected.
+     */
+    allowUnderCredit: z.boolean().optional(),
   })
   .meta({ id: 'DraftFromEventDto' });
 export class DraftFromEventDto extends createZodDto(DraftFromEventBodySchema) {}

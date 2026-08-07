@@ -55,6 +55,7 @@ export class WiseController {
     const row = await this.wiseDraftService.draftFromEvent({
       eventId,
       ourReference: dto.ourReference,
+      allowUnderCredit: dto.allowUnderCredit,
     });
     return mapWiseTransfer(row);
   }
