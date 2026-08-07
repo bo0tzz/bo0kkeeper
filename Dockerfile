@@ -23,7 +23,7 @@ RUN set -eux; \
 # ---- Stage: deps ---------------------------------------------------------
 # Install ALL workspace dependencies (server + web + open-api sdk). Cached
 # on the lockfile alone — code edits don't bust this layer.
-FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS deps
+FROM node:24-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS deps
 WORKDIR /app
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -37,7 +37,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 # Compile the SvelteKit static site + nest build the server. Output:
 #   /app/web/build/        — static SPA bundle (precompressed)
 #   /app/server/dist/      — compiled server JS
-FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS build
+FROM node:24-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS build
 WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
@@ -52,7 +52,7 @@ RUN pnpm --filter web build \
 # Re-resolve a production-only node_modules graph for the server. Drops
 # devDependencies (vitest, eslint, prettier, etc.) so the runtime image
 # stays smaller.
-FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS prod-deps
+FROM node:24-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS prod-deps
 WORKDIR /app
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -63,7 +63,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --prod --filter bo0kkeeper
 
 # ---- Stage: runtime ------------------------------------------------------
-FROM node:24-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS runtime
+FROM node:24-bookworm-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS runtime
 # Build identifier — CI passes the release tag (e.g. `0.4.3`) or short SHA.
 # Surfaced in startup logs + `/api/system/info` so the running build
 # uniquely identifies a commit. `dev` is the fallback when this image is
