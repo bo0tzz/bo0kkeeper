@@ -113,6 +113,21 @@ export class ExpensesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ExpenseApproveDto,
   ): Promise<ExpenseResponseDto> {
+    // Belt-and-suspenders check for the DB CHECK constraint —
+    // foreign-currency expenses need a wise_transfer link so we can
+    // book EUR at sweep-clear time. Doing it here gives a clean 400
+    // instead of a Postgres constraint-violation 500.
+    const existing = await this.expenseRepository.findById(id);
+    if (!existing) {
+      throw new NotFoundException();
+    }
+    const effectiveCurrency = dto.currency ?? existing.currency;
+    const effectiveWiseTransferId = dto.wiseTransferId ?? existing.wiseTransferId;
+    if (effectiveCurrency !== 'EUR' && !effectiveWiseTransferId) {
+      throw new BadRequestException(
+        `Foreign-currency (${effectiveCurrency}) expenses must be linked to a Wise sweep — pick one under "Paid from Wise sweep".`,
+      );
+    }
     const row = await this.expenseRepository.approve(id, dto as unknown as ExpenseUpdate);
     if (!row) {
       throw new NotFoundException();

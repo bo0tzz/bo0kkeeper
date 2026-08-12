@@ -13,6 +13,7 @@ import { ColumnType } from 'kysely';
 import { ExpenseLocationClass, ExpenseStatus } from 'src/enum';
 import { BankTransactionTable } from 'src/schema/tables/bank-transaction.table';
 import { EventTable } from 'src/schema/tables/event.table';
+import { WiseTransferTable } from 'src/schema/tables/wise-transfer.table';
 
 /**
  * Receipt/expense row. Two source flavours:
@@ -33,6 +34,7 @@ import { EventTable } from 'src/schema/tables/event.table';
 @Table('expense')
 @Index({ name: 'expense_paperlessDocId_idx', columns: ['paperlessDocId'] })
 @Index({ name: 'expense_sourceBankTxId_idx', columns: ['sourceBankTxId'] })
+@Index({ name: 'expense_wiseTransferId_idx', columns: ['wiseTransferId'] })
 @Index({ name: 'expense_status_idx', columns: ['status'] })
 @Index({ name: 'expense_expenseDate_idx', columns: ['expenseDate'] })
 export class ExpenseTable {
@@ -62,6 +64,35 @@ export class ExpenseTable {
 
   @Column({ type: 'text' })
   currency!: string;
+
+  /**
+   * Foreign-currency expenses paid from a Wise pool link here to the sweep
+   * that converted (or will convert) that pool. Presence of this FK marks
+   * the expense as Wise-flow — the EUR amount is booked at the sweep's
+   * fxRate when the sweep clears, mirroring how invoice.wiseTransferId
+   * booked income at sweep rate. Null for EUR-native expenses (the common
+   * case) and for legacy foreign-currency rows without a Wise link.
+   */
+  @ForeignKeyColumn(() => WiseTransferTable, { nullable: true, onDelete: 'SET NULL' })
+  wiseTransferId!: string | null;
+
+  /**
+   * EUR-booked amount for foreign-currency expenses, filled in at sweep
+   * clear (from `amountMinor × wise_transfer.fxRate`). Null while the
+   * sweep is still open or when currency = EUR (`amountMinor` is the
+   * EUR figure directly in that case).
+   */
+  @Column({ type: 'bigint', nullable: true })
+  eurAmountMinor!: ColumnType<bigint> | null;
+
+  /**
+   * The sweep's effective fxRate used to compute `eurAmountMinor`. Stored
+   * as a string like the other fxRate columns (invoice.fxRate,
+   * wise_transfer.fxRate) to preserve exact decimal representation.
+   * Populated together with `eurAmountMinor` at sweep clear.
+   */
+  @Column({ type: 'text', nullable: true })
+  fxRate!: string | null;
 
   /** BTW rate in basis points (2100 = 21.00%). Null when no BTW applies. */
   @Column({ type: 'integer', nullable: true })

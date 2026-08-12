@@ -37,6 +37,14 @@ const ExpensePatchShape = {
   locationClass: z.enum(ExpenseLocationClass),
   category: z.string().max(200),
   notes: z.string().nullable(),
+  /**
+   * For foreign-currency expenses paid from a Wise pool. UUID of the
+   * wise_transfer that swept (or will sweep) that pool — the EUR figure
+   * gets computed at sweep-clear time from the sweep's fxRate. Required
+   * when currency ≠ EUR (enforced at controller/service; also by DB
+   * CHECK constraint).
+   */
+  wiseTransferId: z.uuid().nullable(),
 };
 
 const ExpenseUpdateSchema = nonEmptyPartial(ExpensePatchShape).meta({ id: 'ExpenseUpdateDto' });
@@ -75,6 +83,12 @@ const ExpenseResponseSchema = z
      * endpoints return null — callers there don't need the state.
      */
     matchedBankTxId: z.string().nullable(),
+    /** wise_transfer.id for Wise-flow foreign-currency expenses. */
+    wiseTransferId: z.string().nullable(),
+    /** EUR-booked amount, populated at sweep-clear for Wise-flow rows. */
+    eurAmountMinor: z.string().nullable(),
+    /** The sweep's realized fxRate that produced `eurAmountMinor`. */
+    fxRate: z.string().nullable(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
@@ -122,6 +136,9 @@ export function mapExpense(row: Expense | ExpenseWithMatch): ExpenseResponseDto 
     notes: row.notes,
     sourceEventId: row.sourceEventId,
     matchedBankTxId: withMatch.matchedBankTxId ?? null,
+    wiseTransferId: row.wiseTransferId,
+    eurAmountMinor: row.eurAmountMinor === null ? null : String(row.eurAmountMinor),
+    fxRate: row.fxRate,
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
   } as ExpenseResponseDto;

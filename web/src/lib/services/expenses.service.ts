@@ -23,6 +23,15 @@ export type ExpenseResponse = {
    * list responses; individual mutation endpoints return null.
    */
   matchedBankTxId: string | null;
+  /**
+   * For foreign-currency expenses paid from a Wise pool — the sweep this
+   * expense drew from. EUR gets computed at sweep-clear time.
+   */
+  wiseTransferId: string | null;
+  /** EUR-booked amount, filled in at sweep-clear time. */
+  eurAmountMinor: string | null;
+  /** fxRate used to compute eurAmountMinor. */
+  fxRate: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -60,6 +69,11 @@ export type ExpensePatch = {
   locationClass?: ExpenseLocationClass;
   category?: string;
   notes?: string | null;
+  /**
+   * Required (via DB CHECK constraint + controller guard) when
+   * `currency !== 'EUR'`. Null for EUR-native expenses.
+   */
+  wiseTransferId?: string | null;
 };
 
 export const listExpenses = (query: ListExpensesQuery, fetchFn?: typeof fetch) =>

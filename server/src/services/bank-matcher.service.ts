@@ -108,6 +108,7 @@ export class BankMatcherService {
         );
         this.logger.log(`bank_tx ${bankTx.id} → wise_transfer ${transfer.id} via ${txnRef}`);
         await this.tryAutoLinkInvoiceToTransfer(transfer);
+        await this.tryBackfillWiseLinkedExpenses(transfer, bankTx);
         await this.sheetSync.appendWiseIncomeRow(bankTx, transfer);
         return { matched: true, type: 'wise_transfer', transferId: transfer.id, confidence: MatchConfidence.AutoHigh };
       }
@@ -225,6 +226,35 @@ export class BankMatcherService {
    * require a unique candidate; ambiguity (multiple invoices matching)
    * is logged and left for manual resolution.
    */
+  /**
+   * Post sweep-landing: for every approved expense linked to this sweep,
+   * compute EUR from the sweep's realized rate and write its sheet row.
+   * Wise-flow expenses stay in "approved, EUR-pending" limbo between
+   * approval and sweep-clear — this is where they materialize.
+   *
+   * Best-effort per row: if one expense's sheet write fails, others still
+   * try. The retry job (`retryFailedSheetWrites`) picks up anything that
+   * dropped.
+   */
+  private async tryBackfillWiseLinkedExpenses(transfer: WiseTransferRow, bankTx: BankTransaction): Promise<void> {
+    const pending = await this.expenseRepository.findWiseLinkedReadyForBackfill();
+    const forThisTransfer = pending.filter((row) => row.wiseTransferId === transfer.id);
+    if (forThisTransfer.length === 0) {
+      return;
+    }
+    this.logger.log(
+      `wise_transfer ${transfer.id} landed via bank_tx ${bankTx.id} — back-filling ${forThisTransfer.length} linked expense(s)`,
+    );
+    for (const row of forThisTransfer) {
+      try {
+        const backfilled = await this.sheetSync.backfillWiseExpense(row);
+        await this.sheetSync.writeExpenseRowSafely(backfilled, new Date(bankTx.txDate), bankTx.id);
+      } catch (error) {
+        this.logger.error(`Backfill for wise-linked expense ${row.id} failed: ${(error as Error).message}`);
+      }
+    }
+  }
+
   private async tryAutoLinkInvoiceToTransfer(transfer: WiseTransferRow): Promise<void> {
     const sourceAmount = BigInt(transfer.sourceAmountMinor as bigint | number | string);
     const createdAt = toDate(transfer.createdAt);

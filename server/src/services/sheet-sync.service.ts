@@ -175,12 +175,61 @@ export class SheetSyncService {
    * (still pending_review, not matched, already written, or rejected).
    */
   async writeExpenseRowIfReady(expenseId: string): Promise<boolean> {
-    const rows = await this.expenseRepository.findMatchedReadyForSheet(expenseId);
-    const row = rows[0];
-    if (!row) {
+    const snsRows = await this.expenseRepository.findMatchedReadyForSheet(expenseId);
+    const snsRow = snsRows[0];
+    if (snsRow) {
+      return await this.writeExpenseRowSafely(snsRow, toDate(snsRow.bankTxDate), snsRow.bankTxId);
+    }
+    // Wise-flow: expense linked to a wise_transfer whose sweep bank_tx has
+    // landed. Back-fill EUR from the sweep's realized rate, then write the
+    // sheet row at the sweep's clearing date. This is the on-approve trigger
+    // for the case where the sweep cleared *before* the operator approved.
+    const wiseRows = await this.expenseRepository.findWiseLinkedReadyForBackfill(expenseId);
+    const wiseRow = wiseRows[0];
+    if (!wiseRow) {
       return false;
     }
-    return await this.writeExpenseRowSafely(row, toDate(row.bankTxDate), row.bankTxId);
+    const backfilled = await this.backfillWiseExpense(wiseRow);
+    return await this.writeExpenseRowSafely(backfilled, toDate(wiseRow.bankTxDate), wiseRow.bankTxId);
+  }
+
+  /**
+   * Back-fill EUR + fxRate on a wise-linked expense from its sweep's
+   * source/target amounts. Proportional to what the sweep actually
+   * converted (`amountMinor × targetMinor / sourceMinor`) so total invoice
+   * income + total wise-flow expenses tie to the notional EUR value of
+   * the source USD pool.
+   *
+   * Called after a bank_tx → wise_transfer match lands (matcher path) and
+   * from `writeExpenseRowIfReady` (approve path). Returns the updated
+   * expense row so the caller can immediately write the sheet row.
+   */
+  async backfillWiseExpense(input: {
+    id: string;
+    amountMinor: bigint | string;
+    wiseTransferId: string | null;
+    fxRate: string;
+  }): Promise<Expense> {
+    if (!input.wiseTransferId) {
+      throw new Error(`backfillWiseExpense called on expense ${input.id} with no wiseTransferId`);
+    }
+    const transfer = await this.wiseTransferRepository.findById(input.wiseTransferId);
+    if (!transfer) {
+      throw new Error(`wise_transfer ${input.wiseTransferId} not found`);
+    }
+    const amountMinor = BigInt(input.amountMinor as bigint | number | string);
+    const sourceMinor = BigInt(transfer.sourceAmountMinor as bigint | number | string);
+    const targetMinor = BigInt(transfer.targetAmountMinor as bigint | number | string);
+    if (sourceMinor === 0n) {
+      throw new Error(`wise_transfer ${transfer.id} has zero sourceAmountMinor; can't derive EUR`);
+    }
+    const eurAmountMinor = (amountMinor * targetMinor) / sourceMinor;
+    await this.expenseRepository.backfillEurFromSweep(input.id, eurAmountMinor, input.fxRate);
+    const refreshed = await this.expenseRepository.findById(input.id);
+    if (!refreshed) {
+      throw new Error(`expense ${input.id} disappeared during backfill`);
+    }
+    return refreshed;
   }
 
   /**
@@ -234,6 +283,23 @@ export class SheetSyncService {
       const txDate = toDate(row.bankTxDate);
       if (await this.writeExpenseRowSafely(row, txDate, row.bankTxId)) {
         succeeded += 1;
+      }
+    }
+
+    // Wise-flow expense side: approved wise-linked expenses whose sweep
+    // has cleared but EUR back-fill / sheet write didn't complete. The
+    // matcher fires these inline when the sweep lands; this catches
+    // anything that dropped (e.g. sheet outage during backfill).
+    const wiseExpenseRows = await this.expenseRepository.findWiseLinkedReadyForBackfill();
+    for (const row of wiseExpenseRows) {
+      attempted += 1;
+      try {
+        const backfilled = await this.backfillWiseExpense(row);
+        if (await this.writeExpenseRowSafely(backfilled, toDate(row.bankTxDate), row.bankTxId)) {
+          succeeded += 1;
+        }
+      } catch (error) {
+        this.logger.error(`Wise-expense backfill retry failed for ${row.id}: ${(error as Error).message}`);
       }
     }
 

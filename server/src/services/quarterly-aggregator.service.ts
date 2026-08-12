@@ -141,9 +141,19 @@ export class QuarterlyAggregatorService {
     let expenseGross = 0n;
     let expenseDeductibleBtw = 0n;
     for (const row of approvedExpenses) {
-      const eurGross = row.currency === 'EUR' ? BigInt(row.amountMinor as unknown as string) : 0n;
-      // For non-EUR expenses, deductibility requires conversion at the rate
-      // that landed; we'd need a per-expense fxRate column. Skip for now.
+      // EUR figure in priority order:
+      //   1. Wise-flow: eurAmountMinor back-filled from sweep rate.
+      //   2. EUR-native: amountMinor is already EUR.
+      //   3. Foreign-currency without a Wise link (or sweep uncleared):
+      //      no defensible EUR figure yet — contributes 0. Wise-linked
+      //      rows with null EUR are transiently in this state until the
+      //      sweep's bank_tx lands and the matcher back-fills.
+      const eurGross =
+        row.eurAmountMinor !== null && row.eurAmountMinor !== undefined
+          ? BigInt(row.eurAmountMinor as unknown as string)
+          : row.currency === 'EUR'
+            ? BigInt(row.amountMinor as unknown as string)
+            : 0n;
       const eurBtw =
         row.btwMinor === null || row.btwMinor === undefined ? 0n : BigInt(row.btwMinor as unknown as string);
       expenseGross += eurGross;

@@ -385,6 +385,78 @@ describe('QuarterlyAggregatorService', () => {
     expect(q3.expenses.deductibleBtwEurMinor).toBe(3471n);
   });
 
+  // Wise-flow foreign-currency expense: linked to a wise_transfer sweep,
+  // EUR back-filled at sweep-clear time from the sweep's realized rate,
+  // and counted in the sweep's quarter (matching how invoice income is
+  // counted for the same USD pool).
+  it('counts a wise-flow USD expense at proportional-EUR in the sweep quarter', async () => {
+    // Sweep: $4791 USD → €4045.72 EUR, cleared in Q3 (bank_tx txDate Q3).
+    const transfer = await transferRepo.create({
+      wiseTransferId: 'WISE-Q3',
+      direction: WiseTransferDirection.Out,
+      sourceAmountMinor: 479_100n,
+      sourceCurrency: 'USD',
+      targetAmountMinor: 404_572n,
+      targetCurrency: 'EUR',
+      fxRate: '0.846991',
+      feeMinor: 1442n,
+      feeCurrency: 'USD',
+      state: WiseTransferState.OutgoingPaymentSent,
+      stateUpdatedAt: new Date('2099-08-20'),
+      ourReference: 'TXN-0099',
+      counterpartyName: null,
+      correlationId: null,
+    });
+    await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'sweep-q3',
+      txDate: new Date('2099-08-20'),
+      amountMinor: 404_572n,
+      currency: 'EUR',
+      counterpartyName: 'Wise',
+      counterpartyIban: null,
+      description: 'TXN-0099',
+      rawPayload: {},
+      matchedTransferId: transfer.id,
+      matchedAt: new Date('2099-08-20'),
+    });
+
+    // The USD card charge itself: dated Q2 on the receipt, but the sweep
+    // that will realize its EUR value cleared in Q3.
+    const ingest = await expenseRepo.ingest({
+      paperlessDocId: 'doc-wise-flow',
+      vendor: 'US Vendor',
+      expenseDate: new Date('2099-05-10'),
+      amountMinor: 15_000n,
+      currency: 'USD',
+      wiseTransferId: transfer.id,
+      // EUR/fxRate back-filled by the app at sweep-clear; here we seed
+      // them directly since we're testing the aggregator, not the matcher.
+      eurAmountMinor: 12_666n,
+      fxRate: '0.846991',
+      btwRateBps: null,
+      btwMinor: null,
+      locationClass: ExpenseLocationClass.NonEu,
+      category: 'services',
+      notes: null,
+      sourceEventId: null,
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+    await expenseRepo.approve(ingest.row.id);
+
+    // Absent from Q2 (the charge quarter) — recognition follows the sweep.
+    const q2 = await aggregator.aggregate(2099, 2);
+    expect(q2.expenses.grossEurMinor).toBe(0n);
+
+    // Counted in Q3 at the back-filled EUR value. Non-EU location →
+    // contributes gross but not deductible BTW.
+    const q3 = await aggregator.aggregate(2099, 3);
+    expect(q3.expenses.grossEurMinor).toBe(12_666n);
+    expect(q3.expenses.deductibleBtwEurMinor).toBe(0n);
+  });
+
   // Fallback path: an approved expense with no matched bank_tx (cash purchase
   // or manual entry) still counts by expenseDate. Confirms the coalesce works.
   it('falls back to expenseDate when the approved expense has no matched bank-tx', async () => {

@@ -3,6 +3,7 @@
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
   import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
   import { listBankTransactions, setBankTxMatch, type BankTransaction } from '$lib/services/banking.service';
+  import { listWiseTransfers, type WiseTransferListItem } from '$lib/services/wise.service';
   import {
     approveExpense,
     listExpenses,
@@ -96,6 +97,9 @@
     vendor: string;
     expenseDate: string;
     amountMajor: string;
+    currency: string;
+    /** wise_transfer.id when currency !== EUR. Empty string = unset. */
+    wiseTransferId: string;
     btwRatePercent: string;
     btwMajor: string;
     locationClass: ExpenseLocationClass;
@@ -125,11 +129,31 @@
     void load();
   });
 
+  // Populated on first foreign-currency edit; cached across drawer opens.
+  // The dropdown shows sweeps newest-first — the pool the operator drew
+  // from is almost always the most recent one for their currency.
+  let wiseTransfers = $state<WiseTransferListItem[]>([]);
+  let wiseTransfersLoaded = $state(false);
+  async function ensureWiseTransfersLoaded() {
+    if (wiseTransfersLoaded) {
+      return;
+    }
+    try {
+      const result = await listWiseTransfers({ limit: 50 });
+      wiseTransfers = result.items;
+      wiseTransfersLoaded = true;
+    } catch (error_) {
+      error = `Couldn't load Wise sweeps: ${(error_ as Error).message}`;
+    }
+  }
+
   function toDraft(expense: ExpenseResponse): DraftFields {
     return {
       vendor: expense.vendor,
       expenseDate: expense.expenseDate,
       amountMajor: minorToMajor(expense.amountMinor),
+      currency: expense.currency,
+      wiseTransferId: expense.wiseTransferId ?? '',
       btwRatePercent: expense.btwRateBps == null ? '' : (expense.btwRateBps / 100).toFixed(2).replace(/\.?0+$/, ''),
       btwMajor: expense.btwMinor == null ? '' : minorToMajor(expense.btwMinor),
       locationClass: expense.locationClass,
@@ -202,6 +226,42 @@
     if (!Object.hasOwn(drafts, expense.id)) {
       drafts[expense.id] = toDraft(expense);
     }
+    if (expense.currency !== 'EUR' || expense.wiseTransferId) {
+      void ensureWiseTransfersLoaded();
+    }
+  }
+
+  const currencyOptions = [
+    { value: 'EUR', label: 'EUR' },
+    { value: 'USD', label: 'USD' },
+  ];
+
+  function wiseTransferOptions(currentId: string): Array<{ value: string; label: string }> {
+    const base: Array<{ value: string; label: string }> = [{ value: '', label: 'Pick a Wise sweep…' }];
+    for (const t of wiseTransfers) {
+      const src = `${(Number(t.sourceAmountMinor) / 100).toFixed(2)} ${t.sourceCurrency}`;
+      const tgt = `${(Number(t.targetAmountMinor) / 100).toFixed(2)} ${t.targetCurrency}`;
+      base.push({ value: t.id, label: `${t.ourReference ?? t.wiseTransferId} · ${src} → ${tgt} · ${t.state}` });
+    }
+    // If the expense's current transfer isn't in the recent list (e.g. old
+    // one), still show it so the operator can see what's currently linked.
+    if (currentId && wiseTransfers.every((t) => t.id !== currentId)) {
+      base.push({ value: currentId, label: `(currently linked, older) ${currentId}` });
+    }
+    return base;
+  }
+
+  function onCurrencyChange(id: string, next: string) {
+    const draft = drafts[id];
+    if (!draft) {
+      return;
+    }
+    draft.currency = next;
+    if (next === 'EUR') {
+      draft.wiseTransferId = '';
+    } else {
+      void ensureWiseTransfersLoaded();
+    }
   }
 
   // ── Bank-tx link picker ───────────────────────────────────────────────
@@ -268,6 +328,10 @@
       vendor: draft.vendor,
       expenseDate: draft.expenseDate,
       amountMinor: majorToMinor(draft.amountMajor),
+      currency: draft.currency,
+      // EUR-native rows should never carry a wise-transfer link; foreign
+      // currency rows must (DB CHECK constraint enforces this too).
+      wiseTransferId: draft.currency === 'EUR' ? null : draft.wiseTransferId || null,
       btwRateBps,
       btwMinor,
       locationClass: draft.locationClass,
@@ -475,7 +539,19 @@
                 </Field>
               </HStack>
               <HStack gap={3}>
-                <Field label="Amount (gross, EUR)" invalid={hasIssue('amountMinor')}>
+                <Field label="Currency" invalid={hasIssue('currency')}>
+                  <Select
+                    value={drafts[expense.id].currency}
+                    options={currencyOptions}
+                    onChange={(value) => onCurrencyChange(expense.id, value)}
+                  />
+                </Field>
+                <Field
+                  label={drafts[expense.id].currency === 'EUR'
+                    ? 'Amount (gross, EUR)'
+                    : `Amount (gross, ${drafts[expense.id].currency})`}
+                  invalid={hasIssue('amountMinor')}
+                >
                   <Input
                     bind:value={drafts[expense.id].amountMajor}
                     placeholder="0.00"
@@ -497,6 +573,24 @@
                   <Input bind:value={drafts[expense.id].btwMajor} placeholder="0.00" inputmode="decimal" />
                 </Field>
               </HStack>
+              {#if drafts[expense.id].currency !== 'EUR'}
+                <Field label="Paid from Wise sweep" invalid={hasIssue('wiseTransferId')}>
+                  <Select
+                    value={drafts[expense.id].wiseTransferId}
+                    options={wiseTransferOptions(drafts[expense.id].wiseTransferId)}
+                    onChange={(value) => (drafts[expense.id].wiseTransferId = value)}
+                  />
+                </Field>
+                {#if expense.eurAmountMinor}
+                  <Text size="small" color="muted">
+                    EUR booked: {minorToMajor(expense.eurAmountMinor)} at rate {expense.fxRate}
+                  </Text>
+                {:else if drafts[expense.id].wiseTransferId}
+                  <Text size="small" color="muted">
+                    EUR will be booked at sweep-clear time (from the picked transfer's realized rate).
+                  </Text>
+                {/if}
+              {/if}
               <HStack gap={3}>
                 <Field label="Location class" invalid={hasIssue('locationClass')}>
                   <Select

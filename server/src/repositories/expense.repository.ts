@@ -338,10 +338,15 @@ export class ExpenseRepository {
    * places expense rows on the tab of `bankTx.txDate`.
    */
   async findApprovedInPeriod(start: Date, end: Date): Promise<Expense[]> {
-    // COALESCE(latest bt.txDate matched to this expense, expense.expenseDate)
-    // as the effective period date. Kysely's typed `fn.coalesce` doesn't
-    // accept a subquery scalar in this position, so build it via `sql`.
+    // Effective period date, in priority order:
+    //   1. Wise-flow: bank_tx that matched the linked wise_transfer (the sweep
+    //      clearing). Same-period-as-invoice by construction.
+    //   2. SNS-flow: latest bank_tx directly matched to this expense.
+    //   3. Unmatched fallback: expenseDate (cash/manual entries).
+    // Kysely's typed `fn.coalesce` doesn't take subquery scalars here, so
+    // build via `sql`.
     const effectiveDate = sql<Date>`COALESCE(
+      (SELECT bt."txDate" FROM bank_transaction bt WHERE bt."matchedTransferId" = expense."wiseTransferId"),
       (SELECT MAX(bt."txDate") FROM bank_transaction bt WHERE bt."matchedExpenseId" = expense.id),
       expense."expenseDate"
     )`;
@@ -353,6 +358,53 @@ export class ExpenseRepository {
       .where(effectiveDate, '<', end)
       .orderBy('expense.expenseDate', 'asc')
       .execute()) as Expense[];
+  }
+
+  /**
+   * Approved wise-flow expenses whose linked sweep has cleared (i.e. a
+   * bank_transaction matched the wise_transfer) but haven't yet had their
+   * EUR figure back-filled from the sweep's fxRate. Drives the post-sweep
+   * backfill from the matcher, and the sheet-writer's post-approve path.
+   *
+   * Returns the expense + fxRate + settlement date/id needed to compute
+   * `eurAmountMinor` and write the sheet row. Pass `expenseId` to scope to
+   * a single row (post-approve trigger); omit to walk everything (retry).
+   */
+  async findWiseLinkedReadyForBackfill(
+    expenseId?: string,
+  ): Promise<Array<Expense & { fxRate: string; bankTxId: string; bankTxDate: Date | string }>> {
+    let query = this.db
+      .selectFrom('expense')
+      .innerJoin('wise_transfer', 'wise_transfer.id', 'expense.wiseTransferId')
+      .innerJoin('bank_transaction', 'bank_transaction.matchedTransferId', 'wise_transfer.id')
+      .where('expense.status', '=', ExpenseStatus.Approved)
+      .where('expense.wiseTransferId', 'is not', null)
+      .where('expense.eurAmountMinor', 'is', null)
+      .where('wise_transfer.fxRate', 'is not', null);
+    if (expenseId !== undefined) {
+      query = query.where('expense.id', '=', expenseId);
+    }
+    return (await query
+      .selectAll('expense')
+      .select([
+        'wise_transfer.fxRate as fxRate',
+        'bank_transaction.id as bankTxId',
+        'bank_transaction.txDate as bankTxDate',
+      ])
+      .execute()) as Array<Expense & { fxRate: string; bankTxId: string; bankTxDate: Date | string }>;
+  }
+
+  /**
+   * Back-fill EUR + fxRate on a wise-linked expense once the sweep clears.
+   * Called by the matcher (post bank_tx → wise_transfer link) and by the
+   * post-approve trigger.
+   */
+  async backfillEurFromSweep(id: string, eurAmountMinor: bigint, fxRate: string): Promise<void> {
+    await this.db
+      .updateTable('expense')
+      .set({ eurAmountMinor, fxRate, updatedAt: new Date() })
+      .where('id', '=', id)
+      .execute();
   }
 
   async countStaleSheetWrites(staleAfterMs: number): Promise<number> {

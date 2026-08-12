@@ -246,4 +246,96 @@ describe('SheetSyncService', () => {
       expect(row.client.name).toBe('FUTO');
     });
   });
+
+  describe('backfillWiseExpense (Wise-flow USD expense)', () => {
+    it('computes EUR proportionally from the sweep source/target and populates fxRate', async () => {
+      // A $150 USD card spend, drawn from a $4791 USD pool that swept to
+      // €4045.72 EUR. EUR-booked value = 150 * 404572 / 479100 = 126.68 (rounded down).
+      const transfer = await seedWiseTransfer(db, { wiseId: 'WISE-BACKFILL', ref: 'TXN-2001' });
+      const ingest = await expenseRepo.ingest({
+        paperlessDocId: 'doc-wise-card-1',
+        vendor: 'US Vendor',
+        expenseDate: new Date('2099-01-10'),
+        amountMinor: 15_000n,
+        currency: 'USD',
+        wiseTransferId: transfer.id,
+        btwRateBps: null,
+        btwMinor: null,
+        locationClass: ExpenseLocationClass.NonEu,
+        status: ExpenseStatus.Approved,
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+
+      const backfilled = await sheetSync.backfillWiseExpense({
+        id: ingest.row.id,
+        amountMinor: ingest.row.amountMinor,
+        wiseTransferId: ingest.row.wiseTransferId,
+        fxRate: transfer.fxRate ?? '0.846991',
+      });
+
+      // 15_000n * 404_572n / 479_100n = 12_666n (integer floor: 12_666.79…)
+      expect(Number(backfilled.eurAmountMinor)).toBe(12_666);
+      expect(backfilled.fxRate).toBe('0.846991');
+    });
+
+    it('writeExpenseRowIfReady handles the wise-linked case when the sweep bank_tx has landed', async () => {
+      const transfer = await seedWiseTransfer(db, { wiseId: 'WISE-READY-1', ref: 'TXN-2010' });
+      // Sweep bank_tx: SNS row that already matches the transfer.
+      const bankTx = await seedBankTx(bankRepo, 'wise-payout-2010');
+      await bankRepo.setMatch(bankTx.id, { type: 'wise_transfer', id: transfer.id }, 'auto_high' as never);
+
+      const ingest = await expenseRepo.ingest({
+        paperlessDocId: 'doc-wise-card-ready',
+        vendor: 'US Vendor',
+        expenseDate: new Date('2099-01-10'),
+        amountMinor: 15_000n,
+        currency: 'USD',
+        wiseTransferId: transfer.id,
+        btwRateBps: null,
+        btwMinor: null,
+        locationClass: ExpenseLocationClass.NonEu,
+        status: ExpenseStatus.Approved,
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+
+      const didWrite = await sheetSync.writeExpenseRowIfReady(ingest.row.id);
+      expect(didWrite).toBe(true);
+      expect(sheetWriter.writeExpenseRow).toHaveBeenCalledOnce();
+      const refreshed = await expenseRepo.findById(ingest.row.id);
+      expect(refreshed?.eurAmountMinor).not.toBeNull();
+      expect(refreshed?.sheetRowAt).toBeInstanceOf(Date);
+    });
+
+    it('writeExpenseRowIfReady stays a no-op when the wise sweep has not landed', async () => {
+      const transfer = await seedWiseTransfer(db, { wiseId: 'WISE-PENDING', ref: 'TXN-2020' });
+      // No bank_tx match — sweep is still processing.
+
+      const ingest = await expenseRepo.ingest({
+        paperlessDocId: 'doc-wise-card-pending',
+        vendor: 'US Vendor',
+        expenseDate: new Date('2099-01-10'),
+        amountMinor: 15_000n,
+        currency: 'USD',
+        wiseTransferId: transfer.id,
+        btwRateBps: null,
+        btwMinor: null,
+        locationClass: ExpenseLocationClass.NonEu,
+        status: ExpenseStatus.Approved,
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+
+      const didWrite = await sheetSync.writeExpenseRowIfReady(ingest.row.id);
+      expect(didWrite).toBe(false);
+      expect(sheetWriter.writeExpenseRow).not.toHaveBeenCalled();
+      const refreshed = await expenseRepo.findById(ingest.row.id);
+      expect(refreshed?.eurAmountMinor).toBeNull();
+      expect(refreshed?.sheetRowAt).toBeNull();
+    });
+  });
 });
