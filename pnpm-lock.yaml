@@ -71,16 +71,16 @@ importers:
         version: 6.2.8
       kysely:
         specifier: ^0.29.0
-        version: 0.29.4
+        version: 0.29.5
       kysely-postgres-js:
         specifier: ^3.0.0
-        version: 3.0.0(kysely@0.29.4)(postgres@3.4.9)
+        version: 3.0.0(kysely@0.29.5)(postgres@3.4.9)
       nestjs-cls:
         specifier: ^6.0.0
         version: 6.2.1(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       nestjs-kysely:
         specifier: ^3.1.2
-        version: 3.1.2(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.28)(kysely@0.29.4)(reflect-metadata@0.2.2)
+        version: 3.1.2(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.28)(kysely@0.29.5)(reflect-metadata@0.2.2)
       nestjs-zod:
         specifier: ^5.3.0
         version: 5.5.0(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/swagger@11.4.6(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.28)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.4.3)
@@ -3116,8 +3116,8 @@ packages:
     resolution: {integrity: sha512-nbD8lB9EB3wNdMhOCdx5Li8DxnLbvKByylRLcJ1h+4SkrowVeECAyZlyiKMThF7xFdRz0jSQ2MoJr+wXux2y0Q==}
     engines: {node: '>=20.0.0'}
 
-  kysely@0.29.4:
-    resolution: {integrity: sha512-y5mVgQNkMbs1eK9Xyc0pmNdabN2wHhRYY/5r4W5HrUT1rYCEPeVNSj1RUJeSDKT3U0p+mXCvLgkrFuIafYI6BA==}
+  kysely@0.29.5:
+    resolution: {integrity: sha512-ooa+eSbBNPTo3MycPEuW5jdrxQdQwdtB3LC3h43FiXQbIry5tR0C5lDG7eealK0E4D7XjrnOP5DIUg/LyjRMYQ==}
     engines: {node: '>=22.0.0'}
 
   lazystream@1.0.1:
@@ -7391,15 +7391,15 @@ snapshots:
     optionalDependencies:
       postgres: 3.4.9
 
-  kysely-postgres-js@3.0.0(kysely@0.29.4)(postgres@3.4.9):
+  kysely-postgres-js@3.0.0(kysely@0.29.5)(postgres@3.4.9):
     dependencies:
-      kysely: 0.29.4
+      kysely: 0.29.5
     optionalDependencies:
       postgres: 3.4.9
 
   kysely@0.28.17: {}
 
-  kysely@0.29.4: {}
+  kysely@0.29.5: {}
 
   lazystream@1.0.1:
     dependencies:
@@ -7655,11 +7655,11 @@ snapshots:
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
 
-  nestjs-kysely@3.1.2(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.28)(kysely@0.29.4)(reflect-metadata@0.2.2):
+  nestjs-kysely@3.1.2(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.28)(kysely@0.29.5)(reflect-metadata@0.2.2):
     dependencies:
       '@nestjs/common': 11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
       '@nestjs/core': 11.1.28(@nestjs/common@11.1.28(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/platform-express@11.1.28)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      kysely: 0.29.4
+      kysely: 0.29.5
       reflect-metadata: 0.2.2
       tslib: 2.8.1
 
