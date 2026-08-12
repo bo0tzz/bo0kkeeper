@@ -313,14 +313,29 @@ export class InvoiceComposerService {
       });
     }
 
+    // The invoice total is the ORIGINAL credit amount — what the client
+    // actually paid into Wise — not what happened to remain after
+    // Wise-side spends. `originalCreditMinor` is populated at draft time
+    // (see wise-draft.service.ts); pre-that-change transfers fall back to
+    // `sourceAmountMinor` where they were the same by construction.
+    const sourceMinor = BigInt(transfer.sourceAmountMinor as unknown as string);
+    const targetMinor = BigInt(transfer.targetAmountMinor as unknown as string);
+    const totalMinor =
+      transfer.originalCreditMinor === null || transfer.originalCreditMinor === undefined
+        ? sourceMinor
+        : BigInt(transfer.originalCreditMinor as unknown as string);
+    // EUR at the sweep's realized rate. `target × totalMinor / source`
+    // gives the notional EUR value of the full credit pool — i.e. what
+    // the client's payment was worth in EUR, split proportionally between
+    // what actually swept (target EUR) and any Wise-flow expenses that
+    // drew from the same pool. Books tie: invoice_EUR = swept_EUR +
+    // Σ(expense_EUR at same rate).
+    const eurTotalMinor = sourceMinor === 0n ? targetMinor : (totalMinor * targetMinor) / sourceMinor;
     return {
       wiseTransferId: transfer.id,
       currency: transfer.sourceCurrency,
-      totalMinor: BigInt(transfer.sourceAmountMinor as unknown as string),
-      // EUR amount as ACTUALLY arrived at SNS — net of Wise's fee + FX
-      // spread. We deliberately don't store/use Wise's quoted rate; per-line
-      // displays in the future should derive from target/source instead.
-      eurTotalMinor: BigInt(transfer.targetAmountMinor as unknown as string),
+      totalMinor,
+      eurTotalMinor,
       ourReference: transfer.ourReference,
       suggestedClientId: suggestedClient?.id ?? null,
       suggestedPeriodStart: suggestedPeriod?.start ?? null,
@@ -349,6 +364,14 @@ export class InvoiceComposerService {
     // EUR column).
     const sourceMinor = BigInt(transfer.sourceAmountMinor as unknown as string);
     const targetMinor = BigInt(transfer.targetAmountMinor as unknown as string);
+    const originalMinor =
+      transfer.originalCreditMinor === null || transfer.originalCreditMinor === undefined
+        ? sourceMinor
+        : BigInt(transfer.originalCreditMinor as unknown as string);
+    // EUR at the sweep's realized rate, applied to the full credit amount.
+    // See prefillFromWise for the rationale — books tie: invoice_EUR =
+    // swept_EUR + Σ(expense_EUR).
+    const eurTotalMinor = sourceMinor === 0n ? targetMinor : (originalMinor * targetMinor) / sourceMinor;
     const effectiveRate = sourceMinor === 0n ? undefined : (Number(targetMinor) / Number(sourceMinor)).toFixed(6);
     return this.composeAndIssue({
       clientId: input.clientId,
@@ -356,7 +379,7 @@ export class InvoiceComposerService {
       periodStart: input.periodStart,
       periodEnd: input.periodEnd,
       currency: transfer.sourceCurrency,
-      eurTotalMinor: targetMinor,
+      eurTotalMinor,
       fxRate: effectiveRate,
       lines: input.lines,
       wiseTransferId: transfer.id,

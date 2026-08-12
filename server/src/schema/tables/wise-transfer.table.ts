@@ -38,6 +38,23 @@ export class WiseTransferTable {
   @Column({ type: 'text' })
   sourceCurrency!: string;
 
+  /**
+   * The original credit amount from the balance-credit event that spawned
+   * this transfer, in `sourceCurrency`. Equals `sourceAmountMinor` under
+   * a full-balance sweep (nothing was drawn from the pool), and is strictly
+   * greater than `sourceAmountMinor` when the sweep ran with
+   * `allowUnderCredit=true` because part of the balance was already spent
+   * (Wise card charge, direct send, etc.).
+   *
+   * Invoice compose uses this — not `sourceAmountMinor` — as the invoice
+   * total. Otherwise the composed invoice would under-report the amount
+   * the client actually paid by the amount that leaked to Wise-flow
+   * expenses. Null on historical outbound rows (pre-this-change) and on
+   * inbound rows (where there's no notion of a "credit pool").
+   */
+  @Column({ type: 'bigint', nullable: true })
+  originalCreditMinor!: ColumnType<bigint> | null;
+
   @Column({ type: 'bigint' })
   targetAmountMinor!: ColumnType<bigint>;
 

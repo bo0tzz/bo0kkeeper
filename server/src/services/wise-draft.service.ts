@@ -111,6 +111,11 @@ export class WiseDraftService {
       direction: WiseTransferDirection.Out,
       sourceAmountMinor: quote.sourceAmountMinor,
       sourceCurrency: quote.sourceCurrency,
+      // The invoice compose flow needs the original credit amount (what the
+      // client paid), not the swept amount — those diverge whenever we
+      // sweep under credit because of a Wise-side spend. Record it here so
+      // compose doesn't have to walk back to the source event.
+      originalCreditMinor: credit.amountMinor,
       targetAmountMinor: quote.targetAmountMinor,
       targetCurrency: quote.targetCurrency,
       fxRate: quote.rate,

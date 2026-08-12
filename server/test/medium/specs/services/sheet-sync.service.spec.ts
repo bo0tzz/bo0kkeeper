@@ -305,6 +305,9 @@ describe('SheetSyncService', () => {
       const didWrite = await sheetSync.writeExpenseRowIfReady(ingest.row.id);
       expect(didWrite).toBe(true);
       expect(sheetWriter.writeExpenseRow).toHaveBeenCalledOnce();
+      // v0.9.1 fix: the sheet row uses eurAmountMinor for Wise-flow rows,
+      // not amountMinor. USD 150.00 × 404572/479100 = 126.66 EUR.
+      expect(sheetWriter.writeExpenseRow.mock.calls[0][0]).toMatchObject({ eurAmountMinor: 12_666n });
       const refreshed = await expenseRepo.findById(ingest.row.id);
       expect(refreshed?.eurAmountMinor).not.toBeNull();
       expect(refreshed?.sheetRowAt).toBeInstanceOf(Date);

@@ -32,14 +32,23 @@ async function seedOutgoingTransfer(
     state?:
       'incoming_payment_waiting' | 'processing' | 'funds_converted' | 'outgoing_payment_sent' | 'cancelled' | 'failed';
     direction?: 'in' | 'out';
+    sourceAmountMinor?: bigint;
+    targetAmountMinor?: bigint;
+    originalCreditMinor?: bigint | null;
   },
 ) {
   return await new WiseTransferRepository(db).create({
     wiseTransferId: `WISE-${Math.floor(Math.random() * 1e9)}`,
     direction: (overrides?.direction ?? 'out') as never,
-    sourceAmountMinor: 479_100n,
+    sourceAmountMinor: overrides?.sourceAmountMinor ?? 479_100n,
     sourceCurrency: 'USD',
-    targetAmountMinor: 404_572n,
+    // Default to the same as sourceAmountMinor so pre-existing tests that
+    // assume "sweep amount == credit amount" keep passing.
+    originalCreditMinor:
+      overrides?.originalCreditMinor === undefined
+        ? (overrides?.sourceAmountMinor ?? 479_100n)
+        : overrides.originalCreditMinor,
+    targetAmountMinor: overrides?.targetAmountMinor ?? 404_572n,
     targetCurrency: 'EUR',
     fxRate: '0.846991',
     feeMinor: 1442n,
@@ -299,6 +308,33 @@ describe('InvoiceComposerService', () => {
     it('rejects a non-terminal state', async () => {
       const transfer = await seedOutgoingTransfer(db, { state: 'processing' });
       await expect(composer.prefillFromWise(transfer.id)).rejects.toThrow(/state=processing/);
+    });
+
+    // v0.9.1 fix — when the sweep ran under-credit (because some was
+    // spent Wise-side before drafting), invoice compose uses the
+    // *original* credit amount, not the swept amount. EUR total is
+    // proportional to the sweep rate on that full pool.
+    it('uses originalCreditMinor as the invoice total when the sweep ran under-credit', async () => {
+      // Client paid $5000; $150 was Wise-card-spent; sweep drafted for
+      // $4850 → €4109 EUR. Invoice should reflect the $5000 payment.
+      const transfer = await seedOutgoingTransfer(db, {
+        sourceAmountMinor: 485_000n,
+        originalCreditMinor: 500_000n,
+        targetAmountMinor: 410_900n,
+      });
+      const prefill = await composer.prefillFromWise(transfer.id);
+      // USD side: full credit, not sweep amount.
+      expect(String(prefill.totalMinor)).toBe('500000');
+      // EUR side: proportional — 500_000 * 410_900 / 485_000 = 423_608.
+      expect(String(prefill.eurTotalMinor)).toBe('423608');
+
+      const result = await composer.composeFromWise({
+        wiseTransferId: transfer.id,
+        clientId,
+        issuedAt: new Date('2099-01-15T00:00:00Z'),
+        lines: [{ description: 'Services', lineTotalMinor: 500_000n }],
+      });
+      expect(String(result.invoice.eurTotalMinor)).toBe('423608');
     });
 
     it('rejects a transfer that already has an invoice (unique constraint)', async () => {

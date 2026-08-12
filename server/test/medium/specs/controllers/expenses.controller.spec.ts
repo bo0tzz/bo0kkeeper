@@ -128,6 +128,24 @@ describe('ExpensesController', () => {
     expect(result.reviewedAt).not.toBeNull();
   });
 
+  // v0.9.1 guard — approving with amountMinor ≤ 0 is nearly always the
+  // "clicked approve before filling in the amount" mistake. Better to
+  // 400 than to end up with a €0 row on the accountant's sheet that
+  // has to be repaired by hand.
+  it('approve rejects a zero amount', async () => {
+    const ingest = await repo.ingest(fakeExpense({ paperlessDocId: 'zero-amount', amountMinor: 0n }));
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+    await expect(controller.approveExpense(ingest.row.id, {} as ExpenseApproveDto)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    // Also rejects when the patch itself sets zero.
+    await expect(
+      controller.approveExpense(ingest.row.id, { amountMinor: 0n } as unknown as ExpenseApproveDto),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('reject sets the notes string', async () => {
     const ingest = await repo.ingest(fakeExpense({ paperlessDocId: 'reject-test' }));
     if (!ingest.ingested) {

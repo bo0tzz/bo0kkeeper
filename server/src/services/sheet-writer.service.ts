@@ -178,11 +178,19 @@ export class SheetWriterService {
 export function expenseToSheetRow(expense: Expense, date: Date): ExpenseRowInput {
   const vatPercent = expense.btwRateBps == null ? undefined : `${expense.btwRateBps / 100}%`;
   const vatMinor = expense.btwMinor == null ? undefined : BigInt(expense.btwMinor as bigint | string);
+  // Wise-flow foreign-currency expenses have `eurAmountMinor` back-filled at
+  // sweep-clear; using it (rather than `amountMinor`) puts the correct EUR
+  // value on the sheet. EUR-native expenses have `eurAmountMinor` null and
+  // `amountMinor` is already EUR — the fallback handles that.
+  const eurAmountMinor =
+    expense.eurAmountMinor === null || expense.eurAmountMinor === undefined
+      ? BigInt(expense.amountMinor as bigint | string)
+      : BigInt(expense.eurAmountMinor as bigint | string);
   return {
     date,
     id: expense.paperlessDocId ?? expense.id,
     vendor: expense.vendor,
-    eurAmountMinor: BigInt(expense.amountMinor as bigint | string),
+    eurAmountMinor,
     locationClass: expense.locationClass,
     vatPercent,
     vatMinor,

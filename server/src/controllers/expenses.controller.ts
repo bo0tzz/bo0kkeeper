@@ -128,6 +128,17 @@ export class ExpensesController {
         `Foreign-currency (${effectiveCurrency}) expenses must be linked to a Wise sweep — pick one under "Paid from Wise sweep".`,
       );
     }
+    // Zero-amount expenses have no legitimate use case and are the classic
+    // "clicked approve before filling in the amount" mistake. Blocking here
+    // is friendlier than a downstream €0 sheet row that has to be repaired
+    // by hand.
+    const effectiveAmountMinor =
+      dto.amountMinor === undefined
+        ? BigInt(existing.amountMinor as bigint | number | string)
+        : BigInt(dto.amountMinor);
+    if (effectiveAmountMinor <= 0n) {
+      throw new BadRequestException('Expense amount must be greater than 0.');
+    }
     const row = await this.expenseRepository.approve(id, dto as unknown as ExpenseUpdate);
     if (!row) {
       throw new NotFoundException();

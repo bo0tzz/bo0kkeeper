@@ -506,7 +506,7 @@
                   >
                     {expense.status === 'pending_review' ? 'Review' : 'Edit'}
                   </Button>
-                  {#if expense.status === 'approved' && !expense.matchedBankTxId}
+                  {#if expense.status === 'approved' && !expense.matchedBankTxId && !expense.wiseTransferId}
                     <Button size="small" variant="ghost" onclick={() => openLinkModal(expense)}>Link</Button>
                   {/if}
                 </HStack>
