@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.9.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.9.0...v0.9.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* **deps:** update dependency openid-client to v6.8.5 ([#165](https://github.com/bo0tzz/bo0kkeeper/issues/165)) ([5fbcc13](https://github.com/bo0tzz/bo0kkeeper/commit/5fbcc13c18da485f5dcdae4bd5dfc5d5fe96832b))
+* **deps:** update nestjs to v11.1.29 ([#166](https://github.com/bo0tzz/bo0kkeeper/issues/166)) ([c820ed4](https://github.com/bo0tzz/bo0kkeeper/commit/c820ed4e963a3d976d3b2c9bcb75588f0ac5f480))
+* **wise-flow:** four v0.9.0 follow-ups ([21300ce](https://github.com/bo0tzz/bo0kkeeper/commit/21300ce286d75761aee4b4b39656604cf76a4e0d))
+
 ## [0.9.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.8.0...v0.9.0) (2026-08-12)
 
 
