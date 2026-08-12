@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.2](https://github.com/bo0tzz/bo0kkeeper/compare/v0.9.1...v0.9.2) (2026-08-12)
+
+
+### Bug Fixes
+
+* **wise-flow:** two more v0.9.0 follow-ups ([7298cdb](https://github.com/bo0tzz/bo0kkeeper/commit/7298cdb91b4108cddcf069dc78ae6fa8c741bab8))
+
 ## [0.9.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.9.0...v0.9.1) (2026-08-12)
 
 
