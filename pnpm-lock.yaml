@@ -153,7 +153,7 @@ importers:
         version: 72.0.0(eslint@10.8.1(jiti@2.7.0)(supports-color@8.1.1))
       globals:
         specifier: ^17.0.0
-        version: 17.7.0
+        version: 17.10.0
       prettier:
         specifier: ^3.8.3
         version: 3.9.6
@@ -223,7 +223,7 @@ importers:
         version: 72.0.0(eslint@10.8.1(jiti@2.7.0)(supports-color@8.1.1))
       globals:
         specifier: ^17.0.0
-        version: 17.7.0
+        version: 17.10.0
       happy-dom:
         specifier: ^20.9.0
         version: 20.11.2
@@ -2860,8 +2860,8 @@ packages:
     resolution: {integrity: sha512-c/c15i26VrJ4IRt5Z89DnIzCGDn9EcebibhAOjw5ibqEHsE1wLUgkPn9RDmNcUKyU87GeaL633nyJ+pplFR2ZQ==}
     engines: {node: '>=18'}
 
-  globals@17.7.0:
-    resolution: {integrity: sha512-Czmyns5dUsq4seFBR/Kdydhmo8y9kC79hiSkPn0YcGtNnYWnrgt0vjrSjx9tspoDGWm2CMarffRuLjM4xUz8xg==}
+  globals@17.10.0:
+    resolution: {integrity: sha512-V0kztuWST2k8A/VbxAY8+L+7+Rgo3fyA24IHRLrZp7HOzJjV0gHSaZUjK9lpP/IrBSNite2tZ1prhRkinRu1CA==}
     engines: {node: '>=18'}
 
   globrex@0.1.2:
@@ -6810,7 +6810,7 @@ snapshots:
       entities: 4.5.0
       eslint: 10.8.1(jiti@2.7.0)(supports-color@8.1.1)
       find-up-simple: 1.0.1
-      globals: 17.7.0
+      globals: 17.10.0
       indent-string: 5.0.0
       is-builtin-module: 5.0.0
       is-identifier: 1.1.0
@@ -7167,7 +7167,7 @@ snapshots:
 
   globals@16.5.0: {}
 
-  globals@17.7.0: {}
+  globals@17.10.0: {}
 
   globrex@0.1.2: {}
 
