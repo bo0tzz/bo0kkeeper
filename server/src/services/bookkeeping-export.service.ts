@@ -156,7 +156,14 @@ export class BookkeepingExportService {
     const rows = await this.expenseRepository.findApprovedInPeriod(periodStart, periodEnd);
 
     return rows.map((r) => {
-      const totalIncMinor = BigInt(r.amountMinor);
+      // Wise-flow (foreign-currency) expenses have `eurAmountMinor` back-filled
+      // from the sweep's realized rate; that's the EUR figure the accountant
+      // sheet takes. EUR-native rows have `eurAmountMinor` null and
+      // `amountMinor` is already EUR — the fallback covers both.
+      const totalIncMinor =
+        r.eurAmountMinor === null || r.eurAmountMinor === undefined
+          ? BigInt(r.amountMinor)
+          : BigInt(r.eurAmountMinor as bigint | number | string);
       const vatMinor = r.btwMinor === null ? 0n : BigInt(r.btwMinor);
       const exclVatMinor = vatMinor === 0n ? totalIncMinor : totalIncMinor - vatMinor;
       return {

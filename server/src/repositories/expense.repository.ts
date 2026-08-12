@@ -126,24 +126,34 @@ export class ExpenseRepository {
       .$if(!!filter.locationClass, (qb) => qb.where('locationClass', '=', filter.locationClass!))
       .$if(!!filter.from, (qb) => qb.where('expenseDate', '>=', filter.from!))
       .$if(!!filter.to, (qb) => qb.where('expenseDate', '<=', filter.to!))
+      // "Matched" means either an SNS-side bank_tx directly points at this
+      // expense OR the expense is Wise-flow (linked to a wise_transfer,
+      // which the sweep's own bank_tx handles). Without the wise-flow
+      // clause, wise-linked expenses always surfaced as "unmatched" on
+      // the dashboard tile even though they're the linked state.
       .$if(filter.matched === false, (qb) =>
-        qb.where(({ not, exists, selectFrom }) =>
-          not(
+        qb
+          .where('expense.wiseTransferId', 'is', null)
+          .where(({ not, exists, selectFrom }) =>
+            not(
+              exists(
+                selectFrom('bank_transaction')
+                  .select('id')
+                  .whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
+              ),
+            ),
+          ),
+      )
+      .$if(filter.matched === true, (qb) =>
+        qb.where(({ or, exists, selectFrom, eb }) =>
+          or([
+            eb('expense.wiseTransferId', 'is not', null),
             exists(
               selectFrom('bank_transaction')
                 .select('id')
                 .whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
             ),
-          ),
-        ),
-      )
-      .$if(filter.matched === true, (qb) =>
-        qb.where(({ exists, selectFrom }) =>
-          exists(
-            selectFrom('bank_transaction')
-              .select('id')
-              .whereRef('bank_transaction.matchedExpenseId', '=', 'expense.id'),
-          ),
+          ]),
         ),
       );
 

@@ -2,6 +2,7 @@ import { Kysely } from 'kysely';
 import { BankSource, ExpenseLocationClass, ExpenseStatus, MatchConfidence } from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ExpenseRepository, NewExpense } from 'src/repositories/expense.repository';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { getKyselyDB } from 'test/utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -117,6 +118,53 @@ describe('ExpenseRepository', () => {
     const byVendor = Object.fromEntries(page.items.map((row) => [row.vendor, row]));
     expect(byVendor['Linked Vendor'].matchedBankTxId).toBe(tx.id);
     expect(byVendor['Unlinked Vendor'].matchedBankTxId).toBeNull();
+  });
+
+  // v0.9.2 fix — a Wise-flow expense doesn't need an SNS-side bank_tx to
+  // count as "matched"; the sweep's own bank_tx handles the linking via
+  // the wise_transfer FK. Without this, wise-linked rows surfaced on the
+  // "Awaiting bank match" tile forever.
+  it("findMany treats wise-linked expenses as matched (they don't need an SNS bank_tx)", async () => {
+    const wiseTransferRepo = new WiseTransferRepository(db);
+    const transfer = await wiseTransferRepo.create({
+      wiseTransferId: 'WISE-MATCH-1',
+      direction: 'out' as never,
+      sourceAmountMinor: 100_000n,
+      sourceCurrency: 'USD',
+      targetAmountMinor: 85_000n,
+      targetCurrency: 'EUR',
+      fxRate: '0.85',
+      feeMinor: 0n,
+      feeCurrency: 'USD',
+      state: 'outgoing_payment_sent' as never,
+      stateUpdatedAt: new Date(),
+    });
+    const wiseFlow = await repo.ingest(
+      fakeExpense({
+        paperlessDocId: 'wise-flow',
+        vendor: 'US Vendor',
+        amountMinor: 15_000n,
+        currency: 'USD',
+        wiseTransferId: transfer.id,
+      }),
+    );
+    const plain = await repo.ingest(fakeExpense({ paperlessDocId: 'plain-unmatched', vendor: 'Unmatched EUR Vendor' }));
+    if (!wiseFlow.ingested || !plain.ingested) {
+      throw new Error('precondition');
+    }
+    await repo.approve(wiseFlow.row.id);
+    await repo.approve(plain.row.id);
+
+    const unmatched = await repo.findMany({ matched: false, offset: 0, limit: 50 });
+    const vendors = unmatched.items.map((row) => row.vendor);
+    expect(vendors).toContain('Unmatched EUR Vendor');
+    // The wise-linked one must NOT appear as unmatched.
+    expect(vendors).not.toContain('US Vendor');
+
+    const matched = await repo.findMany({ matched: true, offset: 0, limit: 50 });
+    const matchedVendors = matched.items.map((row) => row.vendor);
+    expect(matchedVendors).toContain('US Vendor');
+    expect(matchedVendors).not.toContain('Unmatched EUR Vendor');
   });
 
   it('reject flips status with optional notes', async () => {

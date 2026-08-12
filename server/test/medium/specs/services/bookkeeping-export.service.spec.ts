@@ -1,9 +1,10 @@
 import ExcelJS from 'exceljs';
 import { Kysely } from 'kysely';
-import { ClientClass, ExpenseLocationClass, TradeName } from 'src/enum';
+import { ClientClass, ExpenseLocationClass, TradeName, WiseTransferDirection, WiseTransferState } from 'src/enum';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
+import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
 import { BookkeepingExportService } from 'src/services/bookkeeping-export.service';
 import { getKyselyDB } from 'test/utils';
@@ -194,6 +195,63 @@ describe('BookkeepingExportService', () => {
     expect(expense.total).toBeCloseTo(29.85, 2);
     expect(expense.vat).toBeCloseTo(5.18, 2);
     expect(expense.excl).toBeCloseTo(24.67, 2);
+  });
+
+  // v0.9.2 fix — Wise-flow (foreign-currency) expenses have `amountMinor`
+  // in the source currency (e.g. USD cents); the accountant sheet is EUR
+  // everywhere, so the export must use `eurAmountMinor` (back-filled from
+  // the sweep's realized rate) instead. Before this, a $150 expense
+  // exported as €150.00 — quiet corruption of the BTW rollup.
+  it('exports Wise-flow expenses at eurAmountMinor, not the source-currency amountMinor', async () => {
+    // $150 USD expense, EUR back-filled at €126.66 from the sweep rate.
+    const wiseTransferRepo = new WiseTransferRepository(db);
+    const transfer = await wiseTransferRepo.create({
+      wiseTransferId: 'WISE-EXPORT-1',
+      direction: WiseTransferDirection.Out,
+      sourceAmountMinor: 479_100n,
+      sourceCurrency: 'USD',
+      targetAmountMinor: 404_572n,
+      targetCurrency: 'EUR',
+      fxRate: '0.846991',
+      feeMinor: 1442n,
+      feeCurrency: 'USD',
+      state: WiseTransferState.OutgoingPaymentSent,
+      stateUpdatedAt: new Date('2099-02-10'),
+      ourReference: 'TXN-2001',
+    });
+    const ingest = await expenseRepo.ingest({
+      paperlessDocId: 'pp-wise-usd',
+      vendor: 'US Vendor',
+      expenseDate: new Date('2099-02-10'),
+      amountMinor: 15_000n, // $150.00 USD
+      currency: 'USD',
+      wiseTransferId: transfer.id,
+      eurAmountMinor: 12_666n, // back-filled: 15_000 × 404_572 / 479_100 = 12_666
+      fxRate: '0.846991',
+      btwRateBps: null,
+      btwMinor: null,
+      locationClass: ExpenseLocationClass.NonEu,
+      category: '',
+      notes: 'Wise card charge',
+      sourceEventId: null,
+    });
+    if (ingest.ingested) {
+      await expenseRepo.approve(ingest.row.id);
+    }
+
+    const { buffer } = await service.exportQuarter(2099, 1);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+    const sheet = wb.worksheets[0];
+    for (let r = 1; r <= sheet.rowCount; r += 1) {
+      if (String(sheet.getCell(r, 3).value ?? '') === 'US Vendor') {
+        const total = Number(sheet.getCell(r, 6).value);
+        // 126.66 EUR, not 150.00 (which would be the USD cents misread as EUR).
+        expect(total).toBeCloseTo(126.66, 2);
+        return;
+      }
+    }
+    throw new Error('row for US Vendor not found');
   });
 
   it('only includes approved expenses in the inbound section', async () => {
