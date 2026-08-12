@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.9.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.8.0...v0.9.0) (2026-08-12)
+
+
+### Features
+
+* **expense:** Wise-flow foreign-currency expenses at sweep rate ([d3caf77](https://github.com/bo0tzz/bo0kkeeper/commit/d3caf776789ddf649fef7e84f8a5d029c80b0faa))
+
+
+### Bug Fixes
+
+* **deps:** update dependency @sveltejs/vite-plugin-svelte to v7.3.0 ([#161](https://github.com/bo0tzz/bo0kkeeper/issues/161)) ([e0ed738](https://github.com/bo0tzz/bo0kkeeper/commit/e0ed738387bbdebc4b1ac8f052211bfaff6bb8da))
+* **deps:** update dependency @swc/core to v1.15.47 ([#154](https://github.com/bo0tzz/bo0kkeeper/issues/154)) ([20a1de7](https://github.com/bo0tzz/bo0kkeeper/commit/20a1de768aab99527674bf28175d88cd1085b938))
+* **deps:** update dependency globals to v17.10.0 ([#159](https://github.com/bo0tzz/bo0kkeeper/issues/159)) ([7db083c](https://github.com/bo0tzz/bo0kkeeper/commit/7db083c2bcdafb53ccb692ecfa7a8014ba09e5af))
+* **deps:** update dependency happy-dom to v20.11.2 ([#155](https://github.com/bo0tzz/bo0kkeeper/issues/155)) ([9168da5](https://github.com/bo0tzz/bo0kkeeper/commit/9168da50f362e3f1520d33591fdaf5e041597f06))
+* **deps:** update dependency jose to v6.2.8 ([#156](https://github.com/bo0tzz/bo0kkeeper/issues/156)) ([d176429](https://github.com/bo0tzz/bo0kkeeper/commit/d176429ec59181d2c9c6b960c9a00430bd3c602f))
+* **deps:** update dependency knip to v6.32.2 ([#163](https://github.com/bo0tzz/bo0kkeeper/issues/163)) ([76f218c](https://github.com/bo0tzz/bo0kkeeper/commit/76f218c143cce7331a2305eb9bdedc81796f1f58))
+* **deps:** update dependency kysely to v0.29.5 ([#164](https://github.com/bo0tzz/bo0kkeeper/issues/164)) ([0fbdd54](https://github.com/bo0tzz/bo0kkeeper/commit/0fbdd5403e6798423f82d467fbb53d88d1d592f9))
+* **deps:** update dependency nestjs-zod to v5.5.0 ([#160](https://github.com/bo0tzz/bo0kkeeper/issues/160)) ([d9317c8](https://github.com/bo0tzz/bo0kkeeper/commit/d9317c82eeaafa3e806470aed86fc7b139051c11))
+* **deps:** update dependency unplugin-swc to v1.5.10 ([#158](https://github.com/bo0tzz/bo0kkeeper/issues/158)) ([ea3007e](https://github.com/bo0tzz/bo0kkeeper/commit/ea3007ed56ae4d5f3f273b1e31d874d7a41304e7))
+* **deps:** update eslint ([#157](https://github.com/bo0tzz/bo0kkeeper/issues/157)) ([620a62c](https://github.com/bo0tzz/bo0kkeeper/commit/620a62c1237b4d82106dd8e31069e2c4c2c7ba38))
+* **deps:** update postgres:18 docker digest to a02db8c ([#153](https://github.com/bo0tzz/bo0kkeeper/issues/153)) ([3f175ed](https://github.com/bo0tzz/bo0kkeeper/commit/3f175ed07c69282ce4f9aefe0d8f090cb28a27cf))
+
 ## [0.8.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.7.9...v0.8.0) (2026-08-07)
 
 
