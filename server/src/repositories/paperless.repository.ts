@@ -6,12 +6,20 @@ import { Config, loadConfig } from 'src/config';
  * (and, eventually, paperless-originated expense webhooks come back via the
  * inbound side; that's a separate concern in WebhookService).
  *
+ * Pinned to paperless-ngx API version 10 via the Accept header. paperless
+ * defaults new deployments to v10; without the pin the server would silently
+ * shift under us on the next major release. The task-endpoint parser here
+ * is v10-shaped.
+ *
  * API used:
  * - `POST /api/documents/post_document/` — multipart upload with the file +
  *   optional metadata (title, correspondent_id, document_type_id, tags).
  *   Returns the consume task id (UUID) when status=200.
  * - `GET /api/tasks/?task_id=<uuid>` — poll for the assigned doc id.
  */
+
+const PAPERLESS_API_VERSION = '10';
+const PAPERLESS_ACCEPT_HEADER = `application/json; version=${PAPERLESS_API_VERSION}`;
 
 export type PaperlessUploadInput = {
   file: Buffer;
@@ -67,9 +75,16 @@ export class PaperlessRepository {
     this.fetchFn = fetchFn;
   }
 
+  private authHeaders(extra?: Record<string, string>): Record<string, string> {
+    return {
+      Authorization: `Token ${this.requireToken()}`,
+      Accept: PAPERLESS_ACCEPT_HEADER,
+      ...extra,
+    };
+  }
+
   async uploadDocument(input: PaperlessUploadInput): Promise<PaperlessUploadResult> {
     const baseUrl = this.requireBaseUrl();
-    const token = this.requireToken();
 
     const form = new FormData();
     const blob = new Blob([input.file as unknown as BlobPart], { type: 'application/pdf' });
@@ -94,7 +109,7 @@ export class PaperlessRepository {
 
     const response = await this.fetchFn(url, {
       method: 'POST',
-      headers: { Authorization: `Token ${token}` },
+      headers: this.authHeaders(),
       body: form,
     });
 
@@ -115,18 +130,23 @@ export class PaperlessRepository {
   /**
    * Wait until paperless reports the given consume task as complete and return
    * the assigned document id. Bounded by attempts × intervalMs; throws on
-   * timeout. paperless task statuses: PENDING, STARTED, SUCCESS, FAILURE.
+   * timeout.
+   *
+   * Response shape (v10, pinned via Accept header):
+   *   { count, results: [{ status, result_data, related_document_ids, ... }] }
+   * Task statuses are lowercase: "pending" | "started" | "success" | "failure" | "revoked".
+   * On success the doc id lands in `related_document_ids[0]`; on failure the
+   * reason is in `result_data.error_message`.
    */
   async waitForDocumentId(taskId: string, opts: { attempts?: number; intervalMs?: number } = {}): Promise<string> {
     const baseUrl = this.requireBaseUrl();
-    const token = this.requireToken();
     const attempts = opts.attempts ?? 30;
     const intervalMs = opts.intervalMs ?? 1000;
 
     for (let i = 0; i < attempts; i++) {
       const response = await this.fetchFn(`${baseUrl}/api/tasks/?task_id=${encodeURIComponent(taskId)}`, {
         method: 'GET',
-        headers: { Authorization: `Token ${token}` },
+        headers: this.authHeaders(),
       });
       const text = await response.text();
       if (!response.ok) {
@@ -136,13 +156,23 @@ export class PaperlessRepository {
           `Paperless task lookup failed: ${response.status}`,
         );
       }
-      const tasks = safeJson(text) as Array<{ status: string; result?: string; related_document?: number | null }>;
-      const task = tasks?.[0];
-      if (task?.status === 'SUCCESS' && task.related_document != null) {
-        return String(task.related_document);
+      const page = safeJson(text) as {
+        results?: Array<{
+          status?: string;
+          result_data?: { error_message?: string } | null;
+          related_document_ids?: number[];
+        }>;
+      };
+      const task = page?.results?.[0];
+      if (task?.status === 'success') {
+        const docId = task.related_document_ids?.[0];
+        if (docId != null) {
+          return String(docId);
+        }
       }
-      if (task?.status === 'FAILURE') {
-        throw new PaperlessApiError(0, task, `Paperless consume task failed: ${task.result ?? '(no detail)'}`);
+      if (task?.status === 'failure' || task?.status === 'revoked') {
+        const detail = task.result_data?.error_message ?? '(no detail)';
+        throw new PaperlessApiError(0, task, `Paperless consume task failed: ${detail}`);
       }
       await sleep(intervalMs);
     }
@@ -157,13 +187,12 @@ export class PaperlessRepository {
    */
   async listInboxTagIds(): Promise<number[]> {
     const baseUrl = this.requireBaseUrl();
-    const token = this.requireToken();
     const ids: number[] = [];
     let url: string | null = `${baseUrl}/api/tags/?is_inbox_tag=true&page_size=100`;
     while (url) {
       const response = await this.fetchFn(url, {
         method: 'GET',
-        headers: { Authorization: `Token ${token}` },
+        headers: this.authHeaders(),
       });
       const text = await response.text();
       if (!response.ok) {
@@ -189,13 +218,9 @@ export class PaperlessRepository {
    */
   async setDocumentTags(id: number | string, tagIds: number[]): Promise<void> {
     const baseUrl = this.requireBaseUrl();
-    const token = this.requireToken();
     const response = await this.fetchFn(`${baseUrl}/api/documents/${encodeURIComponent(String(id))}/`, {
       method: 'PATCH',
-      headers: {
-        Authorization: `Token ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: this.authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ tags: tagIds }),
     });
     if (!response.ok) {
@@ -211,10 +236,9 @@ export class PaperlessRepository {
    */
   async getDocument(id: number | string): Promise<PaperlessDocument> {
     const baseUrl = this.requireBaseUrl();
-    const token = this.requireToken();
     const response = await this.fetchFn(`${baseUrl}/api/documents/${encodeURIComponent(String(id))}/`, {
       method: 'GET',
-      headers: { Authorization: `Token ${token}` },
+      headers: this.authHeaders(),
     });
     const text = await response.text();
     if (!response.ok) {
@@ -242,7 +266,6 @@ export class PaperlessRepository {
       return [];
     }
     const baseUrl = this.requireBaseUrl();
-    const token = this.requireToken();
 
     const checked = await this.checkTagsExist(tagNames);
     const missing = checked.filter((c) => !c.exists);
@@ -266,7 +289,7 @@ export class PaperlessRepository {
     while (url) {
       const response = await this.fetchFn(url, {
         method: 'GET',
-        headers: { Authorization: `Token ${token}` },
+        headers: this.authHeaders(),
       });
       const text = await response.text();
       if (!response.ok) {
@@ -332,13 +355,12 @@ export class PaperlessRepository {
       return this.tagCache;
     }
     const baseUrl = this.requireBaseUrl();
-    const token = this.requireToken();
     const cache = new Map<string, number>();
     let url: string | null = `${baseUrl}/api/tags/?page_size=200`;
     while (url) {
       const response = await this.fetchFn(url, {
         method: 'GET',
-        headers: { Authorization: `Token ${token}` },
+        headers: this.authHeaders(),
       });
       const text = await response.text();
       if (!response.ok) {
@@ -356,13 +378,9 @@ export class PaperlessRepository {
 
   private async createTag(name: string): Promise<number> {
     const baseUrl = this.requireBaseUrl();
-    const token = this.requireToken();
     const response = await this.fetchFn(`${baseUrl}/api/tags/`, {
       method: 'POST',
-      headers: {
-        Authorization: `Token ${token}`,
-        'Content-Type': 'application/json',
-      },
+      headers: this.authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ name }),
     });
     const text = await response.text();

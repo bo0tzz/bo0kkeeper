@@ -62,12 +62,17 @@ describe('PaperlessRepository', () => {
     ).rejects.toBeInstanceOf(PaperlessApiError);
   });
 
-  it('waitForDocumentId polls until SUCCESS and returns related_document', async () => {
+  // Regression: paperless-ngx v3.0 flipped the tasks endpoint to API v10 by
+  // default — paginated response wrapper, lowercase status enum,
+  // `related_document_ids: number[]` in place of `related_document: number`.
+  // The old v9-shaped parser here silently timed out on every poll, which pg-boss
+  // amplified into duplicate uploads on retry. This spec locks in v10 shape.
+  it('waitForDocumentId polls until success (v10) and returns related_document_ids[0]', async () => {
     const fetchFn = vi
       .fn()
-      .mockResolvedValueOnce(okResponse([{ status: 'PENDING' }]))
-      .mockResolvedValueOnce(okResponse([{ status: 'STARTED' }]))
-      .mockResolvedValueOnce(okResponse([{ status: 'SUCCESS', related_document: 4242 }]));
+      .mockResolvedValueOnce(okResponse({ count: 1, results: [{ status: 'pending' }] }))
+      .mockResolvedValueOnce(okResponse({ count: 1, results: [{ status: 'started' }] }))
+      .mockResolvedValueOnce(okResponse({ count: 1, results: [{ status: 'success', related_document_ids: [4242] }] }));
 
     const service = new PaperlessRepository(fetchFn);
     const docId = await service.waitForDocumentId('abc-123-task', { attempts: 5, intervalMs: 1 });
@@ -75,8 +80,27 @@ describe('PaperlessRepository', () => {
     expect(fetchFn).toHaveBeenCalledTimes(3);
   });
 
-  it('waitForDocumentId throws when the consume task fails', async () => {
-    const fetchFn = vi.fn().mockResolvedValueOnce(okResponse([{ status: 'FAILURE', result: 'corrupted PDF' }]));
+  it('waitForDocumentId sends the v10 Accept header so paperless routes to the v10 serializer', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(okResponse({ count: 1, results: [{ status: 'success', related_document_ids: [7] }] }));
+
+    const service = new PaperlessRepository(fetchFn);
+    await service.waitForDocumentId('t', { attempts: 1, intervalMs: 1 });
+
+    const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers['Accept']).toBe('application/json; version=10');
+    expect(headers['Authorization']).toBe('Token fake-token');
+  });
+
+  it('waitForDocumentId throws when the consume task fails (v10 shape)', async () => {
+    const fetchFn = vi.fn().mockResolvedValueOnce(
+      okResponse({
+        count: 1,
+        results: [{ status: 'failure', result_data: { error_message: 'corrupted PDF' } }],
+      }),
+    );
 
     const service = new PaperlessRepository(fetchFn);
     await expect(service.waitForDocumentId('bad-task', { attempts: 5, intervalMs: 1 })).rejects.toThrow(
