@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.9.3](https://github.com/bo0tzz/bo0kkeeper/compare/v0.9.2...v0.9.3) (2026-08-23)
+
+
+### Bug Fixes
+
+* **deps:** update dependency globals to v17.11.0 ([#170](https://github.com/bo0tzz/bo0kkeeper/issues/170)) ([6e65b35](https://github.com/bo0tzz/bo0kkeeper/commit/6e65b35117a0471696d21c53f7ec6bea0cf9ebce))
+* **deps:** update dependency testcontainers to v12.1.0 ([#172](https://github.com/bo0tzz/bo0kkeeper/issues/172)) ([4be2383](https://github.com/bo0tzz/bo0kkeeper/commit/4be2383036d80c7c514e797634f3add980c8135c))
+* **deps:** update dependency unplugin-swc to v1.5.11 ([#173](https://github.com/bo0tzz/bo0kkeeper/issues/173)) ([7aea8d1](https://github.com/bo0tzz/bo0kkeeper/commit/7aea8d127f5abb465c36b6864ffc528c172a62c3))
+* **deps:** update docker.io/library/redis:8 docker digest to 691577a ([#179](https://github.com/bo0tzz/bo0kkeeper/issues/179)) ([ef83131](https://github.com/bo0tzz/bo0kkeeper/commit/ef83131b103feb874830e251d305641c336fe1a6))
+* **deps:** update docker/dockerfile docker tag to v1.26 ([#176](https://github.com/bo0tzz/bo0kkeeper/issues/176)) ([614619f](https://github.com/bo0tzz/bo0kkeeper/commit/614619f68deafa3cd5a50922cdcc14b651cc78c2))
+* **deps:** update eslint ([#174](https://github.com/bo0tzz/bo0kkeeper/issues/174)) ([63aa5ab](https://github.com/bo0tzz/bo0kkeeper/commit/63aa5ab498cceaed4f9ddbf919567d2174752d2c))
+* **deps:** update pnpm to v11.23.0 ([#177](https://github.com/bo0tzz/bo0kkeeper/issues/177)) ([556cecd](https://github.com/bo0tzz/bo0kkeeper/commit/556cecd4cb3982e15692b65dfdb94898d9df4729))
+* **deps:** update postgres:18 docker digest to 06cad38 ([#180](https://github.com/bo0tzz/bo0kkeeper/issues/180)) ([00b437d](https://github.com/bo0tzz/bo0kkeeper/commit/00b437d039a8873b90adfb50987120138973114f))
+* **deps:** update svelte ([#171](https://github.com/bo0tzz/bo0kkeeper/issues/171)) ([1df8a65](https://github.com/bo0tzz/bo0kkeeper/commit/1df8a65c75c542567b5d9554ec333c911baf112d))
+* **paperless:** pin API to v10; parse v10 task shape ([b21480f](https://github.com/bo0tzz/bo0kkeeper/commit/b21480f15895b84d954f2e72aa630e9032405200))
+
 ## [0.9.2](https://github.com/bo0tzz/bo0kkeeper/compare/v0.9.1...v0.9.2) (2026-08-12)
 
 
