@@ -181,7 +181,7 @@ export class RecurringFeeService {
     }
     const txDate = toDate(bankTx.txDate);
     const now = new Date();
-    const grossMinor = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
+    const grossMinor = absMinor(BigInt(bankTx.amountMinor));
     const result = await this.expenseRepository.ingestFromBankFee({
       sourceBankTxId: bankTx.id,
       paperlessDocId: null,

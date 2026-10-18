@@ -73,7 +73,7 @@ export class SheetSyncService {
         this.logger.warn(`Skipping sheet write for invoice ${invoice.number}: client ${invoice.clientId} not found`);
         return;
       }
-      const eurAmountMinor = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
+      const eurAmountMinor = absMinor(BigInt(bankTx.amountMinor));
       const vatPercent = invoice.btwRateBps == null ? undefined : `${invoice.btwRateBps / 100}%`;
       const vatMinor = invoice.btwMinor == null ? undefined : BigInt(invoice.btwMinor);
       await this.sheetWriter.writeIncomeRow({
@@ -119,7 +119,7 @@ export class SheetSyncService {
       return;
     }
     try {
-      const eurAmountMinor = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
+      const eurAmountMinor = absMinor(BigInt(bankTx.amountMinor));
       const invoice = await this.invoiceRepository.findByWiseTransferId(transfer.id);
       let invoiceNumber: string;
       let client: { name: string; class: ClientClass };
@@ -237,9 +237,9 @@ export class SheetSyncService {
     if (!transfer) {
       throw new Error(`wise_transfer ${input.wiseTransferId} not found`);
     }
-    const amountMinor = BigInt(input.amountMinor as bigint | number | string);
-    const sourceMinor = BigInt(transfer.sourceAmountMinor as bigint | number | string);
-    const targetMinor = BigInt(transfer.targetAmountMinor as bigint | number | string);
+    const amountMinor = BigInt(input.amountMinor);
+    const sourceMinor = BigInt(transfer.sourceAmountMinor);
+    const targetMinor = BigInt(transfer.targetAmountMinor);
     if (sourceMinor === 0n) {
       throw new Error(`wise_transfer ${transfer.id} has zero sourceAmountMinor; can't derive EUR`);
     }

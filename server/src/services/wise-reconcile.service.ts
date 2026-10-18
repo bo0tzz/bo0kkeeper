@@ -76,8 +76,8 @@ export class WiseReconcileService {
     }
     const upstreamSourceMinor = upstream.sourceValue == null ? null : majorToMinor(upstream.sourceValue);
     const upstreamTargetMinor = upstream.targetValue == null ? null : majorToMinor(upstream.targetValue);
-    const rowSourceMinor = BigInt(row.sourceAmountMinor as bigint | number | string);
-    const rowTargetMinor = BigInt(row.targetAmountMinor as bigint | number | string);
+    const rowSourceMinor = BigInt(row.sourceAmountMinor);
+    const rowTargetMinor = BigInt(row.targetAmountMinor);
     const hasStateDrift = upstream.state !== row.state;
     const hasSourceDrift = upstreamSourceMinor !== null && upstreamSourceMinor !== rowSourceMinor;
     const hasTargetDrift = upstreamTargetMinor !== null && upstreamTargetMinor !== rowTargetMinor;

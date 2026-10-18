@@ -116,8 +116,7 @@ export class QuarterlyAggregatorService {
     for (const row of paidInvoices) {
       const cls = row.clientClass as ClientClass;
       const eurGross = pickEurMinor(row.eurTotalMinor, row.totalMinor, row.currency);
-      const eurBtw =
-        row.btwMinor === null || row.btwMinor === undefined ? 0n : BigInt(row.btwMinor as unknown as string);
+      const eurBtw = row.btwMinor === null || row.btwMinor === undefined ? 0n : BigInt(row.btwMinor);
       const bucket = byClass[cls];
       bucket.invoiceCount += 1;
       bucket.grossEurMinor += eurGross;
@@ -141,12 +140,12 @@ export class QuarterlyAggregatorService {
       if (row.targetCurrency !== 'EUR') {
         continue;
       }
-      const sourceMinor = BigInt(row.sourceAmountMinor as unknown as string);
-      const targetMinor = BigInt(row.targetAmountMinor as unknown as string);
+      const sourceMinor = BigInt(row.sourceAmountMinor);
+      const targetMinor = BigInt(row.targetAmountMinor);
       const originalMinor =
         row.originalCreditMinor === null || row.originalCreditMinor === undefined
           ? sourceMinor
-          : BigInt(row.originalCreditMinor as unknown as string);
+          : BigInt(row.originalCreditMinor);
       const eurGross = sourceMinor === 0n ? targetMinor : (originalMinor * targetMinor) / sourceMinor;
       const bucket = byClass[ClientClass.NonEu];
       bucket.invoiceCount += 1;
@@ -166,12 +165,11 @@ export class QuarterlyAggregatorService {
       //      sweep's bank_tx lands and the matcher back-fills.
       const eurGross =
         row.eurAmountMinor !== null && row.eurAmountMinor !== undefined
-          ? BigInt(row.eurAmountMinor as unknown as string)
+          ? BigInt(row.eurAmountMinor)
           : row.currency === 'EUR'
-            ? BigInt(row.amountMinor as unknown as string)
+            ? BigInt(row.amountMinor)
             : 0n;
-      const eurBtw =
-        row.btwMinor === null || row.btwMinor === undefined ? 0n : BigInt(row.btwMinor as unknown as string);
+      const eurBtw = row.btwMinor === null || row.btwMinor === undefined ? 0n : BigInt(row.btwMinor);
       expenseGross += eurGross;
       const cls = row.locationClass as ExpenseLocationClass;
       // Reverse-charge / non-EU expenses don't yield deductible BTW (you didn't pay any).
@@ -242,12 +240,12 @@ function emptyBucket(): IncomeBucket {
  * missing-FX case; we don't fall back to the native amount because treating
  * USD cents as EUR cents would silently inflate the aggregate.
  */
-function pickEurMinor(eurTotalMinor: unknown, totalMinor: unknown, currency: string): bigint {
+function pickEurMinor(eurTotalMinor: bigint | string | null, totalMinor: bigint | string, currency: string): bigint {
   if (currency === 'EUR') {
-    return BigInt(totalMinor as bigint | number | string);
+    return BigInt(totalMinor);
   }
-  if (eurTotalMinor === null || eurTotalMinor === undefined) {
+  if (eurTotalMinor === null) {
     return 0n;
   }
-  return BigInt(eurTotalMinor as bigint | number | string);
+  return BigInt(eurTotalMinor);
 }

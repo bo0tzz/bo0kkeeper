@@ -318,12 +318,12 @@ export class InvoiceComposerService {
     // Wise-side spends. `originalCreditMinor` is populated at draft time
     // (see wise-draft.service.ts); pre-that-change transfers fall back to
     // `sourceAmountMinor` where they were the same by construction.
-    const sourceMinor = BigInt(transfer.sourceAmountMinor as unknown as string);
-    const targetMinor = BigInt(transfer.targetAmountMinor as unknown as string);
+    const sourceMinor = BigInt(transfer.sourceAmountMinor);
+    const targetMinor = BigInt(transfer.targetAmountMinor);
     const totalMinor =
       transfer.originalCreditMinor === null || transfer.originalCreditMinor === undefined
         ? sourceMinor
-        : BigInt(transfer.originalCreditMinor as unknown as string);
+        : BigInt(transfer.originalCreditMinor);
     // EUR at the sweep's realized rate. `target × totalMinor / source`
     // gives the notional EUR value of the full credit pool — i.e. what
     // the client's payment was worth in EUR, split proportionally between
@@ -362,12 +362,12 @@ export class InvoiceComposerService {
     // template composition below; without this, that helper falls back
     // to formatting the USD minor as EUR (source amount reused in the
     // EUR column).
-    const sourceMinor = BigInt(transfer.sourceAmountMinor as unknown as string);
-    const targetMinor = BigInt(transfer.targetAmountMinor as unknown as string);
+    const sourceMinor = BigInt(transfer.sourceAmountMinor);
+    const targetMinor = BigInt(transfer.targetAmountMinor);
     const originalMinor =
       transfer.originalCreditMinor === null || transfer.originalCreditMinor === undefined
         ? sourceMinor
-        : BigInt(transfer.originalCreditMinor as unknown as string);
+        : BigInt(transfer.originalCreditMinor);
     // EUR at the sweep's realized rate, applied to the full credit amount.
     // See prefillFromWise for the rationale — books tie: invoice_EUR =
     // swept_EUR + Σ(expense_EUR).
@@ -553,7 +553,7 @@ function btwOnNet(netMinor: bigint, rateBps: number): bigint {
  *     payment block.
  */
 function buildInvoiceData(client: Client, invoice: InvoiceWithLines, issuer: IssuerInfo): Record<string, unknown> {
-  const totalMinor = BigInt(invoice.totalMinor as unknown as string);
+  const totalMinor = BigInt(invoice.totalMinor);
   const isNonEu = client.class === ClientClass.NonEu;
   const isReverseCharge = client.class === ClientClass.EuReverseCharge;
   const hasBtw = !(isNonEu || isReverseCharge);
@@ -600,7 +600,7 @@ function domesticTable(invoice: InvoiceWithLines): Table {
       line.description,
       line.unitLabel ?? '',
       line.quantity ?? '',
-      `€ ${formatMinorDutch(BigInt(line.lineTotalMinor as unknown as string))}`,
+      `€ ${formatMinorDutch(BigInt(line.lineTotalMinor))}`,
     ]),
   };
 }
@@ -611,7 +611,7 @@ function nonEuTable(invoice: InvoiceWithLines): Table {
     headers: ['Description', 'Amount'],
     aligns: ['left', 'right'],
     rows: invoice.lines.map((line) => {
-      const lineMinor = BigInt(line.lineTotalMinor as unknown as string);
+      const lineMinor = BigInt(line.lineTotalMinor);
       return [
         line.description,
         formatLineAmount(invoice, formatPrimary(lineMinor), eurFromMinor(lineMinor, invoice.fxRate)),
@@ -621,8 +621,7 @@ function nonEuTable(invoice: InvoiceWithLines): Table {
 }
 
 function domesticSummary(invoice: InvoiceWithLines, totalMinor: bigint): SummaryRow[] {
-  const btwMinor =
-    invoice.btwMinor === null || invoice.btwMinor === undefined ? 0n : BigInt(invoice.btwMinor as unknown as string);
+  const btwMinor = invoice.btwMinor === null || invoice.btwMinor === undefined ? 0n : BigInt(invoice.btwMinor);
   const subtotalMinor = totalMinor - btwMinor;
   const btwRatePercent =
     invoice.btwRateBps === null || invoice.btwRateBps === undefined
@@ -637,9 +636,7 @@ function domesticSummary(invoice: InvoiceWithLines, totalMinor: bigint): Summary
 
 function nonEuSummary(invoice: InvoiceWithLines, totalMinor: bigint): SummaryRow[] {
   const eurTotalMinor =
-    invoice.eurTotalMinor === null || invoice.eurTotalMinor === undefined
-      ? totalMinor
-      : BigInt(invoice.eurTotalMinor as unknown as string);
+    invoice.eurTotalMinor === null || invoice.eurTotalMinor === undefined ? totalMinor : BigInt(invoice.eurTotalMinor);
   const formatPrimary = invoice.currency === 'USD' ? formatMinorWhole : formatMinor;
   return [
     {

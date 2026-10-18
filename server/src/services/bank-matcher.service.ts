@@ -132,7 +132,7 @@ export class BankMatcherService {
     // No high-confidence signal — fall through to heuristics. Outflows look
     // for an expense, inflows look for an invoice. Sheet-write deliberately
     // skipped on auto_low; promotion to manual via the link UI handles that.
-    const isOutflow = BigInt(bankTx.amountMinor as bigint | number | string) < 0n;
+    const isOutflow = BigInt(bankTx.amountMinor) < 0n;
     const heuristic = isOutflow ? await this.tryExpenseHeuristic(bankTx) : await this.tryInvoiceHeuristic(bankTx);
     if (heuristic) {
       return heuristic;
@@ -146,7 +146,7 @@ export class BankMatcherService {
     if (!counterparty || counterparty.length < FUZZY_MIN_LENGTH) {
       return null;
     }
-    const absAmount = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
+    const absAmount = absMinor(BigInt(bankTx.amountMinor));
     const txDate = toDate(bankTx.txDate);
     const dateLow = addDays(txDate, -EXPENSE_DATE_TOLERANCE_DAYS);
     const dateHigh = addDays(txDate, EXPENSE_DATE_TOLERANCE_DAYS);
@@ -179,7 +179,7 @@ export class BankMatcherService {
     if (!counterparty || counterparty.length < FUZZY_MIN_LENGTH) {
       return null;
     }
-    const absAmount = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
+    const absAmount = absMinor(BigInt(bankTx.amountMinor));
     const txDate = toDate(bankTx.txDate);
     const issuedAfter = addDays(txDate, -INVOICE_PAYMENT_WINDOW_DAYS);
     const issuedBefore = addDays(txDate, 1);
@@ -256,7 +256,7 @@ export class BankMatcherService {
    * is logged and left for manual resolution.
    */
   private async tryAutoLinkInvoiceToTransfer(transfer: WiseTransferRow): Promise<void> {
-    const sourceAmount = BigInt(transfer.sourceAmountMinor as bigint | number | string);
+    const sourceAmount = BigInt(transfer.sourceAmountMinor);
     const createdAt = toDate(transfer.createdAt);
     const issuedAfter = addDays(createdAt, -WISE_INVOICE_LINK_WINDOW_DAYS);
     const issuedBefore = addDays(createdAt, WISE_INVOICE_LINK_WINDOW_DAYS);

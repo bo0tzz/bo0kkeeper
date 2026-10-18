@@ -161,9 +161,7 @@ export class BookkeepingExportService {
       // sheet takes. EUR-native rows have `eurAmountMinor` null and
       // `amountMinor` is already EUR — the fallback covers both.
       const totalIncMinor =
-        r.eurAmountMinor === null || r.eurAmountMinor === undefined
-          ? BigInt(r.amountMinor)
-          : BigInt(r.eurAmountMinor as bigint | number | string);
+        r.eurAmountMinor === null || r.eurAmountMinor === undefined ? BigInt(r.amountMinor) : BigInt(r.eurAmountMinor);
       const vatMinor = r.btwMinor === null ? 0n : BigInt(r.btwMinor);
       const exclVatMinor = vatMinor === 0n ? totalIncMinor : totalIncMinor - vatMinor;
       return {

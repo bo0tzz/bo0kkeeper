@@ -136,10 +136,7 @@ export class ExpensesController {
     // "clicked approve before filling in the amount" mistake. Blocking here
     // is friendlier than a downstream €0 sheet row that has to be repaired
     // by hand.
-    const effectiveAmountMinor =
-      dto.amountMinor === undefined
-        ? BigInt(existing.amountMinor as bigint | number | string)
-        : BigInt(dto.amountMinor);
+    const effectiveAmountMinor = dto.amountMinor === undefined ? BigInt(existing.amountMinor) : BigInt(dto.amountMinor);
     if (effectiveAmountMinor <= 0n) {
       throw new BadRequestException('Expense amount must be greater than 0.');
     }
