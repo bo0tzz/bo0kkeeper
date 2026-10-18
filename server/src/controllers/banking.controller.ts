@@ -129,13 +129,18 @@ export class BankingController {
     // apply it to every account that has a baseline. Multi-account setups
     // would need a per-account-uid sum (and bank_transaction → account FK,
     // which we don't have today).
+    //
+    // Pass baseline.asOf as a full timestamp (not sliced to date). The repo
+    // filters on bank_transaction.createdAt — rows ingested AFTER baseline
+    // capture — so same-day ingests that preceded the baseline don't double
+    // count against the live balance that already reflects them.
     const accounts = (row.accountsJson ?? []) as Array<{ baseline?: { asOf: string } }>;
-    const earliestBaselineDate = accounts
+    const earliestBaselineAsOf = accounts
       .map((a) => a.baseline?.asOf)
       .filter((d): d is string => typeof d === 'string')
       .toSorted((a, b) => a.localeCompare(b))[0];
-    const ingestedSinceBaseline = earliestBaselineDate
-      ? await this.bankTransactionRepository.sumIngestedSince(earliestBaselineDate.slice(0, 10))
+    const ingestedSinceBaseline = earliestBaselineAsOf
+      ? await this.bankTransactionRepository.sumIngestedAfter(new Date(earliestBaselineAsOf))
       : 0n;
     return toDto(row, ingestedSinceBaseline);
   }

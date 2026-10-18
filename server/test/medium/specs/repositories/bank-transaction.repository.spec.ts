@@ -235,4 +235,51 @@ describe('BankTransactionRepository', () => {
       expect(unmatched.id).toBe(byExternal['m-none'].id);
     });
   });
+
+  describe('sumIngestedAfter', () => {
+    // Regression: a user ingested a transaction, then relinked bank-authz
+    // the same day. The relink's new baseline captured the live balance
+    // (which already reflected the transaction), yet the drift calc used
+    // `txDate >= baselineDate` and re-added the pre-baseline row — surfacing
+    // a drift of exactly the transaction amount. Filtering on `createdAt`
+    // (ingest time) vs the baseline's full timestamp is what keeps the
+    // live-balance snapshot and the summed delta from double-counting.
+    it('counts only rows ingested after the boundary, even when txDate matches', async () => {
+      const before = await ingest('eb-before', '2099-04-10', {
+        source: BankSource.EnableBanking,
+        amountMinor: -500n,
+      });
+      // Boundary captured AFTER `before`'s createdAt; sleep to let the
+      // clock tick past so `createdAt > boundary` is false for `before`
+      // and true for `after`.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const boundary = new Date();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      await ingest('eb-after', '2099-04-10', {
+        source: BankSource.EnableBanking,
+        amountMinor: -300n,
+      });
+
+      expect(await repo.sumIngestedAfter(boundary)).toBe(-300n);
+      // Sanity: `before` is in the DB with a createdAt strictly before boundary.
+      expect(before.createdAt.getTime()).toBeLessThan(boundary.getTime());
+    });
+
+    it('ignores non-Enable-Banking sources (CSV imports are not drift-relevant)', async () => {
+      const boundary = new Date();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      await ingest('sns-after', '2099-05-01', { source: BankSource.SnsCsv, amountMinor: -1000n });
+      await ingest('eb-after', '2099-05-01', { source: BankSource.EnableBanking, amountMinor: -200n });
+
+      expect(await repo.sumIngestedAfter(boundary)).toBe(-200n);
+    });
+
+    it('returns 0 when nothing has been ingested after the boundary', async () => {
+      await ingest('eb-pre', '2099-06-01', { source: BankSource.EnableBanking, amountMinor: -100n });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const boundary = new Date();
+
+      expect(await repo.sumIngestedAfter(boundary)).toBe(0n);
+    });
+  });
 });

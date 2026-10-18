@@ -147,17 +147,25 @@ export class BankTransactionRepository {
   }
 
   /**
-   * Signed sum of every Enable-Banking-sourced row dated on or after `since`.
-   * Used to derive expected-balance from a baseline. Returns 0n if no rows
-   * match. V1 assumes a single bank account on the session; multi-account
-   * setups will need to filter by account uid.
+   * Signed sum of every Enable-Banking-sourced row INGESTED after
+   * `createdAfter`. Used to derive expected-balance from a baseline.
+   *
+   * Filter is on `createdAt` (ingest time), not `txDate` (posting date):
+   * the baseline captures live bank balance at a specific moment, and
+   * drift is "what has moved OUR VIEW of the account since then". A row
+   * that was already in `bank_transaction` when the baseline snapshot was
+   * taken is already reflected in `baseline.amountMinor`, so re-adding it
+   * via a date-match would double-count — which is exactly what used to
+   * happen when a user relinked bank authz on the same day they'd just
+   * ingested a transaction. V1 assumes a single bank account on the
+   * session; multi-account setups will need to filter by account uid.
    */
-  async sumIngestedSince(since: string): Promise<bigint> {
+  async sumIngestedAfter(createdAfter: Date): Promise<bigint> {
     const result = (await this.db
       .selectFrom('bank_transaction')
       .select((eb) => eb.fn.sum<string>('amountMinor').as('total'))
       .where('source', '=', BankSource.EnableBanking)
-      .where('txDate', '>=', new Date(since))
+      .where('createdAt', '>', createdAfter)
       .executeTakeFirst()) as { total: string | null } | undefined;
     return result?.total ? BigInt(result.total) : 0n;
   }
