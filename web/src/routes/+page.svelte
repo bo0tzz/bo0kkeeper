@@ -2,7 +2,7 @@
   import { resolve } from '$app/paths';
   import { formatDateTime } from '$lib/format';
   import { formatEur as eur } from '$lib/money';
-  import { getQuarterlyAggregate, type QuarterlyAggregateResponse } from '$lib/services/aggregator.service';
+  import { getQuarterlyAggregate, type QuarterlyAggregateResponseDto } from '@bo0kkeeper/sdk';
   import { getLatestBankingSession, listBankTransactions, type BankingSession } from '$lib/services/banking.service';
   import { listEvents, type ListEventsResponse } from '$lib/services/events.service';
   import { listExpenses, type ListExpensesResponse } from '$lib/services/expenses.service';
@@ -43,7 +43,7 @@
     /** Most recent receivedAt for any paperless event, ISO string. Null if none. */
     lastPaperlessEventAt: string | null;
     bankingSession: BankingSession | null;
-    aggregate: QuarterlyAggregateResponse | null;
+    aggregate: QuarterlyAggregateResponseDto | null;
     aggregateYear: number;
     aggregateQuarter: number;
     systemInfo: SystemInfo;
@@ -118,7 +118,7 @@
         listExpenses({ status: 'approved', matched: false, limit: 1 }) as Promise<ListExpensesResponse>,
         listBankTransactions({ status: 'unmatched', limit: 1 }).catch(() => ({ items: [], total: 0 })),
         getLatestBankingSession().catch(() => null),
-        getQuarterlyAggregate(year, quarter).catch(() => null),
+        getQuarterlyAggregate({ year: String(year), quarter: String(quarter) }).catch(() => null),
         listEvents({ status: 'failed', limit: 1 }) as Promise<ListEventsResponse>,
         listEvents({ source: 'wise', limit: 1 }) as Promise<ListEventsResponse>,
         listEvents({ source: 'paperless', limit: 1 }) as Promise<ListEventsResponse>,

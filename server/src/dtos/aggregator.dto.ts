@@ -19,22 +19,32 @@ const IncomeBucketSchema = z.object({
   btwEurMinor: z.string(),
 });
 
+// Stable ids on each branch so the generated SDK emits named interfaces
+// (`InvoiceUnmatchedWarningDto` etc) rather than inline `{ kind: Kind1 }`
+// anonymous shapes — the inline form forces consumers to switch on
+// synthetic Kind1/Kind2/Kind3 enums instead of the literal string.
 const AggregatorWarningSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('invoice_unmatched'),
-    count: z.number().int(),
-    sampleNumbers: z.array(z.string()),
-  }),
-  z.object({
-    kind: z.literal('expense_pending_review'),
-    count: z.number().int(),
-    sampleVendors: z.array(z.string()),
-  }),
-  z.object({
-    kind: z.literal('expense_low_confidence_match'),
-    count: z.number().int(),
-    sampleIds: z.array(z.string()),
-  }),
+  z
+    .object({
+      kind: z.literal('invoice_unmatched'),
+      count: z.number().int(),
+      sampleNumbers: z.array(z.string()),
+    })
+    .meta({ id: 'InvoiceUnmatchedWarningDto' }),
+  z
+    .object({
+      kind: z.literal('expense_pending_review'),
+      count: z.number().int(),
+      sampleVendors: z.array(z.string()),
+    })
+    .meta({ id: 'ExpensePendingReviewWarningDto' }),
+  z
+    .object({
+      kind: z.literal('expense_low_confidence_match'),
+      count: z.number().int(),
+      sampleIds: z.array(z.string()),
+    })
+    .meta({ id: 'ExpenseLowConfidenceMatchWarningDto' }),
 ]);
 
 const QuarterlyAggregateResponseSchema = z
@@ -71,6 +81,20 @@ const ClosePeriodBodySchema = z
   })
   .meta({ id: 'ClosePeriodDto' });
 export class ClosePeriodDto extends createZodDto(ClosePeriodBodySchema) {}
+
+const ClosePeriodResponseSchema = z
+  .object({
+    closedAt: z.iso.datetime(),
+  })
+  .meta({ id: 'ClosePeriodResponseDto' });
+export class ClosePeriodResponseDto extends createZodDto(ClosePeriodResponseSchema) {}
+
+const ReopenPeriodResponseSchema = z
+  .object({
+    reopened: z.literal(true),
+  })
+  .meta({ id: 'ReopenPeriodResponseDto' });
+export class ReopenPeriodResponseDto extends createZodDto(ReopenPeriodResponseSchema) {}
 
 export function mapAggregate(value: QuarterlyAggregate, closedAt: Date | null = null): QuarterlyAggregateResponseDto {
   return {

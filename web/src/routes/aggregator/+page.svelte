@@ -4,17 +4,21 @@
   import {
     closePeriod,
     getQuarterlyAggregate,
+    Kind,
+    Kind2,
+    Kind3,
     reopenPeriod,
-    type AggregatorWarning,
-    type ClientClass,
-    type QuarterlyAggregateResponse,
-  } from '$lib/services/aggregator.service';
+    type QuarterlyAggregateResponseDto,
+  } from '@bo0kkeeper/sdk';
   import { Alert, Badge, Button, Heading, HStack, Select, Stack, Text } from '@immich/ui';
+
+  type AggregatorWarning = QuarterlyAggregateResponseDto['warnings'][number];
+  type ClientClass = keyof QuarterlyAggregateResponseDto['income']['byClass'];
 
   const now = new Date();
   let year = $state<string>(String(now.getUTCFullYear()));
   let quarter = $state<string>(String(Math.floor(now.getUTCMonth() / 3) + 1));
-  let data = $state<QuarterlyAggregateResponse | null>(null);
+  let data = $state<QuarterlyAggregateResponseDto | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
 
@@ -22,7 +26,7 @@
     loading = true;
     error = null;
     try {
-      data = await getQuarterlyAggregate(Number(year), Number(quarter));
+      data = await getQuarterlyAggregate({ year, quarter });
     } catch (error_) {
       error = (error_ as Error).message;
     } finally {
@@ -38,7 +42,7 @@
   async function close() {
     closing = true;
     try {
-      await closePeriod(Number(year), Number(quarter));
+      await closePeriod({ year, quarter, closePeriodDto: {} });
       await load();
     } catch (error_) {
       error = (error_ as Error).message;
@@ -49,7 +53,7 @@
   async function reopen() {
     closing = true;
     try {
-      await reopenPeriod(Number(year), Number(quarter));
+      await reopenPeriod({ year, quarter });
       await load();
     } catch (error_) {
       error = (error_ as Error).message;
@@ -73,13 +77,13 @@
 
   function warningTitle(w: AggregatorWarning): string {
     switch (w.kind) {
-      case 'invoice_unmatched': {
+      case Kind.InvoiceUnmatched: {
         return `${w.count} invoice${w.count === 1 ? '' : 's'} not yet matched to a bank tx`;
       }
-      case 'expense_pending_review': {
+      case Kind2.ExpensePendingReview: {
         return `${w.count} expense${w.count === 1 ? '' : 's'} still pending review`;
       }
-      case 'expense_low_confidence_match': {
+      case Kind3.ExpenseLowConfidenceMatch: {
         return `${w.count} bank tx match${w.count === 1 ? '' : 'es'} need manual confirmation`;
       }
     }
@@ -87,13 +91,13 @@
 
   function warningSamples(w: AggregatorWarning): string[] {
     switch (w.kind) {
-      case 'invoice_unmatched': {
+      case Kind.InvoiceUnmatched: {
         return w.sampleNumbers;
       }
-      case 'expense_pending_review': {
+      case Kind2.ExpensePendingReview: {
         return w.sampleVendors;
       }
-      case 'expense_low_confidence_match': {
+      case Kind3.ExpenseLowConfidenceMatch: {
         return w.sampleIds;
       }
     }

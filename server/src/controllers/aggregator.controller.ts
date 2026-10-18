@@ -1,11 +1,13 @@
 import { Body, Controller, Delete, Get, Post, Query, Res } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import {
   ClosePeriodDto,
+  ClosePeriodResponseDto,
   QuarterlyAggregateQueryDto,
   QuarterlyAggregateResponseDto,
+  ReopenPeriodResponseDto,
   mapAggregate,
 } from 'src/dtos/aggregator.dto';
 import { EventSource } from 'src/enum';
@@ -32,6 +34,7 @@ export class AggregatorController {
   @Get('quarterly')
   @Authenticated()
   @ApiQueryFromDto(QuarterlyAggregateQueryDto)
+  @ApiOkResponse({ type: QuarterlyAggregateResponseDto })
   async getQuarterlyAggregate(@Query() query: QuarterlyAggregateQueryDto): Promise<QuarterlyAggregateResponseDto> {
     const [aggregate, close] = await Promise.all([
       this.aggregator.aggregate(query.year, query.quarter),
@@ -48,10 +51,11 @@ export class AggregatorController {
   @Post('quarterly/close')
   @Authenticated()
   @ApiQueryFromDto(QuarterlyAggregateQueryDto)
+  @ApiOkResponse({ type: ClosePeriodResponseDto })
   async closePeriod(
     @Query() query: QuarterlyAggregateQueryDto,
     @Body() body: ClosePeriodDto,
-  ): Promise<{ closedAt: string }> {
+  ): Promise<ClosePeriodResponseDto> {
     const close = await this.periodCloseRepository.close({
       year: query.year,
       quarter: query.quarter,
@@ -68,7 +72,8 @@ export class AggregatorController {
   @Delete('quarterly/close')
   @Authenticated()
   @ApiQueryFromDto(QuarterlyAggregateQueryDto)
-  async reopenPeriod(@Query() query: QuarterlyAggregateQueryDto): Promise<{ reopened: true }> {
+  @ApiOkResponse({ type: ReopenPeriodResponseDto })
+  async reopenPeriod(@Query() query: QuarterlyAggregateQueryDto): Promise<ReopenPeriodResponseDto> {
     await this.periodCloseRepository.reopen(query.year, query.quarter);
     await this.eventRepository.recordAction({
       source: EventSource.Manual,

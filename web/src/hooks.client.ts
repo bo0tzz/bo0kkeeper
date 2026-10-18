@@ -1,3 +1,5 @@
+import '$lib/sdk';
+
 import type { HandleClientError } from '@sveltejs/kit';
 
 const DEFAULT_MESSAGE = 'Something went wrong. Check the server logs.';
