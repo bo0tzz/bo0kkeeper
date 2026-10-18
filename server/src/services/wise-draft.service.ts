@@ -60,6 +60,18 @@ export class WiseDraftService {
       );
     }
 
+    // Idempotency: if this credit event has already been drafted (double
+    // click, UI retry on network blip, any accidental re-fire), return the
+    // existing wise_transfer instead of creating a second Wise draft and
+    // burning another TXN reference.
+    const existing = await this.wiseTransferRepository.findBySourceEventId(event.id);
+    if (existing) {
+      this.logger.log(
+        `Event ${event.id} already drafted as transfer ${existing.wiseTransferId} (${existing.ourReference}); returning existing`,
+      );
+      return existing;
+    }
+
     const recipientId = this.config.targetRecipientId;
     if (recipientId === undefined) {
       throw new Error('WISE_TARGET_RECIPIENT_ID is not configured');
@@ -130,6 +142,7 @@ export class WiseDraftService {
       ourReference,
       counterpartyName: null,
       correlationId: event.correlationId,
+      sourceEventId: event.id,
     };
     const created = await this.wiseTransferRepository.create(row);
     // Drop the source credit event out of the `pending` inbox — we've now

@@ -50,6 +50,21 @@ export class WiseTransferRepository {
   }
 
   /**
+   * Lookup an outbound transfer by the `balances#credit` event that drafted
+   * it. WiseDraftService uses this as its idempotency check: a repeated
+   * `draftFromEvent({eventId})` returns the existing row instead of making
+   * a second Wise API call. Returns undefined for events that never
+   * resulted in a draft and for pre-schema-change rows (sourceEventId null).
+   */
+  findBySourceEventId(sourceEventId: string): Promise<WiseTransferRow | undefined> {
+    return this.db
+      .selectFrom('wise_transfer')
+      .selectAll()
+      .where('sourceEventId', '=', sourceEventId)
+      .executeTakeFirst() as Promise<WiseTransferRow | undefined>;
+  }
+
+  /**
    * Lookup by our outgoing TXN-NNNN reference. Drives the bank-matcher's
    * high-confidence path — a bank-tx description carrying `TXN-NNNN`
    * unambiguously links to the wise_transfer that allocated it.

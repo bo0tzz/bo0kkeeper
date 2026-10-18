@@ -1,6 +1,7 @@
 import {
   Column,
   CreateDateColumn,
+  ForeignKeyColumn,
   Generated,
   Index,
   PrimaryGeneratedColumn,
@@ -10,6 +11,7 @@ import {
 } from '@immich/sql-tools';
 import { ColumnType } from 'kysely';
 import { WiseTransferDirection, WiseTransferState } from 'src/enum';
+import { EventTable } from 'src/schema/tables/event.table';
 
 /**
  * State table for Wise transfers (both inbound credits and outbound USD→EUR sends).
@@ -92,6 +94,16 @@ export class WiseTransferTable {
   /** Groups events for one logical flow — same value as `event.correlationId`. */
   @Column({ type: 'uuid', nullable: true })
   correlationId!: string | null;
+
+  /**
+   * The event that spawned this transfer (outbound: the `balances#credit`
+   * draft trigger). Powers the WiseDraftService idempotency check: a repeat
+   * `draftFromEvent({eventId})` returns the existing row rather than creating
+   * a second Wise transfer. Null on inbound transfers and on outbound rows
+   * created before this column existed.
+   */
+  @ForeignKeyColumn(() => EventTable, { nullable: true, onDelete: 'SET NULL' })
+  sourceEventId!: string | null;
 
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;

@@ -287,4 +287,31 @@ describe('WiseDraftService', () => {
     expect(row.ourReference).toBe('TXN-0044');
     expect(createTransferMock).toHaveBeenCalledWith(expect.objectContaining({ reference: 'TXN-0044' }));
   });
+
+  // Regression: a double-click or UI retry on `draftFromEvent` used to create
+  // two Wise drafts (two API calls, two TXN references allocated). The
+  // sourceEventId lookup makes the operation idempotent: a repeat returns
+  // the existing wise_transfer without touching Wise.
+  it('is idempotent on repeat — the same event drafted twice returns the first transfer', async () => {
+    const ingest = await eventRepo.ingest({
+      source: EventSource.Wise,
+      eventType: 'balances#credit',
+      externalId: 'delivery-idempotent',
+      occurredAt: new Date('2099-01-15T13:26:00Z'),
+      payload: balanceCreditPayload,
+    });
+    if (!ingest.ingested) {
+      throw new Error('precondition');
+    }
+
+    const first = await service.draftFromEvent({ eventId: ingest.event.id });
+    const second = await service.draftFromEvent({ eventId: ingest.event.id });
+
+    expect(second.id).toBe(first.id);
+    expect(second.wiseTransferId).toBe(first.wiseTransferId);
+    expect(second.ourReference).toBe(first.ourReference);
+    // Wise API got called exactly once — the retry didn't double-draft.
+    expect(createQuoteMock).toHaveBeenCalledTimes(1);
+    expect(createTransferMock).toHaveBeenCalledTimes(1);
+  });
 });
