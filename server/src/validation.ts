@@ -30,9 +30,18 @@ export const isoDateToDate = z
   .meta({ example: '2024-01-01' });
 
 /**
- * Money minor units (cents). Always stored as bigint; never use number for money.
+ * Money minor units (cents). On the wire: integer-string ("100", "-182"); in
+ * TypeScript: bigint. Modelled as a Zod codec so JSON Schema (and the generated
+ * OpenAPI SDK) sees a string — plain `z.coerce.bigint()` makes
+ * zod-to-json-schema throw ("BigInt cannot be represented in JSON Schema") and
+ * every downstream DTO falls back to `any`.
  */
-export const moneyMinor = z.coerce.bigint();
+export const moneyMinor = z
+  .codec(z.string().regex(/^-?\d+$/, { error: 'Expected integer-string minor units' }), z.bigint(), {
+    decode: BigInt,
+    encode: (b) => b.toString(),
+  })
+  .meta({ example: '100' });
 
 /** ISO 4217 currency code, uppercase. */
 export const currencyCode = z

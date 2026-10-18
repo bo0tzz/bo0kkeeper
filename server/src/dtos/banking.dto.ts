@@ -121,7 +121,12 @@ const MatchCandidatesResponseSchema = z
   .meta({ id: 'BankTxMatchCandidatesDto' });
 export class BankTxMatchCandidatesDto extends createZodDto(MatchCandidatesResponseSchema) {}
 
-const BankTxCategoryEnum = z.enum(['tax', 'drawings', 'self_transfer', 'fee', 'ignored']);
+// Give the enum a stable OpenAPI id so `.nullable()` composes cleanly in the
+// generated SDK (an inline nullable enum emits `enum: [..., null]` which
+// oazapfts translates to a TS enum member missing an initializer).
+const BankTxCategoryEnum = z
+  .enum(['tax', 'drawings', 'self_transfer', 'fee', 'ignored'])
+  .meta({ id: 'BankTxCategory' });
 const BankTransactionResponseSchema = z
   .object({
     id: z.uuid(),
