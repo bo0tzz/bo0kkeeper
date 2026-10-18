@@ -1,22 +1,35 @@
 <script lang="ts">
   import { page } from '$app/state';
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
-  import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
-  import { listBankTransactions, setBankTxMatch, type BankTransaction } from '$lib/services/banking.service';
-  import { listWiseTransfers, type WiseTransferListItem } from '$lib/services/wise.service';
+  import { formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
+  import { extractApiError } from '$lib/sdk';
+  import {
+    listTransactions as listBankTransactions,
+    setMatch as setBankTxMatch,
+    Type as MatchTargetType,
+    type BankTransactionResponseDto as BankTransaction,
+  } from '@bo0kkeeper/sdk';
   import {
     approveExpense,
     listExpenses,
+    listTransfers as listWiseTransfers,
     rejectExpense,
     rescanPaperless,
     updateExpense,
-    type ExpenseLocationClass,
-    type ExpensePatch,
-    type ExpenseResponse,
-    type ExpenseStatus,
-    type ListExpensesResponse,
-    type RescanPaperlessResponse,
-  } from '$lib/services/expenses.service';
+    type ExpenseResponseDto,
+    type ExpenseUpdateDto,
+    type ListExpensesResponseDto,
+    type ListWiseTransfersResponseDto,
+    type RescanPaperlessResponseDto,
+  } from '@bo0kkeeper/sdk';
+
+  type WiseTransferListItem = ListWiseTransfersResponseDto['items'][number];
+  type ExpenseResponse = ExpenseResponseDto;
+  type ListExpensesResponse = ListExpensesResponseDto;
+  type ExpensePatch = ExpenseUpdateDto;
+  type ExpenseStatus = ExpenseResponseDto['status'];
+  type ExpenseLocationClass = ExpenseResponseDto['locationClass'];
+  type RescanPaperlessResponse = RescanPaperlessResponseDto;
   import { deriveBtwMinor, majorToMinor, minorToMajor } from '$lib/money';
   import {
     Alert,
@@ -71,7 +84,7 @@
       // Refresh the list so newly-ingested rows show up.
       await load();
     } catch (error_) {
-      rescanError = (error_ as Error).message;
+      rescanError = extractApiError(error_).message;
     } finally {
       rescanRunning = false;
     }
@@ -85,12 +98,9 @@
     issues = [];
   }
   function captureError(error_: unknown) {
-    if (error_ instanceof ApiError) {
-      error = error_.message;
-      issues = error_.issues;
-    } else {
-      error = (error_ as Error).message;
-    }
+    const extracted = extractApiError(error_);
+    error = extracted.message;
+    issues = extracted.issues;
   }
 
   type DraftFields = {
@@ -114,12 +124,12 @@
     try {
       data = await listExpenses({
         status: status || undefined,
-        matched: matched === '' ? undefined : matched === 'true',
-        limit: PAGE_SIZE,
-        offset,
+        matched: matched === '' ? undefined : matched,
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
       });
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       loading = false;
     }
@@ -139,7 +149,7 @@
       return;
     }
     try {
-      const result = await listWiseTransfers({ limit: 50 });
+      const result = await listWiseTransfers({ limit: '50' });
       wiseTransfers = result.items;
       wiseTransfersLoaded = true;
     } catch (error_) {
@@ -279,7 +289,7 @@
     candidates = [];
     candidatesLoading = true;
     try {
-      const result = await listBankTransactions({ status: 'unmatched', limit: 100 });
+      const result = await listBankTransactions({ status: 'unmatched', limit: '100' });
       candidates = result.items;
     } catch (error_) {
       error = (error_ as Error).message;
@@ -299,7 +309,10 @@
     }
     linking = true;
     try {
-      await setBankTxMatch(bankTxId, { type: 'expense', targetId: linkingExpense.id });
+      await setBankTxMatch({
+        id: bankTxId,
+        bankTxSetMatchDto: { type: MatchTargetType.Expense, targetId: linkingExpense.id },
+      });
       closeLinkModal();
       await load();
     } catch (error_) {
@@ -347,7 +360,7 @@
     }
     clearError();
     try {
-      await updateExpense(expense.id, buildPatch(draft));
+      await updateExpense({ id: expense.id, expenseUpdateDto: buildPatch(draft) });
       await load();
     } catch (error_) {
       captureError(error_);
@@ -358,7 +371,7 @@
     const draft = drafts[expense.id];
     clearError();
     try {
-      await approveExpense(expense.id, draft ? buildPatch(draft) : {});
+      await approveExpense({ id: expense.id, expenseApproveDto: draft ? buildPatch(draft) : {} });
       collapse();
       await load();
     } catch (error_) {
@@ -370,7 +383,7 @@
     const draft = drafts[expense.id];
     clearError();
     try {
-      await rejectExpense(expense.id, draft?.notes || undefined);
+      await rejectExpense({ id: expense.id, expenseRejectDto: { notes: draft?.notes || undefined } });
       collapse();
       await load();
     } catch (error_) {

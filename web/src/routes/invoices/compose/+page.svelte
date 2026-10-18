@@ -1,8 +1,14 @@
 <script lang="ts">
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
-  import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
-  import { listClients, type ClientResponse } from '$lib/services/clients.service';
-  import { composeInvoice, type InvoiceComposeResponse } from '$lib/services/invoices.service';
+  import { formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
+  import { extractApiError } from '$lib/sdk';
+  import {
+    Class,
+    composeInvoice,
+    listClients,
+    type ClientResponseDto as ClientResponse,
+    type InvoiceComposeResponseDto as InvoiceComposeResponse,
+  } from '@bo0kkeeper/sdk';
   import { majorToMinor } from '$lib/money';
   import { Alert, Button, Field, Heading, HStack, Input, Select, Stack, Text } from '@immich/ui';
 
@@ -39,7 +45,7 @@
     try {
       clients = await listClients();
     } catch (error_) {
-      clientsError = (error_ as Error).message;
+      clientsError = extractApiError(error_).message;
     }
   }
 
@@ -67,7 +73,9 @@
    * enforces this too, but the form shouldn't offer a rate that gets ignored.
    * Default to true until a client is picked so the field starts enabled.
    */
-  const chargesBtw = $derived(!selectedClient || selectedClient.class === 'domestic' || selectedClient.class === 'eu');
+  const chargesBtw = $derived(
+    !selectedClient || selectedClient.class === Class.Domestic || selectedClient.class === Class.Eu,
+  );
 
   function downloadPdf(invoiceId: string) {
     // Programmatic anchor click bypasses SvelteKit's typed-routing — these
@@ -91,28 +99,27 @@
     issues = [];
     try {
       result = await composeInvoice({
-        clientId,
-        issuedAt,
-        periodStart: periodStart || undefined,
-        periodEnd: periodEnd || undefined,
-        currency,
-        btwRateBps: chargesBtw && btwRatePercent.trim() !== '' ? Math.round(Number(btwRatePercent) * 100) : undefined,
-        lines: lines
-          .filter((l) => l.description.trim() && l.amount.trim())
-          .map((l) => ({
-            description: l.description,
-            unitLabel: l.unitLabel || undefined,
-            quantity: l.quantity || undefined,
-            lineTotalMinor: majorToMinor(l.amount),
-          })),
+        invoiceComposeDto: {
+          clientId,
+          issuedAt,
+          periodStart: periodStart || undefined,
+          periodEnd: periodEnd || undefined,
+          currency,
+          btwRateBps: chargesBtw && btwRatePercent.trim() !== '' ? Math.round(Number(btwRatePercent) * 100) : undefined,
+          lines: lines
+            .filter((l) => l.description.trim() && l.amount.trim())
+            .map((l) => ({
+              description: l.description,
+              unitLabel: l.unitLabel || undefined,
+              quantity: l.quantity || undefined,
+              lineTotalMinor: majorToMinor(l.amount),
+            })),
+        },
       });
     } catch (error_) {
-      if (error_ instanceof ApiError) {
-        error = error_.message;
-        issues = error_.issues;
-      } else {
-        error = (error_ as Error).message;
-      }
+      const extracted = extractApiError(error_);
+      error = extracted.message;
+      issues = extracted.issues;
     } finally {
       submitting = false;
     }

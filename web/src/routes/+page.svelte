@@ -2,11 +2,25 @@
   import { resolve } from '$app/paths';
   import { formatDateTime } from '$lib/format';
   import { formatEur as eur } from '$lib/money';
-  import { getQuarterlyAggregate, type QuarterlyAggregateResponseDto } from '@bo0kkeeper/sdk';
-  import { getLatestBankingSession, listBankTransactions, type BankingSession } from '$lib/services/banking.service';
-  import { listEvents, type ListEventsResponse } from '$lib/services/events.service';
-  import { listExpenses, type ListExpensesResponse } from '$lib/services/expenses.service';
-  import { getSheetWriteStatus, getSystemInfo, retrySheetWrites, type SystemInfo } from '$lib/services/system.service';
+  import { extractApiError } from '$lib/sdk';
+  import {
+    getLatestSession as getLatestBankingSession,
+    listTransactions as listBankTransactions,
+    type BankingSessionResponseDto as BankingSession,
+  } from '@bo0kkeeper/sdk';
+  import {
+    getInfo as getSystemInfo,
+    getQuarterlyAggregate,
+    getSheetWriteStatus,
+    Kind,
+    listEvents,
+    listExpenses,
+    retrySheetWrites,
+    type QuarterlyAggregateResponseDto,
+    type SystemInfoDto,
+  } from '@bo0kkeeper/sdk';
+
+  type SystemInfo = SystemInfoDto;
   import {
     Alert,
     Badge,
@@ -79,7 +93,7 @@
       await retrySheetWrites();
       retryFlash = 'Retry enqueued — refresh in a few seconds to see the count drop.';
     } catch (error_) {
-      retryFlash = `Retry failed to enqueue: ${(error_ as Error).message}`;
+      retryFlash = `Retry failed to enqueue: ${extractApiError(error_).message}`;
     } finally {
       retryingSheetWrites = false;
     }
@@ -112,32 +126,32 @@
           source: 'wise',
           eventType: 'balances#credit',
           status: 'pending',
-          limit: 1,
-        }) as Promise<ListEventsResponse>,
-        listExpenses({ status: 'pending_review', limit: 1 }) as Promise<ListExpensesResponse>,
-        listExpenses({ status: 'approved', matched: false, limit: 1 }) as Promise<ListExpensesResponse>,
-        listBankTransactions({ status: 'unmatched', limit: 1 }).catch(() => ({ items: [], total: 0 })),
+          limit: '1',
+        }),
+        listExpenses({ status: 'pending_review', limit: '1' }),
+        listExpenses({ status: 'approved', matched: 'false', limit: '1' }),
+        listBankTransactions({ status: 'unmatched', limit: '1' }).catch(() => ({ items: [], total: 0 })),
         getLatestBankingSession().catch(() => null),
         getQuarterlyAggregate({ year: String(year), quarter: String(quarter) }).catch(() => null),
-        listEvents({ status: 'failed', limit: 1 }) as Promise<ListEventsResponse>,
-        listEvents({ source: 'wise', limit: 1 }) as Promise<ListEventsResponse>,
-        listEvents({ source: 'paperless', limit: 1 }) as Promise<ListEventsResponse>,
+        listEvents({ status: 'failed', limit: '1' }),
+        listEvents({ source: 'wise', limit: '1' }),
+        listEvents({ source: 'paperless', limit: '1' }),
         listEvents({
           source: 'system',
           eventType: 'ingest.dropped_before_cutover',
           since: since30d,
-          limit: 1,
-        }) as Promise<ListEventsResponse>,
+          limit: '1',
+        }),
         listEvents({
           source: 'system',
           eventType: 'sheet.write_failed',
           since: since30d,
-          limit: 1,
-        }) as Promise<ListEventsResponse>,
+          limit: '1',
+        }),
         getSheetWriteStatus().catch(() => ({ staleCount: 0 })),
         getSystemInfo(),
       ]);
-      const invoiceUnmatched = agg?.warnings.find((w) => w.kind === 'invoice_unmatched');
+      const invoiceUnmatched = agg?.warnings.find((w) => w.kind === Kind.InvoiceUnmatched);
       counts = {
         pendingWiseCredits: wise.total,
         pendingExpenseReviews: expenses.total,
@@ -157,7 +171,7 @@
         systemInfo,
       };
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       loading = false;
     }

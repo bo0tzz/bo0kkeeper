@@ -1,7 +1,17 @@
 <script lang="ts">
   import { formatDateTime } from '$lib/format';
-  import { dismissEvent, listEvents, type EventResponse, type ListEventsResponse } from '$lib/services/events.service';
-  import { draftFromEvent, reconcileWise, type WiseTransferResponse } from '$lib/services/wise.service';
+  import { extractApiError } from '$lib/sdk';
+  import {
+    dismissEvent,
+    draftFromEvent,
+    listEvents,
+    reconcileNow as reconcileWise,
+    type EventResponseDto,
+    type ListEventsResponseDto,
+    type WiseTransferResponseDto,
+  } from '@bo0kkeeper/sdk';
+
+  type EventResponse = EventResponseDto;
   import {
     Alert,
     Badge,
@@ -22,7 +32,7 @@
 
   const PAGE_SIZE = 50;
 
-  let data = $state<ListEventsResponse | null>(null);
+  let data = $state<ListEventsResponseDto | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
   let drafting = $state<string | null>(null);
@@ -31,7 +41,7 @@
   // Per-event "I spent from this Wise balance already; sweep the remainder"
   // toggle. Bypasses the balance-≥-credit guard in wise-draft.service.ts.
   let underCredit = $state<Record<string, boolean>>({});
-  let lastDrafted = $state<WiseTransferResponse | null>(null);
+  let lastDrafted = $state<WiseTransferResponseDto | null>(null);
   let reconciling = $state(false);
   let reconcileInfo = $state<string | null>(null);
 
@@ -43,11 +53,11 @@
         source: 'wise',
         eventType: 'balances#credit',
         status: 'pending',
-        limit: PAGE_SIZE,
-        offset: 0,
+        limit: String(PAGE_SIZE),
+        offset: '0',
       });
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       loading = false;
     }
@@ -71,15 +81,18 @@
     error = null;
     try {
       const reference = drafts[event.id]?.trim() || undefined;
-      lastDrafted = await draftFromEvent(event.id, {
-        ourReference: reference,
-        allowUnderCredit: underCredit[event.id] || undefined,
+      lastDrafted = await draftFromEvent({
+        eventId: event.id,
+        draftFromEventDto: {
+          ourReference: reference,
+          allowUnderCredit: underCredit[event.id] || undefined,
+        },
       });
       delete drafts[event.id];
       delete underCredit[event.id];
       await load();
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       drafting = null;
     }
@@ -96,10 +109,10 @@
     dismissing = event.id;
     error = null;
     try {
-      await dismissEvent(event.id);
+      await dismissEvent({ id: event.id });
       await load();
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       dismissing = null;
     }
@@ -113,7 +126,7 @@
       await reconcileWise();
       reconcileInfo = 'Reconcile queued. Transfer states will refresh in a moment.';
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       reconciling = false;
     }

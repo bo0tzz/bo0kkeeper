@@ -1,6 +1,10 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
-  import { listInvoices, type InvoiceListItem, type ListInvoicesResponse } from '$lib/services/invoices.service';
+  import { extractApiError } from '$lib/sdk';
+  import { listInvoices, type ListInvoicesResponseDto } from '@bo0kkeeper/sdk';
+
+  type ListInvoicesResponse = ListInvoicesResponseDto;
+  type InvoiceListItem = ListInvoicesResponseDto['items'][number];
   import {
     Alert,
     Badge,
@@ -40,15 +44,15 @@
     loading = true;
     error = null;
     try {
-      const yearNum = yearInput ? Number(yearInput) : undefined;
+      const yearStr = yearInput || undefined;
       data = await listInvoices({
-        year: Number.isFinite(yearNum) ? yearNum : undefined,
+        year: yearStr,
         status: status || undefined,
-        page,
-        limit: PAGE_SIZE,
+        page: String(page),
+        limit: String(PAGE_SIZE),
       });
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       loading = false;
     }

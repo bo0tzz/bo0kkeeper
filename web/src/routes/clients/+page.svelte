@@ -1,16 +1,21 @@
 <script lang="ts">
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
-  import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
+  import { formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
+  import { extractApiError } from '$lib/sdk';
+  import { getInfo as getSystemInfo, type SystemInfoDto as SystemInfo } from '@bo0kkeeper/sdk';
   import {
+    Class,
     createClient,
     listClients,
+    TradeName,
     updateClient,
-    type ClientClass,
-    type ClientPatch,
-    type ClientResponse,
-    type TradeName,
-  } from '$lib/services/clients.service';
-  import { getSystemInfo, type SystemInfo } from '$lib/services/system.service';
+    type ClientResponseDto,
+    type ClientUpdateDto,
+  } from '@bo0kkeeper/sdk';
+
+  type ClientResponse = ClientResponseDto;
+  type ClientClass = Class;
+  type ClientPatch = ClientUpdateDto;
   import {
     Badge,
     Button,
@@ -56,8 +61,8 @@
     return {
       id: null,
       name: '',
-      class: 'domestic',
-      tradeName: 'it_services',
+      class: Class.Domestic,
+      tradeName: TradeName.ItServices,
       addressLine1: '',
       city: '',
       postalCode: '',
@@ -79,7 +84,7 @@
       clients = list;
       systemInfo = info;
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       loading = false;
     }
@@ -140,17 +145,25 @@
     try {
       const patch = buildPatch(draft);
       await (draft.id
-        ? updateClient(draft.id, patch)
-        : createClient({ ...patch, name: draft.name, class: draft.class, tradeName: draft.tradeName }));
+        ? updateClient({ id: draft.id, clientUpdateDto: patch })
+        : createClient({
+            clientCreateDto: {
+              ...patch,
+              name: draft.name,
+              class: draft.class,
+              tradeName: draft.tradeName,
+              // ClientCreateDto doesn't accept null for these; patch (an Update
+              // shape) does, so coerce explicitly on the create path.
+              vatId: patch.vatId ?? undefined,
+              wiseSenderPattern: patch.wiseSenderPattern ?? undefined,
+            },
+          }));
       draft = null;
       await load();
     } catch (error_) {
-      if (error_ instanceof ApiError) {
-        error = error_.message;
-        issues = error_.issues;
-      } else {
-        error = (error_ as Error).message;
-      }
+      const extracted = extractApiError(error_);
+      error = extracted.message;
+      issues = extracted.issues;
     }
   }
 

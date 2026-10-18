@@ -1,17 +1,20 @@
 <script lang="ts">
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
   import { formatDateTime, formatTime } from '$lib/format';
-  import { ApiError, type ApiFieldIssue } from '$lib/services/api';
+  import { type ApiFieldIssue } from '$lib/services/api';
+  import { extractApiError } from '$lib/sdk';
   import {
     checkPaperlessTags,
-    getSettings,
-    updateSettings,
-    type PaperlessTagCheckResult,
-    type SettingsResponse,
-  } from '$lib/services/settings.service';
+    getApiSettings,
+    update as updateSettings,
+    type PaperlessTagCheckResponseDto,
+    type SettingsResponseDto,
+  } from '@bo0kkeeper/sdk';
   import { Alert, Button, Field, Heading, HStack, Input, Stack, Text, Textarea } from '@immich/ui';
 
-  let loaded = $state<SettingsResponse | null>(null);
+  type PaperlessTagCheckResult = PaperlessTagCheckResponseDto['results'][number];
+
+  let loaded = $state<SettingsResponseDto | null>(null);
   let loading = $state(false);
   let saving = $state(false);
   let error = $state<string | null>(null);
@@ -33,7 +36,7 @@
   let expenseTagsRaw = $state('');
   let outgoingInvoiceTagsRaw = $state('');
 
-  function applyToDraft(s: SettingsResponse) {
+  function applyToDraft(s: SettingsResponseDto) {
     kvk = s.issuer.kvk;
     vatId = s.issuer.vatId;
     addressLine1 = s.issuer.addressLine1;
@@ -50,10 +53,10 @@
     error = null;
     issues = [];
     try {
-      loaded = await getSettings();
+      loaded = await getApiSettings();
       applyToDraft(loaded);
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       loading = false;
     }
@@ -77,22 +80,21 @@
     info = null;
     try {
       const updated = await updateSettings({
-        issuer: { kvk, vatId, addressLine1, postalCode, city, country, iban },
-        paperless: {
-          expenseTags: splitTags(expenseTagsRaw),
-          outgoingInvoiceTags: splitTags(outgoingInvoiceTagsRaw),
+        updateSettingsDto: {
+          issuer: { kvk, vatId, addressLine1, postalCode, city, country, iban },
+          paperless: {
+            expenseTags: splitTags(expenseTagsRaw),
+            outgoingInvoiceTags: splitTags(outgoingInvoiceTagsRaw),
+          },
         },
       });
       loaded = updated;
       applyToDraft(updated);
       info = `Saved at ${formatTime(new Date(updated.updatedAt))}`;
     } catch (error_) {
-      if (error_ instanceof ApiError) {
-        error = error_.message;
-        issues = error_.issues;
-      } else {
-        error = (error_ as Error).message;
-      }
+      const extracted = extractApiError(error_);
+      error = extracted.message;
+      issues = extracted.issues;
     } finally {
       saving = false;
     }
@@ -117,10 +119,10 @@
         tagCheckResults = [];
         return;
       }
-      const response = await checkPaperlessTags(tags);
+      const response = await checkPaperlessTags({ paperlessTagCheckDto: { tags } });
       tagCheckResults = response.results;
     } catch (error_) {
-      tagCheckError = (error_ as Error).message;
+      tagCheckError = extractApiError(error_).message;
     } finally {
       tagCheckRunning = false;
     }

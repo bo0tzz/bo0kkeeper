@@ -1,12 +1,14 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
+  import { extractApiError } from '$lib/sdk';
   import {
-    listWiseTransfers,
-    reconcileWise,
-    type ListWiseTransfersResponse,
-    type WiseTransferListItem,
-    type WiseTransferState,
-  } from '$lib/services/wise.service';
+    listTransfers as listWiseTransfers,
+    reconcileNow as reconcileWise,
+    type ListWiseTransfersResponseDto,
+  } from '@bo0kkeeper/sdk';
+
+  type WiseTransferListItem = ListWiseTransfersResponseDto['items'][number];
+  type WiseTransferState = WiseTransferListItem['state'];
   import {
     Alert,
     Badge,
@@ -27,7 +29,7 @@
 
   const PAGE_SIZE = 50;
 
-  let data = $state<ListWiseTransfersResponse | null>(null);
+  let data = $state<ListWiseTransfersResponseDto | null>(null);
   let loading = $state(false);
   let reconciling = $state(false);
   let info = $state<string | null>(null);
@@ -52,11 +54,11 @@
     try {
       data = await listWiseTransfers({
         state: stateFilter || undefined,
-        page,
-        limit: PAGE_SIZE,
+        page: String(page),
+        limit: String(PAGE_SIZE),
       });
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       loading = false;
     }
@@ -86,7 +88,7 @@
       info = 'Reconcile queued. Refreshing in a moment…';
       setTimeout(() => void load(), 2500);
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       reconciling = false;
     }

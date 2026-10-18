@@ -1,13 +1,18 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { formatDateTime } from '$lib/format';
+  import { extractApiError } from '$lib/sdk';
   import {
     listEvents,
-    type EventResponse,
-    type EventSource,
-    type EventStatus,
-    type ListEventsResponse,
-  } from '$lib/services/events.service';
+    type EventResponseDto,
+    type ListEventsResponseDto,
+    type Source,
+    type Status,
+  } from '@bo0kkeeper/sdk';
+
+  type EventResponse = EventResponseDto;
+  type EventSource = Source;
+  type EventStatus = Status;
   import {
     Badge,
     Button,
@@ -35,7 +40,7 @@
   let source = $state<EventSource | ''>(initialSource);
   let status = $state<EventStatus | ''>(initialStatus);
   let offset = $state(0);
-  let data = $state<ListEventsResponse | null>(null);
+  let data = $state<ListEventsResponseDto | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
 
@@ -46,11 +51,11 @@
       data = await listEvents({
         source: source || undefined,
         status: status || undefined,
-        limit: PAGE_SIZE,
-        offset,
+        limit: String(PAGE_SIZE),
+        offset: String(offset),
       });
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       loading = false;
     }

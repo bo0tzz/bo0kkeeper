@@ -1,9 +1,8 @@
 <script lang="ts">
-  import {
-    listAllTransactions,
-    type ListTransactionsResponse,
-    type TransactionRow,
-  } from '$lib/services/transactions.service';
+  import { extractApiError } from '$lib/sdk';
+  import { list as listAllTransactions, type ListTransactionsResponseDto } from '@bo0kkeeper/sdk';
+
+  type TransactionRow = ListTransactionsResponseDto['items'][number];
   import {
     Alert,
     Badge,
@@ -23,7 +22,7 @@
     Text,
   } from '@immich/ui';
 
-  let data = $state<ListTransactionsResponse | null>(null);
+  let data = $state<ListTransactionsResponseDto | null>(null);
   let loading = $state(false);
   let error = $state<string | null>(null);
 
@@ -47,7 +46,7 @@
         source: source || undefined,
       });
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       loading = false;
     }

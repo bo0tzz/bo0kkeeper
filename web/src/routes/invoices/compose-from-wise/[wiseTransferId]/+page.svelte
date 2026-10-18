@@ -3,14 +3,17 @@
   import { page } from '$app/state';
   import ApiErrorAlert from '$lib/components/ApiErrorAlert.svelte';
   import { majorToMinor } from '$lib/money';
-  import { ApiError, formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
-  import { listClients, type ClientResponse } from '$lib/services/clients.service';
+  import { formatIssuePath, type ApiFieldIssue } from '$lib/services/api';
+  import { extractApiError } from '$lib/sdk';
   import {
+    Class,
     composeInvoiceFromWise,
-    getWiseInvoicePrefill,
-    type InvoiceComposeResponse,
-    type WiseInvoicePrefill,
-  } from '$lib/services/invoices.service';
+    getWisePrefill as getWiseInvoicePrefill,
+    listClients,
+    type ClientResponseDto as ClientResponse,
+    type InvoiceComposeResponseDto as InvoiceComposeResponse,
+    type WiseInvoicePrefillDto as WiseInvoicePrefill,
+  } from '@bo0kkeeper/sdk';
   import { Alert, Button, Field, Heading, HStack, Input, Select, Stack, Text } from '@immich/ui';
 
   /**
@@ -59,7 +62,7 @@
 
   async function load() {
     try {
-      const [pf, cs] = await Promise.all([getWiseInvoicePrefill(wiseTransferId), listClients()]);
+      const [pf, cs] = await Promise.all([getWiseInvoicePrefill({ wiseTransferId }), listClients()]);
       prefill = pf;
       clients = cs;
       if (pf.suggestedClientId) {
@@ -76,7 +79,7 @@
       }
       lines = [{ description: pf.suggestedLineDescription, amount: minorToMajor(pf.totalMinor) }];
     } catch (error_) {
-      prefillError = error_ instanceof ApiError ? error_.message : (error_ as Error).message;
+      prefillError = extractApiError(error_).message;
     }
   }
 
@@ -94,7 +97,7 @@
 
   const clientOptions = $derived([
     { value: '', label: 'Select a client…' },
-    ...clients.filter((c) => c.class === 'non_eu').map((c) => ({ value: c.id, label: c.name })),
+    ...clients.filter((c) => c.class === Class.NonEu).map((c) => ({ value: c.id, label: c.name })),
   ]);
 
   function downloadPdf(invoiceId: string) {
@@ -115,25 +118,25 @@
     error = null;
     issues = [];
     try {
-      result = await composeInvoiceFromWise(wiseTransferId, {
-        clientId,
-        issuedAt,
-        periodStart: periodStart || undefined,
-        periodEnd: periodEnd || undefined,
-        lines: lines
-          .filter((l) => l.description.trim() && l.amount.trim())
-          .map((l) => ({
-            description: l.description,
-            lineTotalMinor: majorToMinor(l.amount),
-          })),
+      result = await composeInvoiceFromWise({
+        wiseTransferId,
+        invoiceComposeFromWiseDto: {
+          clientId,
+          issuedAt,
+          periodStart: periodStart || undefined,
+          periodEnd: periodEnd || undefined,
+          lines: lines
+            .filter((l) => l.description.trim() && l.amount.trim())
+            .map((l) => ({
+              description: l.description,
+              lineTotalMinor: majorToMinor(l.amount),
+            })),
+        },
       });
     } catch (error_) {
-      if (error_ instanceof ApiError) {
-        error = error_.message;
-        issues = error_.issues;
-      } else {
-        error = (error_ as Error).message;
-      }
+      const extracted = extractApiError(error_);
+      error = extracted.message;
+      issues = extracted.issues;
     } finally {
       submitting = false;
     }

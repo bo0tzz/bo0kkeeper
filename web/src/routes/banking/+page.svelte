@@ -2,25 +2,34 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import { formatDate, formatDateTime } from '$lib/format';
+  import { extractApiError } from '$lib/sdk';
   import {
-    clearBankTxMatch,
-    getLatestBankingSession,
-    listBankingAspsps,
-    listBankTransactions,
-    listMatchCandidates,
-    reprocessBankTx,
-    setBankTxCategory,
-    setBankTxMatch,
-    startBankingAuth,
-    syncBankingNow,
-    type BankingAspsp,
-    type BankingSession,
-    type BankTransaction,
-    type BankTxCategory,
-    type BankTxStatusFilter,
-    type ListBankTransactionsResponse,
-    type MatchCandidates,
-  } from '$lib/services/banking.service';
+    clearMatch as clearBankTxMatch,
+    getLatestSession as getLatestBankingSession,
+    listAspsps as listBankingAspsps,
+    listTransactions as listBankTransactions,
+    matchCandidates as listMatchCandidates,
+    PsuType,
+    reprocess as reprocessBankTx,
+    setCategory as setBankTxCategory,
+    setMatch as setBankTxMatch,
+    startAuth as startBankingAuth,
+    sync as syncBankingNow,
+    Type as MatchTargetType,
+    type BankingAspspsResponseDto,
+    type BankingSessionResponseDto,
+    type BankTransactionResponseDto,
+    type BankTxMatchCandidatesDto,
+    type ListBankTransactionsResponseDto,
+  } from '@bo0kkeeper/sdk';
+
+  type BankingSession = BankingSessionResponseDto;
+  type BankTransaction = BankTransactionResponseDto;
+  type BankingAspsp = BankingAspspsResponseDto['aspsps'][number];
+  type BankTxCategory = NonNullable<BankTransactionResponseDto['category']>;
+  type BankTxStatusFilter = 'matched' | 'categorized' | 'unmatched';
+  type ListBankTransactionsResponse = ListBankTransactionsResponseDto;
+  type MatchCandidates = BankTxMatchCandidatesDto;
   import {
     Alert,
     Badge,
@@ -81,7 +90,7 @@
     try {
       session = await getLatestBankingSession();
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     }
   }
 
@@ -91,11 +100,11 @@
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         status: status || undefined,
-        page: txPage,
-        limit: PAGE_SIZE,
+        page: String(txPage),
+        limit: String(PAGE_SIZE),
       });
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     }
   }
 
@@ -143,10 +152,16 @@
     starting = true;
     error = null;
     try {
-      const result = await startBankingAuth({ aspspName: name, aspspCountry: country, psuType });
+      const result = await startBankingAuth({
+        bankingStartAuthDto: {
+          aspspName: name,
+          aspspCountry: country,
+          psuType: psuType === 'business' ? PsuType.Business : PsuType.Personal,
+        },
+      });
       location.assign(result.redirectUrl);
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
       starting = false;
     }
   }
@@ -170,7 +185,7 @@
 
   async function loadAspsps() {
     try {
-      const result = await listBankingAspsps('NL');
+      const result = await listBankingAspsps({ country: 'NL' });
       aspsps = result.aspsps;
       // Default to whatever the existing session uses, otherwise leave empty
       // so the operator has to make an explicit choice.
@@ -180,7 +195,7 @@
       }
     } catch (error_) {
       // Non-fatal: show the catalog as empty + an error message.
-      error = `Couldn't load bank list: ${(error_ as Error).message}`;
+      error = `Couldn't load bank list: ${extractApiError(error_).message}`;
     }
   }
 
@@ -225,7 +240,7 @@
           : 'Sync done — updated existing rows.'
         : 'Sync ran but no new activity in the polling window; try refreshing manually.';
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       syncing = false;
     }
@@ -305,10 +320,10 @@
   async function changeCategory(tx: BankTransaction, value: string) {
     const next = (value || null) as BankTxCategory | null;
     try {
-      const updated = await setBankTxCategory(tx.id, next);
+      const updated = await setBankTxCategory({ id: tx.id, bankTxSetCategoryDto: { category: next } });
       replaceTx(updated);
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     }
   }
 
@@ -327,9 +342,9 @@
   async function loadCandidates() {
     candidatesLoading = true;
     try {
-      candidates = await listMatchCandidates(candidateQuery);
+      candidates = await listMatchCandidates({ q: candidateQuery || undefined });
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       candidatesLoading = false;
     }
@@ -341,11 +356,14 @@
     }
     linking = true;
     try {
-      const updated = await setBankTxMatch(linkingTx.id, { type, targetId });
+      const updated = await setBankTxMatch({
+        id: linkingTx.id,
+        bankTxSetMatchDto: { type: type as MatchTargetType, targetId },
+      });
       replaceTx(updated);
       closeLinkModal();
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       linking = false;
     }
@@ -353,10 +371,10 @@
 
   async function unlink(tx: BankTransaction) {
     try {
-      const updated = await clearBankTxMatch(tx.id);
+      const updated = await clearBankTxMatch({ id: tx.id });
       replaceTx(updated);
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     }
   }
 
@@ -369,10 +387,10 @@
    */
   async function reprocess(tx: BankTransaction) {
     try {
-      const updated = await reprocessBankTx(tx.id);
+      const updated = await reprocessBankTx({ id: tx.id });
       replaceTx(updated);
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     }
   }
 
@@ -382,22 +400,22 @@
    * sheet row this time (auto_low skips it; manual + auto_high don't).
    */
   async function confirmMatch(tx: BankTransaction) {
-    let target: { type: 'wise_transfer' | 'invoice' | 'expense'; targetId: string } | null = null;
+    let target: { type: MatchTargetType; targetId: string } | null = null;
     if (tx.matchedTransferId) {
-      target = { type: 'wise_transfer', targetId: tx.matchedTransferId };
+      target = { type: MatchTargetType.WiseTransfer, targetId: tx.matchedTransferId };
     } else if (tx.matchedInvoiceId) {
-      target = { type: 'invoice', targetId: tx.matchedInvoiceId };
+      target = { type: MatchTargetType.Invoice, targetId: tx.matchedInvoiceId };
     } else if (tx.matchedExpenseId) {
-      target = { type: 'expense', targetId: tx.matchedExpenseId };
+      target = { type: MatchTargetType.Expense, targetId: tx.matchedExpenseId };
     }
     if (!target) {
       return;
     }
     try {
-      const updated = await setBankTxMatch(tx.id, target);
+      const updated = await setBankTxMatch({ id: tx.id, bankTxSetMatchDto: target });
       replaceTx(updated);
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     }
   }
 

@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { getIntegrations, type IntegrationCheck, type IntegrationStatus } from '$lib/services/system.service';
+  import { extractApiError } from '$lib/sdk';
+  import { getIntegrations, Status3 as IntegrationStatusEnum, type IntegrationsResponseDto } from '@bo0kkeeper/sdk';
+
+  type IntegrationCheck = IntegrationsResponseDto['checks'][number];
+  type IntegrationStatus = IntegrationCheck['status'];
   import {
     Alert,
     Badge,
@@ -27,7 +31,7 @@
       const response = await getIntegrations();
       checks = response.checks;
     } catch (error_) {
-      error = (error_ as Error).message;
+      error = extractApiError(error_).message;
     } finally {
       loading = false;
     }
@@ -42,16 +46,16 @@
     label: string;
   } {
     switch (status) {
-      case 'healthy': {
+      case IntegrationStatusEnum.Healthy: {
         return { color: 'success', label: 'healthy' };
       }
-      case 'degraded': {
+      case IntegrationStatusEnum.Degraded: {
         return { color: 'warning', label: 'degraded' };
       }
-      case 'broken': {
+      case IntegrationStatusEnum.Broken: {
         return { color: 'danger', label: 'broken' };
       }
-      case 'not_configured': {
+      case IntegrationStatusEnum.NotConfigured: {
         return { color: 'secondary', label: 'not configured' };
       }
     }
