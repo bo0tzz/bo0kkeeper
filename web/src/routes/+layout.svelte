@@ -11,17 +11,26 @@
 
   let { children }: Props = $props();
 
-  const navItems = [
-    { href: resolve('/wise'), label: 'Wise drafts' },
-    { href: resolve('/expenses'), label: 'Expenses' },
-    { href: resolve('/invoices'), label: 'Invoices' },
-    { href: resolve('/transactions'), label: 'Transactions' },
-    { href: resolve('/aggregator'), label: 'BTW rollup' },
-    { href: resolve('/clients'), label: 'Clients' },
-    { href: resolve('/banking'), label: 'Banking' },
-    { href: resolve('/events'), label: 'Events' },
-    { href: resolve('/system'), label: 'System' },
-    { href: resolve('/settings'), label: 'Settings' },
+  // Nav grouped by workflow role; items within each group ordered by observed
+  // visit frequency so the most-used surfaces are leftmost. Group separators
+  // between work (daily), reference (occasional lookups), and config
+  // (set-and-forget).
+  const navGroups = [
+    [
+      { href: resolve('/banking'), label: 'Banking' },
+      { href: resolve('/expenses'), label: 'Expenses' },
+      { href: resolve('/wise'), label: 'Wise drafts' },
+      { href: resolve('/aggregator'), label: 'BTW rollup' },
+    ],
+    [
+      { href: resolve('/invoices'), label: 'Invoices' },
+      { href: resolve('/clients'), label: 'Clients' },
+      { href: resolve('/events'), label: 'Events' },
+    ],
+    [
+      { href: resolve('/settings'), label: 'Settings' },
+      { href: resolve('/system'), label: 'System' },
+    ],
   ];
 </script>
 
@@ -33,15 +42,20 @@
   <nav class="border-b bg-white/80 backdrop-blur dark:bg-black/40">
     <div class="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
       <a href={resolve('/')} class="font-semibold">bo0kkeeper</a>
-      <div class="flex flex-1 gap-3 text-sm">
-        {#each navItems as item (item.href)}
-          {@const active = page.url.pathname.startsWith(item.href)}
-          <a
-            href={item.href}
-            class="rounded px-2 py-1 transition {active ? 'bg-subtle font-medium' : 'hover:bg-subtle/50'}"
-          >
-            {item.label}
-          </a>
+      <div class="flex flex-1 items-center gap-3 text-sm">
+        {#each navGroups as group, groupIndex (groupIndex)}
+          {#if groupIndex > 0}
+            <span class="mx-1 h-5 w-px bg-subtle" aria-hidden="true"></span>
+          {/if}
+          {#each group as item (item.href)}
+            {@const active = page.url.pathname.startsWith(item.href)}
+            <a
+              href={item.href}
+              class="rounded px-2 py-1 transition {active ? 'bg-subtle font-medium' : 'hover:bg-subtle/50'}"
+            >
+              {item.label}
+            </a>
+          {/each}
         {/each}
       </div>
     </div>
