@@ -302,7 +302,7 @@
                   </Badge>
                 </HStack>
                 {#if counts.pendingExpenseReviews > 0}
-                  <Button href={resolve('/expenses')} variant="outline">Review →</Button>
+                  <Button href="/expenses/pending" variant="outline">Review →</Button>
                 {/if}
               </Stack>
             </CardBody>
@@ -340,9 +340,7 @@
                   </Badge>
                 </HStack>
                 {#if counts.approvedUnmatchedExpenses > 0}
-                  <Button href={`${resolve('/expenses')}?status=approved&matched=false`} variant="outline">
-                    Review →
-                  </Button>
+                  <Button href="/expenses/awaiting-bank" variant="outline">Review →</Button>
                 {/if}
               </Stack>
             </CardBody>
@@ -361,7 +359,7 @@
                   </Badge>
                 </HStack>
                 {#if counts.unmatchedBankTx > 0}
-                  <Button href={resolve('/banking')} variant="outline">Review →</Button>
+                  <Button href="/banking/unmatched" variant="outline">Review →</Button>
                 {/if}
               </Stack>
             </CardBody>
@@ -380,7 +378,7 @@
                   </Badge>
                 </HStack>
                 {#if counts.failedEvents > 0}
-                  <Button href={`${resolve('/events')}?status=failed`} variant="outline">Investigate →</Button>
+                  <Button href="/events/failed" variant="outline">Investigate →</Button>
                 {/if}
               </Stack>
             </CardBody>

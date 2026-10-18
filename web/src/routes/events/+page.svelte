@@ -31,11 +31,13 @@
 
   const PAGE_SIZE = 50;
 
-  // Initial filter values from URL query — lets the dashboard's "Failed events
-  // → Investigate" link land directly on /events?status=failed instead of the
-  // operator having to re-pick the filter.
+  // Alias path `/events/failed` presets status=failed via src/hooks.ts
+  // reroute(); the URL stays pretty while rendering this component. URL
+  // query params still work as a fallback for direct links.
+  const presetStatus: EventStatus | '' =
+    (page.url.pathname as string) === '/events/failed' ? ('failed' as EventStatus) : '';
   const initialSource = (page.url.searchParams.get('source') ?? '') as EventSource | '';
-  const initialStatus = (page.url.searchParams.get('status') ?? '') as EventStatus | '';
+  const initialStatus = presetStatus || ((page.url.searchParams.get('status') ?? '') as EventStatus | '');
 
   let source = $state<EventSource | ''>(initialSource);
   let status = $state<EventStatus | ''>(initialStatus);

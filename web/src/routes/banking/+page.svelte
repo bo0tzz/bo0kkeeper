@@ -68,7 +68,11 @@
 
   let dateFrom = $state('');
   let dateTo = $state('');
-  let status = $state<'' | BankTxStatusFilter>('');
+  // Alias path `/banking/unmatched` presets the filter via src/hooks.ts
+  // reroute(); the URL stays pretty while rendering this component.
+  const initialStatus: '' | BankTxStatusFilter =
+    (page.url.pathname as string) === '/banking/unmatched' ? 'unmatched' : '';
+  let status = $state<'' | BankTxStatusFilter>(initialStatus);
   let txPage = $state(1);
 
   const statusOptions = [

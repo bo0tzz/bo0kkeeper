@@ -25,7 +25,8 @@
     },
     "web": {
       "entry": [
-        "e2e/specs/*.spec.ts"
+        "e2e/specs/*.spec.ts",
+        "src/hooks.ts"
       ]
     },
     "open-api/typescript-sdk": {}

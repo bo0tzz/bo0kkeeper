@@ -55,15 +55,20 @@
 
   const PAGE_SIZE = 50;
 
-  // URL-driven initial filters — lets the dashboard's "Approved, no bank
-  // match" tile link directly to /expenses?status=approved&matched=false.
-  const initialStatus = (page.url.searchParams.get('status') ?? '') as ExpenseStatus | '';
-  const initialMatched = page.url.searchParams.get('matched');
+  // Alias paths map to filter presets; src/hooks.ts reroute() keeps the pretty
+  // URL (`/expenses/pending`) while rendering this component. URL query params
+  // still work as a fallback for any direct links.
+  const aliasPresets: Record<string, { status: ExpenseStatus | ''; matched: '' | 'true' | 'false' }> = {
+    '/expenses/pending': { status: 'pending_review' as ExpenseStatus, matched: '' },
+    '/expenses/awaiting-bank': { status: 'approved' as ExpenseStatus, matched: 'false' },
+  };
+  const preset = aliasPresets[page.url.pathname as string];
+  const initialStatus = preset?.status ?? ((page.url.searchParams.get('status') ?? '') as ExpenseStatus | '');
+  const rawMatched = page.url.searchParams.get('matched');
+  const initialMatched = preset?.matched ?? (rawMatched === 'true' || rawMatched === 'false' ? rawMatched : '');
 
   let status = $state<ExpenseStatus | ''>(initialStatus);
-  let matched = $state<'' | 'true' | 'false'>(
-    initialMatched === 'true' || initialMatched === 'false' ? initialMatched : '',
-  );
+  let matched = $state<'' | 'true' | 'false'>(initialMatched);
   let offset = $state(0);
   let data = $state<ListExpensesResponse | null>(null);
   let loading = $state(false);
