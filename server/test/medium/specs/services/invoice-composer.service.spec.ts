@@ -356,6 +356,128 @@ describe('InvoiceComposerService', () => {
     });
   });
 
+  async function setTemplateDescription(db: Kysely<DB>, clientId: string) {
+    await db
+      .updateTable('client')
+      .set({ defaultDescription: 'Provided services, {period.start.day} {period.start.month_long}' })
+      .where('id', '=', clientId)
+      .execute();
+  }
+
+  async function seedPriorInvoice(
+    composer: InvoiceComposerService,
+    db: Kysely<DB>,
+    clientId: string,
+    lineTotal = 479_100n,
+  ) {
+    const priorTransfer = await seedOutgoingTransfer(db);
+    await composer.composeFromWise({
+      wiseTransferId: priorTransfer.id,
+      clientId,
+      issuedAt: new Date('2099-01-15T00:00:00Z'),
+      periodStart: new Date('2099-01-01T00:00:00Z'),
+      periodEnd: new Date('2099-01-15T00:00:00Z'),
+      lines: [{ description: 'Services', lineTotalMinor: lineTotal }],
+    });
+  }
+
+  describe('tryAutoComposeFromWise', () => {
+    it('composes when every guard passes (steady-cadence template-driven client)', async () => {
+      await setTemplateDescription(db, clientId);
+      await seedPriorInvoice(composer, db, clientId);
+      const settled = await seedOutgoingTransfer(db);
+
+      const result = await composer.tryAutoComposeFromWise(settled.id);
+      expect(result.outcome).toBe('composed');
+      if (result.outcome !== 'composed') {
+        return;
+      }
+      const invoice = await invoiceRepo.findById(result.invoiceId);
+      expect(invoice?.wiseTransferId).toBe(settled.id);
+      expect(invoice?.lines).toHaveLength(1);
+    });
+
+    it('is idempotent — a second attempt on the same transfer returns already_invoiced', async () => {
+      await setTemplateDescription(db, clientId);
+      await seedPriorInvoice(composer, db, clientId);
+      const settled = await seedOutgoingTransfer(db);
+      await composer.tryAutoComposeFromWise(settled.id);
+
+      const second = await composer.tryAutoComposeFromWise(settled.id);
+      expect(second.outcome).toBe('already_invoiced');
+    });
+
+    it('declines no_prior_invoice when the client has never been invoiced', async () => {
+      await setTemplateDescription(db, clientId);
+      const settled = await seedOutgoingTransfer(db);
+
+      const result = await composer.tryAutoComposeFromWise(settled.id);
+      expect(result).toMatchObject({ outcome: 'declined', reason: 'no_prior_invoice' });
+    });
+
+    it('declines rate_changed when the latest invoice total differs from the prefill', async () => {
+      await setTemplateDescription(db, clientId);
+      await seedPriorInvoice(composer, db, clientId, 500_000n);
+      const settled = await seedOutgoingTransfer(db, { sourceAmountMinor: 479_100n, originalCreditMinor: 479_100n });
+
+      const result = await composer.tryAutoComposeFromWise(settled.id);
+      expect(result).toMatchObject({ outcome: 'declined', reason: 'rate_changed' });
+    });
+
+    it('declines client_not_template_driven when the client has a non-template description', async () => {
+      // Non-empty but static — passes the "no description at all" guard but
+      // fails the template-driven check. Caller probably writes line text per
+      // invoice, so don't guess.
+      await db.updateTable('client').set({ defaultDescription: 'Services' }).where('id', '=', clientId).execute();
+      await seedPriorInvoice(composer, db, clientId);
+      const settled = await seedOutgoingTransfer(db);
+
+      const result = await composer.tryAutoComposeFromWise(settled.id);
+      expect(result).toMatchObject({ outcome: 'declined', reason: 'client_not_template_driven' });
+    });
+
+    it('declines no_line_description when the client has no defaultDescription at all', async () => {
+      await seedPriorInvoice(composer, db, clientId);
+      const settled = await seedOutgoingTransfer(db);
+
+      const result = await composer.tryAutoComposeFromWise(settled.id);
+      expect(result).toMatchObject({ outcome: 'declined', reason: 'no_line_description' });
+    });
+
+    it('declines no_suggested_client when there are multiple Non-EU clients', async () => {
+      await setTemplateDescription(db, clientId);
+      await seedPriorInvoice(composer, db, clientId);
+      await clientRepo.create({
+        name: 'OTHERCO',
+        class: ClientClass.NonEu,
+        tradeName: TradeName.ItServices,
+        address: { line1: 'other', city: 'elsewhere' },
+      });
+      const settled = await seedOutgoingTransfer(db);
+
+      const result = await composer.tryAutoComposeFromWise(settled.id);
+      expect(result).toMatchObject({ outcome: 'declined', reason: 'no_suggested_client' });
+    });
+
+    it('declines wrong_state for a non-settled transfer', async () => {
+      await setTemplateDescription(db, clientId);
+      await seedPriorInvoice(composer, db, clientId);
+      const draft = await seedOutgoingTransfer(db, { state: 'processing' });
+
+      const result = await composer.tryAutoComposeFromWise(draft.id);
+      expect(result).toMatchObject({ outcome: 'declined', reason: 'wrong_state' });
+    });
+
+    it('declines wrong_direction for an inbound transfer', async () => {
+      await setTemplateDescription(db, clientId);
+      await seedPriorInvoice(composer, db, clientId);
+      const inbound = await seedOutgoingTransfer(db, { direction: 'in' });
+
+      const result = await composer.tryAutoComposeFromWise(inbound.id);
+      expect(result).toMatchObject({ outcome: 'declined', reason: 'wrong_direction' });
+    });
+  });
+
   it('never records BTW for a non-EU client even if a rate is passed', async () => {
     // The compose form's BTW field defaults to 21 and isn't class-aware. A
     // non-EU client is out of scope for BTW, so the composer must ignore the

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnJob } from 'src/decorators';
 import { EventSource, JobName, QueueName, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { WiseApiError, WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { WiseTransferRepository, WiseTransferRow } from 'src/repositories/wise-transfer.repository';
 import { majorToMinor } from 'src/utils/money';
@@ -28,6 +29,7 @@ export class WiseReconcileService {
     private readonly wiseTransferRepository: WiseTransferRepository,
     private readonly wiseApi: WiseApiRepository,
     private readonly eventRepository: EventRepository,
+    private readonly jobRepository: JobRepository,
   ) {}
 
   @OnJob({ name: JobName.WiseReconcile, queue: QueueName.Default })
@@ -112,6 +114,12 @@ export class WiseReconcileService {
       targetAmountMinor: upstreamTargetMinor ?? undefined,
       fxRate: upstream.rate ?? undefined,
     });
+    // Mirror the webhook handler: reconcile catching a missed state-change
+    // to `outgoing_payment_sent` should trigger the same auto-compose
+    // attempt the webhook would have.
+    if (hasStateDrift && upstream.state === WiseTransferState.OutgoingPaymentSent) {
+      await this.jobRepository.queue(JobName.InvoiceAutoComposeFromWise, { wiseTransferId: row.id });
+    }
     return 'updated';
   }
 }

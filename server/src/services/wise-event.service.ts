@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { OnJob } from 'src/decorators';
 import { EventSource, JobName, QueueName, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { JobOf } from 'src/types';
@@ -20,6 +21,7 @@ export class WiseEventService {
     private readonly eventRepository: EventRepository,
     private readonly wiseTransferRepository: WiseTransferRepository,
     private readonly wiseApi: WiseApiRepository,
+    private readonly jobRepository: JobRepository,
   ) {}
 
   /**
@@ -71,6 +73,15 @@ export class WiseEventService {
     });
     await this.eventRepository.markProcessed(event.id);
     this.logger.log(`wise_transfer ${parsed.transferId} → ${parsed.state} (event ${event.id})`);
+
+    // Settled transfers may be auto-composable (steady-cadence Non-EU
+    // template-driven client, line total unchanged). Enqueue the attempt;
+    // the handler runs the guards and either composes or declines with a
+    // logged reason. Keeping it as a separate job means an auto-compose
+    // failure can't rebind this state-change to retry.
+    if (parsed.state === WiseTransferState.OutgoingPaymentSent) {
+      await this.jobRepository.queue(JobName.InvoiceAutoComposeFromWise, { wiseTransferId: existing.id });
+    }
   }
 }
 
