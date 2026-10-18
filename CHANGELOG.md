@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.10.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.9.4...v0.10.0) (2026-10-18)
+
+
+### Features
+
+* **open-api:** generate proper SDK types from zod DTOs ([8c72aa3](https://github.com/bo0tzz/bo0kkeeper/commit/8c72aa38b93dce9d0aa0ca657e7c8cb141faffb9))
+* **open-api:** type all endpoint responses for SDK generation ([755e3a4](https://github.com/bo0tzz/bo0kkeeper/commit/755e3a47330f5f722723605c92048581805e8e7c))
+* **web:** migrate every hand-written service to @bo0kkeeper/sdk ([17457bb](https://github.com/bo0tzz/bo0kkeeper/commit/17457bb2348fffc28a91a7ec84982d2b727d024a))
+* **web:** wire aggregator service via @bo0kkeeper/sdk (POC) ([8a251c8](https://github.com/bo0tzz/bo0kkeeper/commit/8a251c8ca6c388042d982d4c18f4ea8c49aed480))
+
+
+### Bug Fixes
+
+* **aggregator:** Non-EU income uses full-pool EUR, matching composer + export ([f51c6f1](https://github.com/bo0tzz/bo0kkeeper/commit/f51c6f1cc0abaa609093190f9506c0d366968015))
+* **bookkeeping:** accountant export selects by payment date (strict kasstelsel) ([1a92ac3](https://github.com/bo0tzz/bo0kkeeper/commit/1a92ac31b28d2f1f9afd1501cd481c4b4d5c9889))
+* **deps:** update dependency @types/node to v24.19.2 ([#198](https://github.com/bo0tzz/bo0kkeeper/issues/198)) ([782620f](https://github.com/bo0tzz/bo0kkeeper/commit/782620fa98e18c9814138e5b448bad1fea164521))
+* **deps:** update dependency compression to v1.8.2 ([#195](https://github.com/bo0tzz/bo0kkeeper/issues/195)) ([a6021c5](https://github.com/bo0tzz/bo0kkeeper/commit/a6021c530a16b141c49a3ba29651cbf407d74819))
+* **deps:** update dependency express to v5.3.0 ([#199](https://github.com/bo0tzz/bo0kkeeper/issues/199)) ([cf8e819](https://github.com/bo0tzz/bo0kkeeper/commit/cf8e8195f46134b00816bc886c1119e3bba37158))
+* **deps:** update dependency globals to v17.13.0 ([#200](https://github.com/bo0tzz/bo0kkeeper/issues/200)) ([1376ea6](https://github.com/bo0tzz/bo0kkeeper/commit/1376ea6e2461c564d01a21422ed2200149c6b3b3))
+* **deps:** update dependency knip to v6.42.0 ([#201](https://github.com/bo0tzz/bo0kkeeper/issues/201)) ([9559726](https://github.com/bo0tzz/bo0kkeeper/commit/9559726cad5edf51cee50aa79826fbe9f98d0171))
+* **deps:** update dependency kysely to v0.29.7 ([#196](https://github.com/bo0tzz/bo0kkeeper/issues/196)) ([bb12977](https://github.com/bo0tzz/bo0kkeeper/commit/bb129774087edeea1ee948a350535c203d477029))
+* **deps:** update dependency prettier to v3.9.10 ([#197](https://github.com/bo0tzz/bo0kkeeper/issues/197)) ([440e417](https://github.com/bo0tzz/bo0kkeeper/commit/440e4178486178c5a3341b817f25998c1652daf9))
+* **deps:** update ghcr.io/paperless-ngx/paperless-ngx:latest docker digest to d232cba ([#191](https://github.com/bo0tzz/bo0kkeeper/issues/191)) ([59cbd90](https://github.com/bo0tzz/bo0kkeeper/commit/59cbd9019e7db4531b8b8e0462812eb0f9f92696))
+* **deps:** update node.js to a5f4366 ([#192](https://github.com/bo0tzz/bo0kkeeper/issues/192)) ([bd69499](https://github.com/bo0tzz/bo0kkeeper/commit/bd69499a0463d747f66cc86190c9f3a58ffb8e3a))
+* **deps:** update postgres:18 docker digest to 74935e7 ([#194](https://github.com/bo0tzz/bo0kkeeper/issues/194)) ([9c9d63f](https://github.com/bo0tzz/bo0kkeeper/commit/9c9d63ffe56afc61985291ea8662ef78feb3ac8e))
+* **docker:** --ignore-scripts in deps stages; build SDK in build stage ([95c5675](https://github.com/bo0tzz/bo0kkeeper/commit/95c56757ce53da436e4ccb17ed48aa4b2a50323e))
+* **knip:** resolve CI findings after wiring knip into CI ([33881ec](https://github.com/bo0tzz/bo0kkeeper/commit/33881ecb32c2cd87bbe2e2c4a83031020af504d7))
+* **open-api:** build SDK on pnpm install via prepare hook ([470a346](https://github.com/bo0tzz/bo0kkeeper/commit/470a3466c7e70d68562f718376665be873fdfe00))
+* **sheet-sync:** unlink/relink doesn't duplicate the sheet row ([7b4ef00](https://github.com/bo0tzz/bo0kkeeper/commit/7b4ef005ed506a81da98843f1d3b5bb9ca49019e))
+* **wise:** draftFromEvent is idempotent on repeat ([55bb05d](https://github.com/bo0tzz/bo0kkeeper/commit/55bb05dc5b4d50a6fbcc07a90bd1342dcadf39a4))
+
 ## [0.9.4](https://github.com/bo0tzz/bo0kkeeper/compare/v0.9.3...v0.9.4) (2026-10-18)
 
 
