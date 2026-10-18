@@ -125,13 +125,29 @@ export class QuarterlyAggregatorService {
       totalGross += eurGross;
       totalBtw += eurBtw;
     }
-    // Wise transfers that landed in the quarter contribute Non-EU income at the
-    // EUR amount that actually arrived. No BTW (export, outside scope).
+    // Wise transfers that landed in the quarter contribute Non-EU income.
+    // The reportable revenue is the FULL client payment in EUR
+    // (originalCredit × target / source, i.e. "full-pool EUR"), not just
+    // what landed in SNS. On an under-credit sweep part of the client's
+    // payment leaked to Wise-flow expenses before the sweep cleared;
+    // `targetAmountMinor` is only the swept-residual leg. The invoice
+    // composer (post-v0.9.1) and the accountant export both already report
+    // full-pool EUR, so the dashboard aligns on the same convention and
+    // net stays consistent (full-pool - expense-pool = swept-residual).
+    // Pre-v0.9.1 rows have `originalCreditMinor` null, where it was equal
+    // to `sourceAmountMinor` by construction (nothing leaked), so the
+    // formula collapses to the old `targetAmountMinor` behavior.
     for (const row of paidTransfers) {
       if (row.targetCurrency !== 'EUR') {
         continue;
       }
-      const eurGross = BigInt(row.targetAmountMinor as unknown as string);
+      const sourceMinor = BigInt(row.sourceAmountMinor as unknown as string);
+      const targetMinor = BigInt(row.targetAmountMinor as unknown as string);
+      const originalMinor =
+        row.originalCreditMinor === null || row.originalCreditMinor === undefined
+          ? sourceMinor
+          : BigInt(row.originalCreditMinor as unknown as string);
+      const eurGross = sourceMinor === 0n ? targetMinor : (originalMinor * targetMinor) / sourceMinor;
       const bucket = byClass[ClientClass.NonEu];
       bucket.invoiceCount += 1;
       bucket.grossEurMinor += eurGross;

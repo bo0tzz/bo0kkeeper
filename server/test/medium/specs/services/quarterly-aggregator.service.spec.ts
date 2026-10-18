@@ -666,6 +666,53 @@ describe('QuarterlyAggregatorService', () => {
     expect(result.warnings.find((w) => w.kind === 'invoice_unmatched')).toBeUndefined();
   });
 
+  // Regression: on an under-credit sweep (client paid more than what actually
+  // got swept because wise-flow expenses ate part of the balance first), the
+  // dashboard aggregate used to show only `targetAmountMinor` as Non-EU income
+  // — understating revenue by exactly the leaked-expense amount. The composer
+  // and the accountant export both treat full-pool EUR (originalCredit × target
+  // / source) as income, and the dashboard now matches.
+  it('reports Non-EU income at full-pool EUR for under-credit sweeps (originalCredit > sourceAmount)', async () => {
+    // Client paid $4791 → full pool. Only $4596 made it into the sweep; the
+    // remaining $195 leaked to a Wise-flow card charge. Sweep landed at
+    // sourceAmount=$4596, target=€3889 (rate 0.846) — so pre-fix the
+    // aggregator would report €3889. Full-pool EUR = 4791 × 3889 / 4596 ≈ €4053.
+    const transfer = await transferRepo.create({
+      wiseTransferId: 'WISE-UNDERCREDIT',
+      direction: WiseTransferDirection.Out,
+      sourceAmountMinor: 459_600n,
+      sourceCurrency: 'USD',
+      targetAmountMinor: 388_900n,
+      targetCurrency: 'EUR',
+      fxRate: '0.846',
+      feeMinor: 0n,
+      feeCurrency: 'USD',
+      state: WiseTransferState.OutgoingPaymentSent,
+      stateUpdatedAt: new Date('2099-02-10'),
+      ourReference: 'TXN-UC1',
+      originalCreditMinor: 479_100n,
+    });
+    await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'q1:wise-undercredit-sweep',
+      txDate: new Date('2099-02-12'),
+      amountMinor: 388_900n,
+      currency: 'EUR',
+      counterpartyName: 'Wise',
+      counterpartyIban: null,
+      description: 'TXN-UC1',
+      rawPayload: {},
+      matchedTransferId: transfer.id,
+      matchedAt: new Date('2099-02-12'),
+    });
+
+    const result = await aggregator.aggregate(2099, 1);
+    // Full-pool EUR = 479_100 × 388_900 / 459_600 = 405_400 (BigInt
+    // integer-div truncates, as the composer does).
+    expect(result.income.byClass[ClientClass.NonEu].grossEurMinor).toBe(405_400n);
+    expect(result.income.totalGrossEurMinor).toBe(405_400n);
+  });
+
   it('returns zeroed buckets when the quarter has no activity', async () => {
     const result = await aggregator.aggregate(2099, 3);
     expect(result.income.totalGrossEurMinor).toBe(0n);

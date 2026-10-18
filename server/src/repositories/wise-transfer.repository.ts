@@ -200,13 +200,26 @@ export class WiseTransferRepository {
   /**
    * Transfers "paid in `[start, end)`" — wise_transfer rows whose matched
    * bank_tx booked inside the period. Drives Non-EU income aggregation
-   * for the quarterly report (target leg in the company account).
+   * for the quarterly report.
+   *
+   * We return the three legs the aggregator needs to compute income at the
+   * invoice-composer convention: full-pool EUR = originalCredit × target /
+   * source. targetAmountMinor alone (what landed in SNS) understates revenue
+   * on under-credit sweeps where some of the client's payment leaked to
+   * Wise-flow expenses before the sweep cleared; the export and the sheet
+   * already use full-pool EUR, so this keeps the dashboard aligned.
    */
   async findPaidInPeriod(start: Date, end: Date): Promise<WiseTransferPaidRow[]> {
     return (await this.db
       .selectFrom('bank_transaction')
       .innerJoin('wise_transfer', 'wise_transfer.id', 'bank_transaction.matchedTransferId')
-      .select(['wise_transfer.id', 'wise_transfer.targetAmountMinor', 'wise_transfer.targetCurrency'])
+      .select([
+        'wise_transfer.id',
+        'wise_transfer.sourceAmountMinor',
+        'wise_transfer.targetAmountMinor',
+        'wise_transfer.targetCurrency',
+        'wise_transfer.originalCreditMinor',
+      ])
       .where('bank_transaction.txDate', '>=', start)
       .where('bank_transaction.txDate', '<', end)
       .execute()) as WiseTransferPaidRow[];
@@ -242,8 +255,10 @@ export class WiseTransferRepository {
 /** Row returned by `findPaidInPeriod` — slim projection for the quarterly aggregator. */
 export type WiseTransferPaidRow = {
   id: string;
+  sourceAmountMinor: bigint | string;
   targetAmountMinor: bigint | string;
   targetCurrency: string;
+  originalCreditMinor: bigint | string | null;
 };
 
 /** Abbreviated row used by the manual match-candidate picker. */
