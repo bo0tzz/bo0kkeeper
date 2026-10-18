@@ -1,11 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, Selectable } from 'kysely';
+import { Kysely, Selectable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { DB } from 'src/schema';
 import { PeriodCloseTable } from 'src/schema/tables/period-close.table';
 
 export type PeriodClose = Selectable<PeriodCloseTable>;
-export type NewPeriodClose = Insertable<PeriodCloseTable>;
 
 @Injectable()
 export class PeriodCloseRepository {

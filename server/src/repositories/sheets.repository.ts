@@ -12,12 +12,6 @@ import { Config, loadConfig } from 'src/config';
  * cached until ~30s before expiry.
  */
 
-export type SheetTab = {
-  sheetId: number;
-  title: string;
-  /** 0-based row index of the next empty row (cached from last read). */
-};
-
 export type ColumnFormat = {
   /** 0-based column index. */
   index: number;

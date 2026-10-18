@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path';
  * WORKDIR) and tests, so this resolves consistently. Override with the
  * `templatesDir` constructor arg for fixtures.
  */
-export const TEMPLATES_DIR = resolve(process.cwd(), 'src/templates');
+const TEMPLATES_DIR = resolve(process.cwd(), 'src/templates');
 const KNOWN_TEMPLATES = ['invoice'] as const;
 
 export type RenderInput = {

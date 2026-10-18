@@ -63,7 +63,6 @@ const WiseTransferListItemSchema = WiseTransferResponseSchema.extend({
   linkedInvoiceId: z.string().nullable(),
   linkedInvoiceNumber: z.string().nullable(),
 }).meta({ id: 'WiseTransferListItemDto' });
-export class WiseTransferListItemDto extends createZodDto(WiseTransferListItemSchema) {}
 
 const ListWiseTransfersResponseSchema = z
   .object({

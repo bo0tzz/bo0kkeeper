@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Insertable, Kysely, Selectable, Updateable } from 'kysely';
+import { Insertable, Kysely, Selectable } from 'kysely';
 import { InjectKysely } from 'nestjs-kysely';
 import { randomUUID } from 'node:crypto';
 import { EventSource, EventStatus } from 'src/enum';
@@ -8,7 +8,6 @@ import { EventTable } from 'src/schema/tables/event.table';
 
 export type Event = Selectable<EventTable>;
 export type NewEvent = Insertable<EventTable>;
-export type EventUpdate = Updateable<EventTable>;
 
 export type IngestResult = { ingested: true; event: Event } | { ingested: false; existingId: string };
 

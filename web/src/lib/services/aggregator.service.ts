@@ -2,7 +2,7 @@ import { apiDelete, apiGet, apiPost } from '$lib/services/api';
 
 export type ClientClass = 'non_eu' | 'eu' | 'eu_reverse_charge' | 'domestic';
 
-export type IncomeBucket = {
+type IncomeBucket = {
   invoiceCount: number;
   grossEurMinor: string;
   btwEurMinor: string;

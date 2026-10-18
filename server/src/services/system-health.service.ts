@@ -7,7 +7,7 @@ import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { SettingsService } from 'src/services/settings.service';
 
-export type IntegrationStatus = 'healthy' | 'degraded' | 'broken' | 'not_configured';
+type IntegrationStatus = 'healthy' | 'degraded' | 'broken' | 'not_configured';
 
 export type IntegrationCheck = {
   /** Stable id (e.g. `wise`, `paperless`). */

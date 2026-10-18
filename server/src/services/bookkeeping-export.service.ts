@@ -26,7 +26,7 @@ import { minorToMajor } from 'src/utils/money';
  * doesn't shift the cached row numbers of the sections above.
  */
 
-export const TEMPLATES_DIR = resolve(process.cwd(), 'src/templates');
+const TEMPLATES_DIR = resolve(process.cwd(), 'src/templates');
 const TEMPLATE_FILENAME = 'bookkeeping-list.xlsx';
 
 @Injectable()

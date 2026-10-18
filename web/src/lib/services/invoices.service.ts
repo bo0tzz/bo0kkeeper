@@ -1,6 +1,6 @@
 import { apiGet, apiPost } from '$lib/services/api';
 
-export type InvoiceLineInput = {
+type InvoiceLineInput = {
   description: string;
   unitLabel?: string;
   quantity?: string;
@@ -24,7 +24,7 @@ export type InvoiceComposeInput = {
   lines: InvoiceLineInput[];
 };
 
-export type InvoiceLineResponse = {
+type InvoiceLineResponse = {
   id: string;
   ordinal: number;
   description: string;
@@ -33,7 +33,7 @@ export type InvoiceLineResponse = {
   lineTotalMinor: string;
 };
 
-export type InvoiceResponse = {
+type InvoiceResponse = {
   id: string;
   number: string;
   clientId: string;

@@ -114,7 +114,6 @@ const InvoiceListItemSchema = z
     paid: z.boolean(),
   })
   .meta({ id: 'InvoiceListItemDto' });
-export class InvoiceListItemDto extends createZodDto(InvoiceListItemSchema) {}
 
 const ListInvoicesQuerySchema = z
   .object({

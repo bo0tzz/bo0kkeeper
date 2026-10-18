@@ -50,7 +50,7 @@ type IncomeBucket = {
   btwEurMinor: bigint;
 };
 
-export type AggregatorWarning =
+type AggregatorWarning =
   | { kind: 'invoice_unmatched'; count: number; sampleNumbers: string[] }
   | { kind: 'expense_pending_review'; count: number; sampleVendors: string[] }
   | { kind: 'expense_low_confidence_match'; count: number; sampleIds: string[] };

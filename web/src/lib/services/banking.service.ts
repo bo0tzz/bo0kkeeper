@@ -1,6 +1,6 @@
 import { apiDelete, apiGet, apiPost, apiPut } from '$lib/services/api';
 
-export type BankingAccount = {
+type BankingAccount = {
   uid: string;
   iban: string | null;
   currency: string;
@@ -109,7 +109,7 @@ export const listBankTransactions = (params: ListBankTransactionsParams = {}, fe
     },
   });
 
-export type TransferCandidate = {
+type TransferCandidate = {
   id: string;
   wiseTransferId: string;
   ourReference: string | null;
@@ -120,7 +120,7 @@ export type TransferCandidate = {
   targetAmountMinor: string;
   createdAt: string;
 };
-export type InvoiceCandidate = {
+type InvoiceCandidate = {
   id: string;
   number: string;
   totalMinor: string;
@@ -128,7 +128,7 @@ export type InvoiceCandidate = {
   issuedAt: string;
   clientName: string | null;
 };
-export type ExpenseCandidate = {
+type ExpenseCandidate = {
   id: string;
   vendor: string;
   amountMinor: string;

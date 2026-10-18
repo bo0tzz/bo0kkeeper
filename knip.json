@@ -3,34 +3,29 @@
   "workspaces": {
     ".": {
       "entry": [
-        "tools/browser-harness/*.mjs"
+        "tools/browser-harness/*.mjs",
+        "scripts/dev-oidc.mjs"
       ]
     },
     "server": {
       "entry": [
         "src/main.ts",
         "src/bin/*.ts",
+        "src/schema/index.ts",
         "src/schema/migrations/*.ts",
-        "test/medium/globalSetup.ts",
-        "test/vitest.config.mjs",
-        "test/vitest.config.medium.mjs",
-        "test/vitest.config.e2e.mjs"
+        "test/medium/globalSetup.ts"
       ],
       "project": [
         "src/**/*.ts",
         "test/**/*.ts"
-      ]
+      ],
+      "ignoreExportsUsedInFile": true
     },
     "web": {
       "entry": [
-        "playwright.config.ts",
         "e2e/specs/*.spec.ts"
       ]
     },
-    "open-api/typescript-sdk": {
-      "entry": [
-        "src/index.ts"
-      ]
-    }
+    "open-api/typescript-sdk": {}
   }
 }

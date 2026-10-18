@@ -11,6 +11,10 @@ import { InvoiceTable } from 'src/schema/tables/invoice.table';
 import { PeriodCloseTable } from 'src/schema/tables/period-close.table';
 import { WiseTransferTable } from 'src/schema/tables/wise-transfer.table';
 
+// Decorator-driven schema registration — @Database is sql-tools's hook to
+// discover tables (which this class lists) at migrations:generate time.
+// No TypeScript code imports the class by name, but the decorator side-effect
+// is load-bearing, so keep it exported to silence unused-var lints.
 @Extensions(['uuid-ossp', 'plpgsql'])
 @Database({ name: 'bo0kkeeper' })
 export class Bo0kkeeperDatabase {
@@ -31,7 +35,7 @@ export class Bo0kkeeperDatabase {
   enum = [];
 }
 
-export interface Migrations {
+interface Migrations {
   id: Generated<number>;
   name: string;
   timestamp: Int8;

@@ -106,7 +106,7 @@ export type ListTransactionsResult = {
   continuationKey: string | null;
 };
 
-export type EnableBankingBalance = {
+type EnableBankingBalance = {
   balance_amount: { amount: string; currency: string };
   balance_type: string;
   reference_date?: string;
