@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.9.4](https://github.com/bo0tzz/bo0kkeeper/compare/v0.9.3...v0.9.4) (2026-10-18)
+
+
+### Bug Fixes
+
+* **banking:** drift uses createdAt vs baseline timestamp, not txDate vs date ([76a1fdf](https://github.com/bo0tzz/bo0kkeeper/commit/76a1fdf34af84e0b7d3b1c609cd3240639d89e7d))
+* **deps:** update debian:13-slim docker digest to a29215f ([#189](https://github.com/bo0tzz/bo0kkeeper/issues/189)) ([6997b26](https://github.com/bo0tzz/bo0kkeeper/commit/6997b266ca38f6b01f78ec92819846517b9a4056))
+* **deps:** update dependency @immich/sql-tools to ^0.6.0 ([#169](https://github.com/bo0tzz/bo0kkeeper/issues/169)) ([abbbd50](https://github.com/bo0tzz/bo0kkeeper/commit/abbbd50b9e171c318636ddd78d3a5e7eb9bc4064))
+* **deps:** update dependency @swc/core to v1.16.18 ([#186](https://github.com/bo0tzz/bo0kkeeper/issues/186)) ([48de947](https://github.com/bo0tzz/bo0kkeeper/commit/48de947ecdb62d2a6f233642eeaf86805de04824))
+* **deps:** update dependency happy-dom to v20.14.6 ([#181](https://github.com/bo0tzz/bo0kkeeper/issues/181)) ([26bae64](https://github.com/bo0tzz/bo0kkeeper/commit/26bae64819692ce14597a20310a1fabbda4af3f3))
+* **deps:** update dependency jose to v6.2.12 ([#182](https://github.com/bo0tzz/bo0kkeeper/issues/182)) ([e3776b4](https://github.com/bo0tzz/bo0kkeeper/commit/e3776b476bc58733e7cb3258001b190eaed804e1))
+* **deps:** update dependency nestjs-kysely to v3.1.4 ([#183](https://github.com/bo0tzz/bo0kkeeper/issues/183)) ([e41ffc1](https://github.com/bo0tzz/bo0kkeeper/commit/e41ffc16af83384e07e64e6a933c8dd9e3b263a3))
+* **deps:** update dependency openid-client to v6.8.8 ([#184](https://github.com/bo0tzz/bo0kkeeper/issues/184)) ([26f21fa](https://github.com/bo0tzz/bo0kkeeper/commit/26f21faa7afb645d65c4e03bfcb63096d3a5ebcf))
+* **deps:** update dependency pg-boss to v12.38.0 ([#187](https://github.com/bo0tzz/bo0kkeeper/issues/187)) ([65d872d](https://github.com/bo0tzz/bo0kkeeper/commit/65d872dfbd40f593fbfd9d603a1f90888095e70f))
+* **deps:** update dependency vite to v8.3.4 ([#175](https://github.com/bo0tzz/bo0kkeeper/issues/175)) ([b6c93f9](https://github.com/bo0tzz/bo0kkeeper/commit/b6c93f9db6ccf768607aa3f19c1a95ba02428d62))
+* **deps:** update docker.io/library/redis:8 docker digest to 2c2dff7 ([#190](https://github.com/bo0tzz/bo0kkeeper/issues/190)) ([5b646fc](https://github.com/bo0tzz/bo0kkeeper/commit/5b646fcf14d0b80bf6cc9e10214c1afb5826db3d))
+* **deps:** update vitest to v4.1.12 ([#185](https://github.com/bo0tzz/bo0kkeeper/issues/185)) ([2578894](https://github.com/bo0tzz/bo0kkeeper/commit/25788942311e49cf05d240b63301b3ecd9ded181))
+
 ## [0.9.3](https://github.com/bo0tzz/bo0kkeeper/compare/v0.9.2...v0.9.3) (2026-08-23)
 
 
