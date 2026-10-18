@@ -212,21 +212,6 @@ export class BankMatcherService {
   }
 
   /**
-   * Once a bank_tx → wise_transfer match lands (high-confidence via TXN
-   * ref), wire the corresponding invoice to that wise_transfer if it
-   * isn't linked already. Closes the gap left by the manual-compose
-   * flow: the user issues an invoice before the Wise outgoing payout
-   * completes (compose-from-wise refuses until then), so wiseTransferId
-   * stays NULL — and the dashboard's unmatched-invoices warning would
-   * fire forever otherwise.
-   *
-   * Match key is the wise_transfer's source side (currency + amount) —
-   * for an export-non-EU flow that's exactly what the client paid
-   * (e.g. 4791.00 USD), which equals invoice.totalMinor / currency. We
-   * require a unique candidate; ambiguity (multiple invoices matching)
-   * is logged and left for manual resolution.
-   */
-  /**
    * Post sweep-landing: for every approved expense linked to this sweep,
    * compute EUR from the sweep's realized rate and write its sheet row.
    * Wise-flow expenses stay in "approved, EUR-pending" limbo between
@@ -255,6 +240,21 @@ export class BankMatcherService {
     }
   }
 
+  /**
+   * Once a bank_tx → wise_transfer match lands (high-confidence via TXN
+   * ref), wire the corresponding invoice to that wise_transfer if it
+   * isn't linked already. Closes the gap left by the manual-compose
+   * flow: the user issues an invoice before the Wise outgoing payout
+   * completes (compose-from-wise refuses until then), so wiseTransferId
+   * stays NULL — and the dashboard's unmatched-invoices warning would
+   * fire forever otherwise.
+   *
+   * Match key is the wise_transfer's source side (currency + amount) —
+   * for an export-non-EU flow that's exactly what the client paid
+   * (e.g. 4791.00 USD), which equals invoice.totalMinor / currency. We
+   * require a unique candidate; ambiguity (multiple invoices matching)
+   * is logged and left for manual resolution.
+   */
   private async tryAutoLinkInvoiceToTransfer(transfer: WiseTransferRow): Promise<void> {
     const sourceAmount = BigInt(transfer.sourceAmountMinor as bigint | number | string);
     const createdAt = toDate(transfer.createdAt);
@@ -286,13 +286,6 @@ export class BankMatcherService {
   }
 
   /**
-   * Operator-driven match. Sets exactly one of the matched* FKs (clearing the
-   * others), marks confidence=manual, and runs the same sheet-append we'd run
-   * on an auto-match — manual matches earn the same sheet row treatment.
-   *
-   * Returns the updated row so the UI can refresh in place.
-   */
-  /**
    * Things the user might want to manually link a bank tx to. With a free-
    * text query, this is a substring match on the most useful identifier per
    * type. Without one, we exclude candidates that are already matched to
@@ -312,6 +305,13 @@ export class BankMatcherService {
     return { transfers, invoices, expenses };
   }
 
+  /**
+   * Operator-driven match. Sets exactly one of the matched* FKs (clearing the
+   * others), marks confidence=manual, and runs the same sheet-append we'd run
+   * on an auto-match — manual matches earn the same sheet row treatment.
+   *
+   * Returns the updated row so the UI can refresh in place.
+   */
   async manualMatch(
     bankTxId: string,
     target: { type: 'wise_transfer' | 'invoice' | 'expense'; targetId: string },

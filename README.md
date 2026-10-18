@@ -89,7 +89,7 @@ Five layers, increasing in scope:
 | Medium | `mise run test-medium` | Repositories + services against a real Postgres (testcontainers, per-test cloned DB). Mocks Wise/paperless/sheets HTTP. |
 | E2E auth | `mise run test-e2e` | Boots a real Nest app + an in-process fake OIDC IDP, walks login → callback → `/api/auth/me` with a cookie jar. Catches JWKS, cookie scoping, OIDC discovery, and AuthGuard regressions. |
 | Smoke | `mise run smoke` | Hits the **running** dev stack and asserts wire-up: db reachable, vite proxy targets backend, `/api/auth/login` redirects to the configured IDP, IDP JWKS is non-empty, redirect URI is on the frontend port. Run after any infra/env change. |
-| Web | `mise run test-web` | SvelteKit unit tests (vitest, jsdom). |
+| Web | `mise run test-web` | SvelteKit unit tests (vitest, jsdom). _No tests exist yet; runner uses `--passWithNoTests` so it's a no-op until a `*.spec.ts` lands under `web/src/`._ |
 | Browser e2e | `pnpm --filter web test:browser` | Playwright against the **running** dev stack (server + web + IDP). Smokes every nav route and exercises the higher-leverage flows (settings tag-check, system health refresh, compose-form validation). Auth state is reused from `tools/browser-harness/state.json`; bootstrap with `node tools/browser-harness/refresh-state.mjs` if your IDP session has expired. |
 
 `mise run test` runs everything except smoke + browser e2e (both assume a running stack).

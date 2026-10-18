@@ -237,8 +237,10 @@ function emptyBucket(): IncomeBucket {
 /**
  * Pick the EUR equivalent of an invoice's gross. Native-EUR invoices use
  * `totalMinor`; foreign-currency invoices use `eurTotalMinor` (set at the FX
- * rate that landed). Falls back to `totalMinor` if the EUR amount wasn't
- * recorded — the warning system will flag missing FX as needed.
+ * rate that landed). Foreign-currency rows with no eurTotalMinor recorded
+ * contribute 0 — the dashboard's warning system is expected to catch the
+ * missing-FX case; we don't fall back to the native amount because treating
+ * USD cents as EUR cents would silently inflate the aggregate.
  */
 function pickEurMinor(eurTotalMinor: unknown, totalMinor: unknown, currency: string): bigint {
   if (currency === 'EUR') {

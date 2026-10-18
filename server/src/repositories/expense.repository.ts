@@ -207,12 +207,6 @@ export class ExpenseRepository {
   }
 
   /**
-   * Count approved expenses with a manual-match linked bank_tx whose sheet
-   * row never landed AND where the bank-tx-match has been sitting for longer
-   * than `staleAfterMs`. Parallel to
-   * BankTransactionRepository.countStaleSheetWrites for the expense side.
-   */
-  /**
    * Approved expense + its manual-confidence bank-tx link, surfaced with
    * the bank-tx id + date, for rows that don't yet have a sheet write.
    * Used by the sheet-write helper that runs after either approval or

@@ -442,11 +442,6 @@ export type InvoiceExportRow = {
   lineDescription: string | null;
 };
 
-/**
- * Allocate the next `YYYY/NNN` invoice number for the given year, gap-free.
- * Upsert pattern lets the first invoice of a new year auto-create the row.
- * Wrapped in the issuing transaction to prevent races.
- */
 /** Heuristic-candidate row used by the bank-matcher auto-low path. */
 export type InvoiceHeuristicCandidate = {
   invoiceId: string;
@@ -467,6 +462,11 @@ export type InvoiceMatchCandidate = {
   clientName: string | null;
 };
 
+/**
+ * Allocate the next `YYYY/NNN` invoice number for the given year, gap-free.
+ * Upsert pattern lets the first invoice of a new year auto-create the row.
+ * Wrapped in the issuing transaction to prevent races.
+ */
 async function allocateInvoiceNumber(trx: Transaction<DB>, year: number): Promise<string> {
   const result = await sql<{ lastNumber: number }>`
     INSERT INTO "invoice_number_sequence" ("year", "lastNumber")

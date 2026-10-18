@@ -473,7 +473,10 @@ function eurFromMinor(minor: bigint, fxRate: string | null): string {
   if (fxRate === null) {
     return formatMinor(minor);
   }
-  // Multiply minor by fxRate as a decimal — string math to avoid float drift.
+  // Display-only EUR conversion for the invoice PDF — float math is fine here
+  // because the stored eurTotalMinor (used for all bookkeeping) is BigInt and
+  // computed elsewhere. A sub-cent rounding drift in the PDF would be lost in
+  // `.toFixed(2)` anyway.
   const eur = (Number(minor) / 100) * Number.parseFloat(fxRate);
   return eur.toFixed(2);
 }
@@ -526,6 +529,17 @@ function formatDateDutch(date: Date | string): string {
 }
 
 /**
+ * BTW (Dutch VAT) charged on top of a net subtotal, in minor units.
+ *
+ * Composer line amounts are net (excl-BTW); they sum to the subtotal, and BTW
+ * is `subtotal × rate` added on top (Total = subtotal + BTW). Rounded half-up
+ * to the nearest cent.
+ */
+function btwOnNet(netMinor: bigint, rateBps: number): bigint {
+  return (netMinor * BigInt(rateBps) + 5000n) / 10_000n;
+}
+
+/**
  * Build the data object handed to `invoice.typ`. The composer fully describes
  * the line-items table (headers + per-row cells) and the totals section, so
  * the template is a generic renderer rather than a class-specific switch.
@@ -538,17 +552,6 @@ function formatDateDutch(date: Date | string): string {
  *     amount / total) and a 3-line summary (subtotal, BTW, total). IBAN
  *     payment block.
  */
-/**
- * BTW (Dutch VAT) charged on top of a net subtotal, in minor units.
- *
- * Composer line amounts are net (excl-BTW); they sum to the subtotal, and BTW
- * is `subtotal × rate` added on top (Total = subtotal + BTW). Rounded half-up
- * to the nearest cent.
- */
-function btwOnNet(netMinor: bigint, rateBps: number): bigint {
-  return (netMinor * BigInt(rateBps) + 5000n) / 10_000n;
-}
-
 function buildInvoiceData(client: Client, invoice: InvoiceWithLines, issuer: IssuerInfo): Record<string, unknown> {
   const totalMinor = BigInt(invoice.totalMinor as unknown as string);
   const isNonEu = client.class === ClientClass.NonEu;
