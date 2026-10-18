@@ -50,3 +50,10 @@ const SheetWriteStatusSchema = z
   })
   .meta({ id: 'SheetWriteStatusDto' });
 export class SheetWriteStatusDto extends createZodDto(SheetWriteStatusSchema) {}
+
+const RetrySheetWritesResponseSchema = z
+  .object({
+    enqueued: z.literal(true),
+  })
+  .meta({ id: 'RetrySheetWritesResponseDto' });
+export class RetrySheetWritesResponseDto extends createZodDto(RetrySheetWritesResponseSchema) {}

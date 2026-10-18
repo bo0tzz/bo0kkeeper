@@ -1,7 +1,7 @@
 import { Body, Controller, Headers, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
-import { PaperlessWebhookDto, WiseWebhookDto } from 'src/dtos/webhook.dto';
+import { PaperlessWebhookDto, WebhookIngestResponseDto, WiseWebhookDto } from 'src/dtos/webhook.dto';
 import { WebhookService } from 'src/services/webhook.service';
 
 type RawRequest = Request & { rawBody?: string };
@@ -19,12 +19,13 @@ export class WebhookController {
    */
   @Post('wise')
   @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: WebhookIngestResponseDto })
   async ingestWiseWebhook(
     @Req() req: RawRequest,
     @Body() body: WiseWebhookDto,
     @Headers('x-signature-sha256') signature: string | undefined,
     @Headers('x-delivery-id') deliveryId: string | undefined,
-  ) {
+  ): Promise<WebhookIngestResponseDto> {
     this.webhookService.verifyWiseSignature(req.rawBody ?? '', signature);
     const result = await this.webhookService.ingestWiseEvent(body, deliveryId);
     return { ingested: result.ingested };
@@ -38,11 +39,12 @@ export class WebhookController {
    */
   @Post('paperless')
   @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: WebhookIngestResponseDto })
   async ingestPaperlessWebhook(
     @Body() body: PaperlessWebhookDto,
     @Headers('authorization') authorization: string | undefined,
     @Headers('x-delivery-id') deliveryId: string | undefined,
-  ) {
+  ): Promise<WebhookIngestResponseDto> {
     this.webhookService.verifyPaperlessAuthorization(authorization);
     const result = await this.webhookService.ingestPaperlessEvent(body, deliveryId);
     return { ingested: result.ingested };

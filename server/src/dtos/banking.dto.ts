@@ -189,3 +189,10 @@ const ListBankTransactionsResponseSchema = z
   })
   .meta({ id: 'ListBankTransactionsResponseDto' });
 export class ListBankTransactionsResponseDto extends createZodDto(ListBankTransactionsResponseSchema) {}
+
+const BankingSyncResponseSchema = z
+  .object({
+    enqueued: z.literal(true),
+  })
+  .meta({ id: 'BankingSyncResponseDto' });
+export class BankingSyncResponseDto extends createZodDto(BankingSyncResponseSchema) {}

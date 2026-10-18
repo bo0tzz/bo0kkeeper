@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Patch, Post } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Authenticated } from 'src/decorators';
 import {
   PaperlessTagCheckDto,
@@ -29,6 +29,7 @@ export class SettingsController {
 
   @Get()
   @Authenticated()
+  @ApiOkResponse({ type: SettingsResponseDto })
   async get(): Promise<SettingsResponseDto> {
     const settings = await this.settingsService.get();
     return toDto(settings);
@@ -40,6 +41,7 @@ export class SettingsController {
    */
   @Patch()
   @Authenticated()
+  @ApiOkResponse({ type: SettingsResponseDto })
   async update(@Body() body: UpdateSettingsDto): Promise<SettingsResponseDto> {
     const patch: Parameters<SettingsService['update']>[0] = {};
     if (body.issuer) {
@@ -91,6 +93,7 @@ export class SettingsController {
    */
   @Post('/paperless/tag-check')
   @Authenticated()
+  @ApiOkResponse({ type: PaperlessTagCheckResponseDto })
   async checkPaperlessTags(@Body() body: PaperlessTagCheckDto): Promise<PaperlessTagCheckResponseDto> {
     const results = await this.paperlessService.checkTagsExist(body.tags);
     return { results };

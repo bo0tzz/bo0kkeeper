@@ -1,5 +1,5 @@
 import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post, Query, Res } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { loadConfig } from 'src/config';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
@@ -28,6 +28,7 @@ export class InvoicesController {
   @Get()
   @Authenticated()
   @ApiQueryFromDto(ListInvoicesQueryDto)
+  @ApiOkResponse({ type: ListInvoicesResponseDto })
   async listInvoices(@Query() query: ListInvoicesQueryDto): Promise<ListInvoicesResponseDto> {
     const { items, total } = await this.invoiceRepository.findPaginated({
       year: query.year,
@@ -56,6 +57,7 @@ export class InvoicesController {
 
   @Get(':id')
   @Authenticated()
+  @ApiOkResponse({ type: InvoiceResponseDto })
   async getInvoice(@Param('id', ParseUUIDPipe) id: string): Promise<InvoiceResponseDto> {
     const invoice = await this.invoiceRepository.findById(id);
     if (!invoice) {
@@ -71,6 +73,7 @@ export class InvoicesController {
    */
   @Post('compose')
   @Authenticated()
+  @ApiOkResponse({ type: InvoiceComposeResponseDto })
   async composeInvoice(@Body() dto: InvoiceComposeDto): Promise<InvoiceComposeResponseDto> {
     const result = await this.composer.composeAndIssue({
       clientId: dto.clientId,
@@ -103,6 +106,7 @@ export class InvoicesController {
    */
   @Get('wise-prefill/:wiseTransferId')
   @Authenticated()
+  @ApiOkResponse({ type: WiseInvoicePrefillDto })
   async getWisePrefill(@Param('wiseTransferId', ParseUUIDPipe) wiseTransferId: string): Promise<WiseInvoicePrefillDto> {
     const prefill = await this.composer.prefillFromWise(wiseTransferId);
     return {
@@ -125,6 +129,7 @@ export class InvoicesController {
    */
   @Post('compose-from-wise/:wiseTransferId')
   @Authenticated()
+  @ApiOkResponse({ type: InvoiceComposeResponseDto })
   async composeInvoiceFromWise(
     @Param('wiseTransferId', ParseUUIDPipe) wiseTransferId: string,
     @Body() dto: InvoiceComposeFromWiseDto,

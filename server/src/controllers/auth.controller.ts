@@ -1,5 +1,5 @@
 import { Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { loadConfig } from 'src/config';
 import { Auth, Authenticated } from 'src/decorators';
@@ -121,6 +121,7 @@ export class AuthController {
 
   @Get('me')
   @Authenticated()
+  @ApiOkResponse({ type: AuthMeDto })
   getMe(@Auth() user: AuthUser): AuthMeDto {
     return { sub: user.sub, email: user.email, name: user.name } as AuthMeDto;
   }

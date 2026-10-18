@@ -11,7 +11,7 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { loadConfig } from 'src/config';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
@@ -48,6 +48,7 @@ export class ExpensesController {
   @Get()
   @Authenticated()
   @ApiQueryFromDto(ListExpensesQueryDto)
+  @ApiOkResponse({ type: ListExpensesResponseDto })
   async listExpenses(@Query() query: ListExpensesQueryDto): Promise<ListExpensesResponseDto> {
     const page = await this.expenseRepository.findMany({
       status: query.status,
@@ -67,6 +68,7 @@ export class ExpensesController {
 
   @Get(':id')
   @Authenticated()
+  @ApiOkResponse({ type: ExpenseResponseDto })
   async getExpense(@Param('id', ParseUUIDPipe) id: string): Promise<ExpenseResponseDto> {
     const row = await this.expenseRepository.findById(id);
     if (!row) {
@@ -81,6 +83,7 @@ export class ExpensesController {
    */
   @Patch(':id')
   @Authenticated()
+  @ApiOkResponse({ type: ExpenseResponseDto })
   async updateExpense(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ExpenseUpdateDto,
@@ -109,6 +112,7 @@ export class ExpensesController {
    */
   @Post(':id/approve')
   @Authenticated()
+  @ApiOkResponse({ type: ExpenseResponseDto })
   async approveExpense(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ExpenseApproveDto,
@@ -194,6 +198,7 @@ export class ExpensesController {
    */
   @Post('rescan-paperless')
   @Authenticated()
+  @ApiOkResponse({ type: RescanPaperlessResponseDto })
   async rescanPaperless(): Promise<RescanPaperlessResponseDto> {
     const cutover = loadConfig().cutoverDate;
     if (!cutover) {
@@ -237,6 +242,7 @@ export class ExpensesController {
   /** Reject the expense (paperless doc was misclassified, isn't a business expense, etc). */
   @Post(':id/reject')
   @Authenticated()
+  @ApiOkResponse({ type: ExpenseResponseDto })
   async rejectExpense(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ExpenseRejectDto,

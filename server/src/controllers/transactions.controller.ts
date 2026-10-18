@@ -1,5 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import { ListTransactionsQueryDto, ListTransactionsResponseDto } from 'src/dtos/transactions.dto';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
@@ -31,6 +31,7 @@ export class TransactionsController {
   @Get()
   @Authenticated()
   @ApiQueryFromDto(ListTransactionsQueryDto)
+  @ApiOkResponse({ type: ListTransactionsResponseDto })
   async list(@Query() query: ListTransactionsQueryDto): Promise<ListTransactionsResponseDto> {
     // The merge is in-memory, so we either fetch generously or accept that
     // the date filter trims things on the way out. Bumped to 500 each which

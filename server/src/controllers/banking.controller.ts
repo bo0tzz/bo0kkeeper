@@ -13,7 +13,7 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import {
@@ -22,6 +22,7 @@ import {
   BankingSessionResponseDto,
   BankingStartAuthDto,
   BankingStartAuthResponseDto,
+  BankingSyncResponseDto,
   BankTransactionResponseDto,
   BankTxMatchCandidatesDto,
   BankTxSetCategoryDto,
@@ -75,6 +76,7 @@ export class BankingController {
   @Get('aspsps')
   @Authenticated()
   @ApiQueryFromDto(BankingAspspsQueryDto)
+  @ApiOkResponse({ type: BankingAspspsResponseDto })
   async listAspsps(@Query() query: BankingAspspsQueryDto): Promise<BankingAspspsResponseDto> {
     const country = query.country ?? 'NL';
     const aspsps = await this.enableBanking.listAspsps(country);
@@ -89,6 +91,7 @@ export class BankingController {
 
   @Post('auth/start')
   @Authenticated()
+  @ApiOkResponse({ type: BankingStartAuthResponseDto })
   async startAuth(@Body() body: BankingStartAuthDto): Promise<BankingStartAuthResponseDto> {
     const result = await this.sessionService.startAuth({
       aspspName: body.aspspName,
@@ -119,6 +122,7 @@ export class BankingController {
 
   @Get('session')
   @Authenticated()
+  @ApiOkResponse({ type: BankingSessionResponseDto })
   async getLatestSession(): Promise<BankingSessionResponseDto | null> {
     const row = await this.sessionRepository.findLatest();
     if (!row) {
@@ -152,7 +156,8 @@ export class BankingController {
    */
   @Post('sync')
   @Authenticated()
-  async sync(@Ip() ip: string): Promise<{ enqueued: true }> {
+  @ApiOkResponse({ type: BankingSyncResponseDto })
+  async sync(@Ip() ip: string): Promise<BankingSyncResponseDto> {
     await this.jobRepository.queue(JobName.BankingSyncAll, { psuIpAddress: ip });
     return { enqueued: true };
   }
@@ -161,6 +166,7 @@ export class BankingController {
   @Get('transactions')
   @Authenticated()
   @ApiQueryFromDto(ListBankTransactionsQueryDto)
+  @ApiOkResponse({ type: ListBankTransactionsResponseDto })
   async listTransactions(@Query() query: ListBankTransactionsQueryDto): Promise<ListBankTransactionsResponseDto> {
     const { items, total } = await this.bankTransactionRepository.findPaginated({
       dateFrom: query.dateFrom,
@@ -179,6 +185,7 @@ export class BankingController {
    */
   @Get('match-candidates')
   @Authenticated()
+  @ApiOkResponse({ type: BankTxMatchCandidatesDto })
   async matchCandidates(@Query('q') q?: string): Promise<BankTxMatchCandidatesDto> {
     const candidates = await this.matcher.findMatchCandidates(q);
     return {
@@ -215,6 +222,7 @@ export class BankingController {
   /** Operator-driven manual match. Sets confidence=manual, runs sheet append. */
   @Put('transactions/:id/match')
   @Authenticated()
+  @ApiOkResponse({ type: BankTransactionResponseDto })
   async setMatch(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: BankTxSetMatchDto,
@@ -230,6 +238,7 @@ export class BankingController {
    */
   @Put('transactions/:id/category')
   @Authenticated()
+  @ApiOkResponse({ type: BankTransactionResponseDto })
   async setCategory(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: BankTxSetCategoryDto,
@@ -249,6 +258,7 @@ export class BankingController {
   /** Operator unlink — clears all match fields. */
   @Delete('transactions/:id/match')
   @Authenticated()
+  @ApiOkResponse({ type: BankTransactionResponseDto })
   async clearMatch(@Param('id', ParseUUIDPipe) id: string): Promise<BankTransactionResponseDto> {
     const row = await this.matcher.clearMatch(id);
     return toBankTransactionDto(row);
@@ -262,6 +272,7 @@ export class BankingController {
    */
   @Post('transactions/:id/reprocess')
   @Authenticated()
+  @ApiOkResponse({ type: BankTransactionResponseDto })
   async reprocess(@Param('id', ParseUUIDPipe) id: string): Promise<BankTransactionResponseDto> {
     try {
       const { row } = await this.matcher.reprocess(id);

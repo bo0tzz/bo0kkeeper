@@ -72,3 +72,10 @@ const PaperlessWebhookSchema = paperlessPayloadShape
   .meta({ id: 'PaperlessWebhookDto' });
 
 export class PaperlessWebhookDto extends createZodDto(PaperlessWebhookSchema) {}
+
+const WebhookIngestResponseSchema = z
+  .object({
+    ingested: z.boolean(),
+  })
+  .meta({ id: 'WebhookIngestResponseDto' });
+export class WebhookIngestResponseDto extends createZodDto(WebhookIngestResponseSchema) {}

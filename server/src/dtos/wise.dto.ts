@@ -71,3 +71,10 @@ const ListWiseTransfersResponseSchema = z
   })
   .meta({ id: 'ListWiseTransfersResponseDto' });
 export class ListWiseTransfersResponseDto extends createZodDto(ListWiseTransfersResponseSchema) {}
+
+const WiseReconcileResponseSchema = z
+  .object({
+    enqueued: z.literal(true),
+  })
+  .meta({ id: 'WiseReconcileResponseDto' });
+export class WiseReconcileResponseDto extends createZodDto(WiseReconcileResponseSchema) {}

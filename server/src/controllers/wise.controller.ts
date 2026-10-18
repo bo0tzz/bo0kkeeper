@@ -1,10 +1,11 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import {
   DraftFromEventDto,
   ListWiseTransfersQueryDto,
   ListWiseTransfersResponseDto,
+  WiseReconcileResponseDto,
   WiseTransferResponseDto,
 } from 'src/dtos/wise.dto';
 import { JobName, WiseTransferState } from 'src/enum';
@@ -25,6 +26,7 @@ export class WiseController {
   @Get('transfers')
   @Authenticated()
   @ApiQueryFromDto(ListWiseTransfersQueryDto)
+  @ApiOkResponse({ type: ListWiseTransfersResponseDto })
   async listTransfers(@Query() query: ListWiseTransfersQueryDto): Promise<ListWiseTransfersResponseDto> {
     const { items, total } = await this.wiseTransferRepository.findPaginated({
       state: query.state as WiseTransferState | undefined,
@@ -48,6 +50,7 @@ export class WiseController {
    */
   @Post('draft-from-event/:eventId')
   @Authenticated()
+  @ApiOkResponse({ type: WiseTransferResponseDto })
   async draftFromEvent(
     @Param('eventId', ParseUUIDPipe) eventId: string,
     @Body() dto: DraftFromEventDto,
@@ -67,7 +70,8 @@ export class WiseController {
    */
   @Post('reconcile')
   @Authenticated()
-  async reconcileNow(): Promise<{ enqueued: true }> {
+  @ApiOkResponse({ type: WiseReconcileResponseDto })
+  async reconcileNow(): Promise<WiseReconcileResponseDto> {
     await this.jobRepository.queue(JobName.WiseReconcile, {});
     return { enqueued: true };
   }

@@ -54,6 +54,13 @@ const ClientResponseSchema = z
   .meta({ id: 'ClientResponseDto' });
 export class ClientResponseDto extends createZodDto(ClientResponseSchema) {}
 
+const ClientDeleteResponseSchema = z
+  .object({
+    deleted: z.boolean(),
+  })
+  .meta({ id: 'ClientDeleteResponseDto' });
+export class ClientDeleteResponseDto extends createZodDto(ClientDeleteResponseSchema) {}
+
 export function mapClient(client: Client): ClientResponseDto {
   return {
     id: client.id,

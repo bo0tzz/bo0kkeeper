@@ -1,9 +1,14 @@
 import { Controller, Get, Post } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { loadConfig } from 'src/config';
 import { APP_VERSION } from 'src/constants';
 import { Authenticated } from 'src/decorators';
-import { IntegrationsResponseDto, SheetWriteStatusDto, SystemInfoDto } from 'src/dtos/system.dto';
+import {
+  IntegrationsResponseDto,
+  RetrySheetWritesResponseDto,
+  SheetWriteStatusDto,
+  SystemInfoDto,
+} from 'src/dtos/system.dto';
 import { JobName } from 'src/enum';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
@@ -31,6 +36,7 @@ export class SystemController {
 
   @Get('info')
   @Authenticated()
+  @ApiOkResponse({ type: SystemInfoDto })
   getInfo(): SystemInfoDto {
     const cutoverDate = loadConfig().cutoverDate ?? null;
     return {
@@ -43,6 +49,7 @@ export class SystemController {
 
   @Get('integrations')
   @Authenticated()
+  @ApiOkResponse({ type: IntegrationsResponseDto })
   async getIntegrations(): Promise<IntegrationsResponseDto> {
     const checks = await this.systemHealthService.checkAll();
     return { checks };
@@ -56,7 +63,8 @@ export class SystemController {
    */
   @Post('retry-sheet-writes')
   @Authenticated()
-  async retrySheetWrites(): Promise<{ enqueued: true }> {
+  @ApiOkResponse({ type: RetrySheetWritesResponseDto })
+  async retrySheetWrites(): Promise<RetrySheetWritesResponseDto> {
     await this.jobRepository.queue(JobName.SheetWriteRetry, {});
     return { enqueued: true };
   }
@@ -70,6 +78,7 @@ export class SystemController {
    */
   @Get('sheet-write-status')
   @Authenticated()
+  @ApiOkResponse({ type: SheetWriteStatusDto })
   async getSheetWriteStatus(): Promise<SheetWriteStatusDto> {
     const [bankTxStale, expenseStale] = await Promise.all([
       this.bankTransactionRepository.countStaleSheetWrites(SHEET_WRITE_STALE_AFTER_MS),
