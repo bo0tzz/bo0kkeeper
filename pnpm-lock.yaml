@@ -80,7 +80,7 @@ importers:
         version: 6.2.1(@nestjs/common@11.1.29(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.29)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       nestjs-kysely:
         specifier: ^3.1.2
-        version: 3.1.2(@nestjs/common@11.1.29(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.29)(kysely@0.29.5)(reflect-metadata@0.2.2)
+        version: 3.1.4(@nestjs/common@11.1.29(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.29)(kysely@0.29.5)(reflect-metadata@0.2.2)
       nestjs-zod:
         specifier: ^5.3.0
         version: 5.5.0(@nestjs/common@11.1.29(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/swagger@11.4.6(@nestjs/common@11.1.29(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.29)(reflect-metadata@0.2.2))(rxjs@7.8.2)(zod@4.4.3)
@@ -3443,11 +3443,11 @@ packages:
       reflect-metadata: '*'
       rxjs: '>= 7'
 
-  nestjs-kysely@3.1.2:
-    resolution: {integrity: sha512-m7gK37oza6yyRmOs6VWQ6Ri5wgqUnmWpMUByd1V8WLZcYCeVPgXGxzw3ABRWUIX/1kr+nZUhaAZRgAIhk2JXoQ==}
+  nestjs-kysely@3.1.4:
+    resolution: {integrity: sha512-fZ1MFqXPkcxAKuaWbxEKNW9pn2QLaseCDd0cL6yiXtob2nvjCU+JJC7ma44YvH1GvddxL9+x/3M5IHEWzXAkeA==}
     peerDependencies:
-      '@nestjs/common': ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0
-      '@nestjs/core': ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0
+      '@nestjs/common': ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0 || ^12.0.0
+      '@nestjs/core': ^8.0.0 || ^9.0.0 || ^10.0.0 || ^11.0.0 || ^12.0.0
       kysely: 0.x
       reflect-metadata: ^0.1.13 || ^0.2.2
 
@@ -7648,7 +7648,7 @@ snapshots:
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
 
-  nestjs-kysely@3.1.2(@nestjs/common@11.1.29(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.29)(kysely@0.29.5)(reflect-metadata@0.2.2):
+  nestjs-kysely@3.1.4(@nestjs/common@11.1.29(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/core@11.1.29)(kysely@0.29.5)(reflect-metadata@0.2.2):
     dependencies:
       '@nestjs/common': 11.1.29(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1)
       '@nestjs/core': 11.1.29(@nestjs/common@11.1.29(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@8.1.1))(@nestjs/platform-express@11.1.29)(reflect-metadata@0.2.2)(rxjs@7.8.2)
