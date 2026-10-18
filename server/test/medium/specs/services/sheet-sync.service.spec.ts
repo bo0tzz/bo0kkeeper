@@ -193,6 +193,42 @@ describe('SheetSyncService', () => {
       const refetched = await bankRepo.findById(ingest.row.id);
       expect(refetched?.sheetRowAt).toBeInstanceOf(Date);
     });
+
+    // Regression: operator unlinks a bank_tx (clearMatch doesn't touch
+    // sheetRowAt by design — "Sheet rows aren't rewound") and relinks it,
+    // which used to append a duplicate row. The sheetRowAt guard makes
+    // the second append a no-op; the first row remains in the sheet with
+    // its (possibly now-stale) invoice annotation.
+    it('skips when the bank_tx already has sheetRowAt set (unlink/relink no-ops)', async () => {
+      const client = await clientRepo.create({
+        name: 'DutchCo',
+        class: ClientClass.Domestic,
+        tradeName: TradeName.ItServices,
+        address: { line1: 'Dorpsstraat 1', city: 'Amsterdam' },
+      });
+      const ingest = await bankRepo.ingest({
+        source: BankSource.SnsCsv,
+        externalId: 'relink-invoice',
+        txDate: new Date('2099-03-05'),
+        amountMinor: 121_000n,
+        currency: 'EUR',
+        counterpartyName: 'DutchCo',
+        counterpartyIban: null,
+        description: 'payment 2099/001',
+        rawPayload: {},
+      });
+      if (!ingest.ingested) {
+        throw new Error('precondition');
+      }
+      const invoiceArg = { clientId: client.id, number: '2099/001', btwRateBps: 2100, btwMinor: 21_000n };
+
+      await sheetSync.appendInvoiceIncomeRow(ingest.row, invoiceArg);
+      const afterFirst = await bankRepo.findById(ingest.row.id);
+      // Simulate the relink path: fresh row read, sheetRowAt now set.
+      await sheetSync.appendInvoiceIncomeRow(afterFirst!, invoiceArg);
+
+      expect(sheetWriter.writeIncomeRow).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('appendWiseIncomeRow', () => {
@@ -244,6 +280,26 @@ describe('SheetSyncService', () => {
       // actual composed invoice and the operator + accountant can trace it.
       expect(row.invoiceNumber).toBe('2099/001');
       expect(row.client.name).toBe('FUTO');
+    });
+
+    // Mirror of the invoice-side regression: unlinking a wise-matched bank_tx
+    // and relinking it (even to the same transfer, or a different one) used
+    // to duplicate the sheet row.
+    it('skips when the bank_tx already has sheetRowAt set (unlink/relink no-ops)', async () => {
+      await clientRepo.create({
+        name: 'FUTO',
+        class: ClientClass.NonEu,
+        tradeName: TradeName.ItServices,
+        address: { line1: '1 Fake Park Dr', city: 'Nullstate' },
+      });
+      const transfer = await seedWiseTransfer(db, { wiseId: 'WISE-RELINK', ref: 'TXN-0099' });
+      const bankTx = await seedBankTx(bankRepo, 'wise-relink');
+
+      await sheetSync.appendWiseIncomeRow(bankTx, transfer);
+      const afterFirst = await bankRepo.findById(bankTx.id);
+      await sheetSync.appendWiseIncomeRow(afterFirst!, transfer);
+
+      expect(sheetWriter.writeIncomeRow).toHaveBeenCalledTimes(1);
     });
   });
 

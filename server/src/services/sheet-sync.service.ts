@@ -43,6 +43,14 @@ export class SheetSyncService {
    *
    * Date convention: the bank tx date is the kasstelsel "payment received"
    * date, which is what the sheet is keyed on.
+   *
+   * Idempotency: if the bank_tx already has `sheetRowAt` set, we skip —
+   * unlink + relink would otherwise duplicate the sheet row. The sheet
+   * row's amount/date come from the bank_tx (same across re-links), so
+   * the first write is still correct; only the invoice-number annotation
+   * could be stale on a mis-link correction. Sheet rows are append-only
+   * by design, so the operator fixes any stale annotation directly in
+   * Google Sheets rather than us trying to rewind.
    */
   async appendInvoiceIncomeRow(
     bankTx: BankTransaction,
@@ -53,6 +61,12 @@ export class SheetSyncService {
       btwMinor: bigint | string | null;
     },
   ): Promise<void> {
+    if (bankTx.sheetRowAt) {
+      this.logger.log(
+        `bank_tx ${bankTx.id} already has sheet row (sheetRowAt=${String(bankTx.sheetRowAt)}); skipping invoice ${invoice.number} append`,
+      );
+      return;
+    }
     try {
       const client = await this.clientRepository.findById(invoice.clientId);
       if (!client) {
@@ -98,6 +112,12 @@ export class SheetSyncService {
     bankTx: BankTransaction,
     transfer: { id: string; ourReference: string | null; targetCurrency: string },
   ): Promise<void> {
+    if (bankTx.sheetRowAt) {
+      this.logger.log(
+        `bank_tx ${bankTx.id} already has sheet row (sheetRowAt=${String(bankTx.sheetRowAt)}); skipping wise_transfer ${transfer.id} append`,
+      );
+      return;
+    }
     try {
       const eurAmountMinor = absMinor(BigInt(bankTx.amountMinor as bigint | number | string));
       const invoice = await this.invoiceRepository.findByWiseTransferId(transfer.id);
