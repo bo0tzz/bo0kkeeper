@@ -30,8 +30,13 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY server/package.json ./server/
 COPY web/package.json ./web/
 COPY open-api/typescript-sdk/package.json ./open-api/typescript-sdk/
+# --ignore-scripts: @bo0kkeeper/sdk has a `prepare: tsc` hook so plain
+# `pnpm install` builds its workspace package. That's exactly what we
+# want locally and in CI, but here the deps stage only has the
+# package.json files — no source yet — so tsc would fail. The build
+# stage runs the compile explicitly after source copy below.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+    pnpm install --frozen-lockfile --ignore-scripts
 
 # ---- Stage: build --------------------------------------------------------
 # Compile the SvelteKit static site + nest build the server. Output:
@@ -45,7 +50,10 @@ COPY --from=deps /app/server/node_modules ./server/node_modules
 COPY --from=deps /app/web/node_modules ./web/node_modules
 COPY --from=deps /app/open-api/typescript-sdk/node_modules ./open-api/typescript-sdk/node_modules
 COPY . .
-RUN pnpm --filter web build \
+# @bo0kkeeper/sdk is a workspace package whose `main`/`types` point at
+# `./build/*`. Build it before web/server so their SDK imports resolve.
+RUN pnpm --filter @bo0kkeeper/sdk build \
+ && pnpm --filter web build \
  && pnpm --filter bo0kkeeper build
 
 # ---- Stage: prod-deps ----------------------------------------------------
@@ -60,7 +68,7 @@ COPY server/package.json ./server/
 COPY web/package.json ./web/
 COPY open-api/typescript-sdk/package.json ./open-api/typescript-sdk/
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile --prod --filter bo0kkeeper
+    pnpm install --frozen-lockfile --prod --filter bo0kkeeper --ignore-scripts
 
 # ---- Stage: runtime ------------------------------------------------------
 FROM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS runtime
