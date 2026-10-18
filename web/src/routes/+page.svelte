@@ -302,7 +302,7 @@
                   </Badge>
                 </HStack>
                 {#if counts.pendingExpenseReviews > 0}
-                  <Button href={resolve('/expenses')} variant="outline">Review →</Button>
+                  <Button href={`${resolve('/expenses')}?status=pending_review`} variant="outline">Review →</Button>
                 {/if}
               </Stack>
             </CardBody>
