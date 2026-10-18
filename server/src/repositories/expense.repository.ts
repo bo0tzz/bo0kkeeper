@@ -337,28 +337,28 @@ export class ExpenseRepository {
   /**
    * Approved expenses whose *payment date* falls in `[start, end)`.
    *
-   * Kasstelsel (cash basis) counts an expense in the quarter it was paid,
-   * not the quarter its receipt is dated — so we look at the matched
-   * bank_transaction's `txDate` first, and only fall back to
-   * `expense.expenseDate` when nothing is matched yet (rare: cash purchases
-   * or manual entries). If multiple bank_transactions point at the same
-   * expense (partial payments), the latest one wins.
+   * Kasstelsel (cash basis) strict: an expense counts in the quarter it was
+   * actually paid — the matched `bank_transaction.txDate`. If nothing is
+   * matched yet, the row is excluded entirely; it will land in the quarter
+   * where the operator eventually links a bank_tx. The operator's dashboard
+   * surfaces approved+unmatched counts so stragglers get caught before an
+   * export is run. If multiple bank_transactions point at the same expense
+   * (partial payments), the latest one wins.
    *
-   * This aligns the aggregator with the sheet-sync path, which already
-   * places expense rows on the tab of `bankTx.txDate`.
+   * This aligns the aggregator and the accountant export with the sheet-sync
+   * path, which already places rows on the tab of `bankTx.txDate`.
    */
   async findApprovedInPeriod(start: Date, end: Date): Promise<Expense[]> {
     // Effective period date, in priority order:
     //   1. Wise-flow: bank_tx that matched the linked wise_transfer (the sweep
     //      clearing). Same-period-as-invoice by construction.
     //   2. SNS-flow: latest bank_tx directly matched to this expense.
-    //   3. Unmatched fallback: expenseDate (cash/manual entries).
-    // Kysely's typed `fn.coalesce` doesn't take subquery scalars here, so
-    // build via `sql`.
+    // No fallback — unmatched approved expenses are intentionally excluded
+    // (strict kasstelsel; see method docstring). Kysely's typed `fn.coalesce`
+    // doesn't take subquery scalars here, so build via `sql`.
     const effectiveDate = sql<Date>`COALESCE(
       (SELECT bt."txDate" FROM bank_transaction bt WHERE bt."matchedTransferId" = expense."wiseTransferId"),
-      (SELECT MAX(bt."txDate") FROM bank_transaction bt WHERE bt."matchedExpenseId" = expense.id),
-      expense."expenseDate"
+      (SELECT MAX(bt."txDate") FROM bank_transaction bt WHERE bt."matchedExpenseId" = expense.id)
     )`;
     return (await this.db
       .selectFrom('expense')

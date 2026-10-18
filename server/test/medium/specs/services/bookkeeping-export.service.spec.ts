@@ -1,6 +1,14 @@
 import ExcelJS from 'exceljs';
 import { Kysely } from 'kysely';
-import { ClientClass, ExpenseLocationClass, TradeName, WiseTransferDirection, WiseTransferState } from 'src/enum';
+import {
+  BankSource,
+  ClientClass,
+  ExpenseLocationClass,
+  TradeName,
+  WiseTransferDirection,
+  WiseTransferState,
+} from 'src/enum';
+import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
@@ -40,6 +48,7 @@ describe('BookkeepingExportService', () => {
   let clientRepo: ClientRepository;
   let invoiceRepo: InvoiceRepository;
   let expenseRepo: ExpenseRepository;
+  let bankRepo: BankTransactionRepository;
   let service: BookkeepingExportService;
 
   beforeEach(async () => {
@@ -47,12 +56,59 @@ describe('BookkeepingExportService', () => {
     clientRepo = new ClientRepository(db);
     invoiceRepo = new InvoiceRepository(db);
     expenseRepo = new ExpenseRepository(db);
+    bankRepo = new BankTransactionRepository(db);
     service = new BookkeepingExportService(invoiceRepo, expenseRepo);
   });
 
   afterEach(async () => {
     await db.destroy();
   });
+
+  // Strict kasstelsel: the export filters by payment date (bank_tx.txDate),
+  // so every invoice/expense setup needs a matching bank_tx or it's absent
+  // from the quarterly export. These helpers keep per-test setup terse.
+  const payInvoice = (opts: { invoiceId: string; txDate: Date; amountMinor: bigint; externalId: string }) =>
+    bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: opts.externalId,
+      txDate: opts.txDate,
+      amountMinor: opts.amountMinor,
+      currency: 'EUR',
+      counterpartyName: null,
+      counterpartyIban: null,
+      description: '',
+      rawPayload: {},
+      matchedInvoiceId: opts.invoiceId,
+      matchedAt: opts.txDate,
+    });
+  const payExpense = (opts: { expenseId: string; txDate: Date; amountMinor: bigint; externalId: string }) =>
+    bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: opts.externalId,
+      txDate: opts.txDate,
+      amountMinor: opts.amountMinor,
+      currency: 'EUR',
+      counterpartyName: null,
+      counterpartyIban: null,
+      description: '',
+      rawPayload: {},
+      matchedExpenseId: opts.expenseId,
+      matchedAt: opts.txDate,
+    });
+  const payWiseTransfer = (opts: { transferId: string; txDate: Date; amountMinor: bigint; externalId: string }) =>
+    bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: opts.externalId,
+      txDate: opts.txDate,
+      amountMinor: opts.amountMinor,
+      currency: 'EUR',
+      counterpartyName: 'Wise',
+      counterpartyIban: null,
+      description: '',
+      rawPayload: {},
+      matchedTransferId: opts.transferId,
+      matchedAt: opts.txDate,
+    });
 
   it('produces a non-empty xlsx with PERIOD header for an empty quarter', async () => {
     const { buffer, filename } = await service.exportQuarter(2099, 1);
@@ -81,7 +137,7 @@ describe('BookkeepingExportService', () => {
       tradeName: TradeName.ItServices,
       address: { line1: 'X', city: 'Y' },
     });
-    await invoiceRepo.issue({
+    const domesticInvoice = await invoiceRepo.issue({
       year: 2099,
       invoice: {
         clientId: domestic.id,
@@ -102,7 +158,13 @@ describe('BookkeepingExportService', () => {
         },
       ],
     });
-    await invoiceRepo.issue({
+    await payInvoice({
+      invoiceId: domesticInvoice.id,
+      txDate: new Date('2099-02-20'),
+      amountMinor: 23_898n,
+      externalId: 'q1:route-domestic',
+    });
+    const nonEuInvoice = await invoiceRepo.issue({
       year: 2099,
       invoice: {
         clientId: nonEu.id,
@@ -117,6 +179,12 @@ describe('BookkeepingExportService', () => {
       lines: [
         { ordinal: 0, description: 'Immich development', lineTotalMinor: 300_000n, unitLabel: null, quantity: null },
       ],
+    });
+    await payInvoice({
+      invoiceId: nonEuInvoice.id,
+      txDate: new Date('2099-02-25'),
+      amountMinor: 308_055n,
+      externalId: 'q1:route-noneu',
     });
 
     const { buffer } = await service.exportQuarter(2099, 1);
@@ -137,7 +205,7 @@ describe('BookkeepingExportService', () => {
       tradeName: TradeName.ThreeD,
       address: { line1: 'X', city: 'Y' },
     });
-    await invoiceRepo.issue({
+    const colInvoice = await invoiceRepo.issue({
       year: 2099,
       invoice: {
         clientId: domestic.id,
@@ -149,6 +217,12 @@ describe('BookkeepingExportService', () => {
         sourceEventId: null,
       },
       lines: [{ ordinal: 0, description: 'Design work', lineTotalMinor: 23_898n, unitLabel: null, quantity: null }],
+    });
+    await payInvoice({
+      invoiceId: colInvoice.id,
+      txDate: new Date('2099-02-20'),
+      amountMinor: 23_898n,
+      externalId: 'q1:col-invoice',
     });
     const ingested = await expenseRepo.ingest({
       paperlessDocId: 'pp-cols',
@@ -165,6 +239,12 @@ describe('BookkeepingExportService', () => {
     });
     if (ingested.ingested) {
       await expenseRepo.approve(ingested.row.id);
+      await payExpense({
+        expenseId: ingested.row.id,
+        txDate: new Date('2099-02-15'),
+        amountMinor: -2985n,
+        externalId: 'q1:col-expense',
+      });
     }
 
     const { buffer } = await service.exportQuarter(2099, 1);
@@ -218,6 +298,14 @@ describe('BookkeepingExportService', () => {
       state: WiseTransferState.OutgoingPaymentSent,
       stateUpdatedAt: new Date('2099-02-10'),
       ourReference: 'TXN-2001',
+    });
+    // Sweep lands in Q1 so the Wise-flow expense's effective date resolves
+    // to a Q1 bank_tx (via its wiseTransferId link).
+    await payWiseTransfer({
+      transferId: transfer.id,
+      txDate: new Date('2099-02-12'),
+      amountMinor: 404_572n,
+      externalId: 'q1:wise-sweep',
     });
     const ingest = await expenseRepo.ingest({
       paperlessDocId: 'pp-wise-usd',
@@ -289,6 +377,12 @@ describe('BookkeepingExportService', () => {
     const tofakapprove = all.find((e) => e.vendor === 'PrintCo');
     if (tofakapprove) {
       await expenseRepo.approve(tofakapprove.id);
+      await payExpense({
+        expenseId: tofakapprove.id,
+        txDate: new Date('2099-02-15'),
+        amountMinor: -2985n,
+        externalId: 'q1:printco-pay',
+      });
     }
 
     const { buffer } = await service.exportQuarter(2099, 1);
@@ -308,7 +402,7 @@ describe('BookkeepingExportService', () => {
       address: { line1: 'X', city: 'Y' },
     });
     for (let i = 0; i < 8; i += 1) {
-      await invoiceRepo.issue({
+      const invoice = await invoiceRepo.issue({
         year: 2099,
         invoice: {
           clientId: nonEu.id,
@@ -328,6 +422,12 @@ describe('BookkeepingExportService', () => {
             quantity: null,
           },
         ],
+      });
+      await payInvoice({
+        invoiceId: invoice.id,
+        txDate: new Date(`2099-02-${String(i + 1).padStart(2, '0')}`),
+        amountMinor: 10_000n + BigInt(i),
+        externalId: `q1:bulk-${i}`,
       });
     }
 
@@ -369,18 +469,18 @@ describe('BookkeepingExportService', () => {
     }
   });
 
-  it('omits invoices outside the quarter window', async () => {
+  it('omits invoices outside the quarter window (payment date, not issue date)', async () => {
     const domestic = await clientRepo.create({
       name: 'InRangeClient',
       class: ClientClass.Domestic,
       tradeName: TradeName.ThreeD,
       address: { line1: 'X', city: 'Y' },
     });
-    await invoiceRepo.issue({
+    const invoice = await invoiceRepo.issue({
       year: 2099,
       invoice: {
         clientId: domestic.id,
-        issuedAt: new Date('2099-04-15'), // Q2, not Q1
+        issuedAt: new Date('2099-04-15'), // Q2
         currency: 'EUR',
         totalMinor: 12_100n,
         btwRateBps: 2100,
@@ -389,13 +489,93 @@ describe('BookkeepingExportService', () => {
       },
       lines: [{ ordinal: 0, description: 'Out of range', lineTotalMinor: 12_100n, unitLabel: null, quantity: null }],
     });
+    await payInvoice({
+      invoiceId: invoice.id,
+      txDate: new Date('2099-04-20'), // paid in Q2
+      amountMinor: 12_100n,
+      externalId: 'q2:in-range',
+    });
+
     const { buffer } = await service.exportQuarter(2099, 1);
     const cells = await readXlsxStrings(buffer);
     expect(cells).not.toContain('InRangeClient');
     expect(cells).not.toContain('Out of range');
-    // Sanity: with the same data, Q2 should include it.
+    // Sanity: paid in Q2 → appears in Q2 export.
     const q2 = await service.exportQuarter(2099, 2);
     const q2cells = await readXlsxStrings(q2.buffer);
     expect(q2cells).toContain('InRangeClient');
+  });
+
+  // Regression: strict kasstelsel. An invoice issued in one quarter but paid
+  // in the next lands in the paying quarter, not the issuing one — matching
+  // what the Belastingdienst sees on the BTW return. Previously the export
+  // filtered on `issuedAt`, so a Dec/Jan invoice straddled quarters
+  // inconsistently between this export and the quarterly aggregator.
+  it('invoice issued Q4, paid Q1-next-year lands in Q1 only', async () => {
+    const domestic = await clientRepo.create({
+      name: 'StraddleClient',
+      class: ClientClass.Domestic,
+      tradeName: TradeName.ItServices,
+      address: { line1: 'X', city: 'Y' },
+    });
+    const invoice = await invoiceRepo.issue({
+      year: 2099,
+      invoice: {
+        clientId: domestic.id,
+        issuedAt: new Date('2099-12-20'),
+        currency: 'EUR',
+        totalMinor: 24_200n,
+        btwRateBps: 2100,
+        btwMinor: 4200n,
+        sourceEventId: null,
+      },
+      lines: [{ ordinal: 0, description: 'Dec work', lineTotalMinor: 24_200n, unitLabel: null, quantity: null }],
+    });
+    await payInvoice({
+      invoiceId: invoice.id,
+      txDate: new Date('2100-01-10'),
+      amountMinor: 24_200n,
+      externalId: 'straddle-pay',
+    });
+
+    const q4 = await service.exportQuarter(2099, 4);
+    const q4Cells = await readXlsxStrings(q4.buffer);
+    expect(q4Cells).not.toContain('StraddleClient');
+    expect(q4Cells).not.toContain('Dec work');
+
+    const q1 = await service.exportQuarter(2100, 1);
+    const q1Cells = await readXlsxStrings(q1.buffer);
+    expect(q1Cells).toContain('StraddleClient');
+    expect(q1Cells).toContain('Dec work');
+  });
+
+  // Issued-but-unpaid invoice is silently absent from the export under
+  // strict kasstelsel. Operator relies on the dashboard's unmatched-invoice
+  // warning to catch stragglers before running the export.
+  it('invoice issued but never paid is excluded entirely', async () => {
+    const domestic = await clientRepo.create({
+      name: 'DeadbeatClient',
+      class: ClientClass.Domestic,
+      tradeName: TradeName.ItServices,
+      address: { line1: 'X', city: 'Y' },
+    });
+    await invoiceRepo.issue({
+      year: 2099,
+      invoice: {
+        clientId: domestic.id,
+        issuedAt: new Date('2099-02-15'),
+        currency: 'EUR',
+        totalMinor: 12_100n,
+        btwRateBps: 2100,
+        btwMinor: 2100n,
+        sourceEventId: null,
+      },
+      lines: [{ ordinal: 0, description: 'Unpaid work', lineTotalMinor: 12_100n, unitLabel: null, quantity: null }],
+    });
+
+    const q1 = await service.exportQuarter(2099, 1);
+    const cells = await readXlsxStrings(q1.buffer);
+    expect(cells).not.toContain('DeadbeatClient');
+    expect(cells).not.toContain('Unpaid work');
   });
 });

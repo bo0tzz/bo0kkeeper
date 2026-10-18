@@ -364,11 +364,26 @@ export class InvoiceRepository {
   }
 
   /**
-   * Invoices issued in `[start, end)`, joined with client + the first
-   * invoice_line (ordinal=0) for the accountant export. invoice_line is
-   * left-joined because legacy / synthetic rows may not have lines yet.
+   * Invoices PAID in `[start, end)` under strict kasstelsel, joined with
+   * client + the first invoice_line (ordinal=0) for the accountant export.
+   * invoice_line is left-joined because legacy / synthetic rows may not
+   * have lines yet.
+   *
+   * "Paid" effective date:
+   *   1. Wise-flow invoices: bank_tx that matched the linked wise_transfer
+   *      (the sweep landing in the user's bank account).
+   *   2. Domestic invoices: bank_tx directly matched to the invoice (the
+   *      inbound SEPA from the client).
+   * No fallback to `issuedAt` — an unpaid invoice doesn't appear on the
+   * accountant export until the matching bank_tx exists. See
+   * ExpenseRepository.findApprovedInPeriod for the symmetric treatment of
+   * expenses; docs/domain.md spells out the kasstelsel rule.
    */
   async findInPeriodWithClientAndFirstLine(start: Date, end: Date): Promise<InvoiceExportRow[]> {
+    const effectiveDate = sql<Date>`COALESCE(
+      (SELECT bt."txDate" FROM bank_transaction bt WHERE bt."matchedTransferId" = invoice."wiseTransferId"),
+      (SELECT bt."txDate" FROM bank_transaction bt WHERE bt."matchedInvoiceId" = invoice.id)
+    )`;
     return (
       (await this.db
         .selectFrom('invoice')
@@ -393,8 +408,8 @@ export class InvoiceRepository {
           'client.defaultDescription',
           'invoice_line.description as lineDescription',
         ])
-        .where('invoice.issuedAt', '>=', start)
-        .where('invoice.issuedAt', '<', end)
+        .where(effectiveDate, '>=', start)
+        .where(effectiveDate, '<', end)
         .orderBy('invoice.issuedAt', 'asc')
         .execute()) as InvoiceExportRow[]
     );

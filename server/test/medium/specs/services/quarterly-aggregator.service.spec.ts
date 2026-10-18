@@ -189,8 +189,9 @@ describe('QuarterlyAggregatorService', () => {
   });
 
   it('subtracts deductible expense BTW from collected to compute net', async () => {
-    // No income, just two approved expenses in Q1.
-    await expenseRepo.ingest({
+    // No income, just two approved expenses in Q1. Both get bank_tx matches
+    // in Q1 so they count under strict kasstelsel.
+    const first = await expenseRepo.ingest({
       paperlessDocId: 'doc-A',
       vendor: 'Acme Cables',
       expenseDate: new Date('2099-02-01'),
@@ -216,13 +217,37 @@ describe('QuarterlyAggregatorService', () => {
       notes: null,
       sourceEventId: null,
     });
-    if (!second.ingested) {
+    if (!first.ingested || !second.ingested) {
       throw new Error('precondition');
     }
-    // One must be approved before it's counted.
+    await expenseRepo.approve(first.row.id);
     await expenseRepo.approve(second.row.id);
-    const firstIngest = await expenseRepo.findPendingReview();
-    await expenseRepo.approve(firstIngest[0].id);
+    await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'q1:expense-A-pay',
+      txDate: new Date('2099-02-05'),
+      amountMinor: -12_100n,
+      currency: 'EUR',
+      counterpartyName: 'Acme Cables',
+      counterpartyIban: null,
+      description: 'hardware',
+      rawPayload: {},
+      matchedExpenseId: first.row.id,
+      matchedAt: new Date('2099-02-05'),
+    });
+    await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'q1:expense-B-pay',
+      txDate: new Date('2099-03-05'),
+      amountMinor: -10_000n,
+      currency: 'EUR',
+      counterpartyName: 'Cloud Hosting',
+      counterpartyIban: null,
+      description: 'hosting',
+      rawPayload: {},
+      matchedExpenseId: second.row.id,
+      matchedAt: new Date('2099-03-05'),
+    });
 
     const result = await aggregator.aggregate(2099, 1);
     expect(result.expenses.grossEurMinor).toBe(22_100n);
@@ -457,9 +482,13 @@ describe('QuarterlyAggregatorService', () => {
     expect(q3.expenses.deductibleBtwEurMinor).toBe(0n);
   });
 
-  // Fallback path: an approved expense with no matched bank_tx (cash purchase
-  // or manual entry) still counts by expenseDate. Confirms the coalesce works.
-  it('falls back to expenseDate when the approved expense has no matched bank-tx', async () => {
+  // Strict kasstelsel: an approved expense with no matched bank_tx is
+  // excluded from the aggregate entirely. It will land in whichever quarter
+  // the operator eventually links a bank_tx. The dashboard's
+  // "approved + awaiting match" tile surfaces these so they don't go
+  // unnoticed. Changed from a prior "falls back to expenseDate" behavior
+  // which the user confirmed was inconsistent with kasstelsel.
+  it('excludes an approved expense with no matched bank-tx (strict kasstelsel)', async () => {
     const ingest = await expenseRepo.ingest({
       paperlessDocId: 'doc-unmatched',
       vendor: 'Cash Purchase',
@@ -479,8 +508,8 @@ describe('QuarterlyAggregatorService', () => {
     await expenseRepo.approve(ingest.row.id);
 
     const q1 = await aggregator.aggregate(2099, 1);
-    expect(q1.expenses.grossEurMinor).toBe(5000n);
-    expect(q1.expenses.deductibleBtwEurMinor).toBe(868n);
+    expect(q1.expenses.grossEurMinor).toBe(0n);
+    expect(q1.expenses.deductibleBtwEurMinor).toBe(0n);
   });
 
   it('warning count matches the sample (regression: count was filtered to period-only)', async () => {
