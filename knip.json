@@ -19,7 +19,10 @@
         "src/**/*.ts",
         "test/**/*.ts"
       ],
-      "ignoreExportsUsedInFile": true
+      "ignoreExportsUsedInFile": true,
+      "ignoreUnresolved": [
+        "test/medium/globalSetup.ts"
+      ]
     },
     "web": {
       "entry": [
