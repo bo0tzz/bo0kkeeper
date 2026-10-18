@@ -68,7 +68,13 @@
 
   let dateFrom = $state('');
   let dateTo = $state('');
-  let status = $state<'' | BankTxStatusFilter>('');
+  // URL-driven initial filter — lets the dashboard "Needs linking" tile deep-link
+  // to /banking?status=unmatched directly instead of landing on the full list.
+  const bankTxStatusFilters: BankTxStatusFilter[] = ['matched', 'categorized', 'unmatched'];
+  const initialStatusParam = page.url.searchParams.get('status') as BankTxStatusFilter | null;
+  const initialStatus: '' | BankTxStatusFilter =
+    initialStatusParam && bankTxStatusFilters.includes(initialStatusParam) ? initialStatusParam : '';
+  let status = $state<'' | BankTxStatusFilter>(initialStatus);
   let txPage = $state(1);
 
   const statusOptions = [

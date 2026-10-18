@@ -38,12 +38,14 @@
   type Counts = {
     pendingWiseCredits: number;
     pendingExpenseReviews: number;
-    /** Approved expenses with no matched bank_transaction — the new failure
-     * mode under bank-tx-match-only sheet writes. */
-    approvedUnmatchedExpenses: number;
     /** Issued invoices with no bank tx linked (any quarter). Sourced from
      * the quarterly aggregator's `invoice_unmatched` warning. */
     unmatchedInvoices: number;
+    /** Bank_txs that still need to be linked to an entity (expense / invoice
+     * / wise_transfer) or categorized as fee/drawings/ignored. Replaces the
+     * old split between this and "approved expenses awaiting bank match" —
+     * both tiles counted the same physical un-linked pair from opposite
+     * sides. */
     unmatchedBankTx: number;
     failedEvents: number;
     /** Count of sheet.write_failed system events in the last 30 days. */
@@ -110,7 +112,6 @@
       const [
         wise,
         expenses,
-        approvedUnmatched,
         bankTx,
         bankingSession,
         agg,
@@ -129,7 +130,6 @@
           limit: '1',
         }),
         listExpenses({ status: 'pending_review', limit: '1' }),
-        listExpenses({ status: 'approved', matched: 'false', limit: '1' }),
         listBankTransactions({ status: 'unmatched', limit: '1' }).catch(() => ({ items: [], total: 0 })),
         getLatestBankingSession().catch(() => null),
         getQuarterlyAggregate({ year: String(year), quarter: String(quarter) }).catch(() => null),
@@ -155,7 +155,6 @@
       counts = {
         pendingWiseCredits: wise.total,
         pendingExpenseReviews: expenses.total,
-        approvedUnmatchedExpenses: approvedUnmatched.total,
         unmatchedInvoices: invoiceUnmatched?.count ?? 0,
         unmatchedBankTx: bankTx.total,
         failedEvents: failed.total,
@@ -203,7 +202,6 @@
       {@const totalThingsToDo =
         counts.pendingWiseCredits +
         counts.pendingExpenseReviews +
-        counts.approvedUnmatchedExpenses +
         counts.unmatchedBankTx +
         counts.failedEvents +
         counts.staleSheetWrites}
@@ -329,39 +327,18 @@
 
           <Card>
             <CardHeader>
-              <CardTitle>Expenses awaiting bank match</CardTitle>
-            </CardHeader>
-            <CardBody>
-              <Stack gap={3}>
-                <HStack class="items-center justify-between">
-                  <Heading size="medium" tag="h3">{counts.approvedUnmatchedExpenses}</Heading>
-                  <Badge color={counts.approvedUnmatchedExpenses === 0 ? 'secondary' : 'warning'}>
-                    {counts.approvedUnmatchedExpenses === 0 ? 'clean' : 'waiting for bank'}
-                  </Badge>
-                </HStack>
-                {#if counts.approvedUnmatchedExpenses > 0}
-                  <Button href={`${resolve('/expenses')}?status=approved&matched=false`} variant="outline">
-                    Review →
-                  </Button>
-                {/if}
-              </Stack>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Bank reconciliation</CardTitle>
+              <CardTitle>Needs linking</CardTitle>
             </CardHeader>
             <CardBody>
               <Stack gap={3}>
                 <HStack class="items-center justify-between">
                   <Heading size="medium" tag="h3">{counts.unmatchedBankTx}</Heading>
                   <Badge color={counts.unmatchedBankTx === 0 ? 'secondary' : 'warning'}>
-                    {counts.unmatchedBankTx === 0 ? 'all matched' : 'unmatched'}
+                    {counts.unmatchedBankTx === 0 ? 'clean' : 'unmatched'}
                   </Badge>
                 </HStack>
                 {#if counts.unmatchedBankTx > 0}
-                  <Button href={resolve('/banking')} variant="outline">Review →</Button>
+                  <Button href={`${resolve('/banking')}?status=unmatched`} variant="outline">Review →</Button>
                 {/if}
               </Stack>
             </CardBody>
