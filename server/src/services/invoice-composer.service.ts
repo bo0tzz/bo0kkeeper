@@ -68,6 +68,23 @@ export type ComposeFromWiseInput = {
   lines: InvoiceLineInput[];
 };
 
+export type AutoComposeDeclineReason =
+  | 'transfer_not_found'
+  | 'wrong_direction'
+  | 'wrong_state'
+  | 'no_suggested_client'
+  | 'no_suggested_period'
+  | 'no_line_description'
+  | 'unresolved_template'
+  | 'client_not_template_driven'
+  | 'no_prior_invoice'
+  | 'rate_changed';
+
+export type AutoComposeResult =
+  | { outcome: 'composed'; invoiceId: string; invoiceNumber: string }
+  | { outcome: 'already_invoiced'; invoiceId: string }
+  | { outcome: 'declined'; reason: AutoComposeDeclineReason; detail: string };
+
 export type WiseInvoicePrefill = {
   wiseTransferId: string;
   currency: string;
@@ -384,6 +401,132 @@ export class InvoiceComposerService {
       lines: input.lines,
       wiseTransferId: transfer.id,
     });
+  }
+
+  /**
+   * Fire-and-forget auto-compose from a settled wise_transfer. Called via
+   * `JobName.InvoiceAutoComposeFromWise` immediately after a transfer reaches
+   * `outgoing_payment_sent`. Runs a conservative set of guards; the common
+   * case (steady-cadence Non-EU client, template-driven description,
+   * unchanged line total vs the last invoice) composes directly. Any mismatch
+   * falls back to the manual compose UI, surfaced via the dashboard tile.
+   *
+   * All outcomes log a system event (`invoice.auto_composed` on success,
+   * `invoice.auto_compose_declined` with the failing guard name otherwise)
+   * so /events shows what happened.
+   */
+  @OnJob({ name: JobName.InvoiceAutoComposeFromWise, queue: QueueName.Default })
+  async handleAutoComposeFromWise({ wiseTransferId }: JobOf<JobName.InvoiceAutoComposeFromWise>): Promise<void> {
+    await this.tryAutoComposeFromWise(wiseTransferId);
+  }
+
+  async tryAutoComposeFromWise(wiseTransferId: string): Promise<AutoComposeResult> {
+    const transfer = await this.wiseTransferRepository.findById(wiseTransferId);
+    if (!transfer) {
+      return this.declineAutoCompose(wiseTransferId, 'transfer_not_found', `wise_transfer ${wiseTransferId} missing`);
+    }
+    if (transfer.direction !== WiseTransferDirection.Out) {
+      return this.declineAutoCompose(wiseTransferId, 'wrong_direction', `direction=${transfer.direction}`);
+    }
+    if (transfer.state !== WiseTransferState.OutgoingPaymentSent) {
+      return this.declineAutoCompose(wiseTransferId, 'wrong_state', `state=${transfer.state}`);
+    }
+    const existing = await this.invoiceRepository.findByWiseTransferId(wiseTransferId);
+    if (existing) {
+      // Idempotent no-op; don't log a decline — this fires on every retry of
+      // a job that already succeeded, so logging would be noise.
+      return { outcome: 'already_invoiced', invoiceId: existing.id };
+    }
+
+    const prefill = await this.prefillFromWise(wiseTransferId);
+    if (!prefill.suggestedClientId) {
+      return this.declineAutoCompose(wiseTransferId, 'no_suggested_client', 'exactly-one Non-EU client not found');
+    }
+    if (!prefill.suggestedPeriodStart || !prefill.suggestedPeriodEnd) {
+      return this.declineAutoCompose(wiseTransferId, 'no_suggested_period', 'period could not be derived');
+    }
+    if (!prefill.suggestedLineDescription) {
+      return this.declineAutoCompose(
+        wiseTransferId,
+        'no_line_description',
+        'client has no defaultDescription template',
+      );
+    }
+    if (/\{period\./.test(prefill.suggestedLineDescription)) {
+      // Template substitution left raw placeholders — missing period vars or
+      // unknown token. Don't bake a half-rendered description into an invoice.
+      return this.declineAutoCompose(
+        wiseTransferId,
+        'unresolved_template',
+        `description still contains placeholders: ${prefill.suggestedLineDescription}`,
+      );
+    }
+    const client = await this.clientRepository.findById(prefill.suggestedClientId);
+    if (!client?.defaultDescription || !/\{period\./.test(client.defaultDescription)) {
+      // Client isn't template-driven; a non-templated description could mean
+      // the operator writes a fresh line per invoice. Don't guess.
+      return this.declineAutoCompose(
+        wiseTransferId,
+        'client_not_template_driven',
+        'client.defaultDescription missing period placeholder',
+      );
+    }
+    const priorTotal = await this.invoiceRepository.findLatestLineTotalForClient(prefill.suggestedClientId);
+    if (priorTotal === null) {
+      // No history for this client — don't risk auto-composing the first
+      // one. Let the operator confirm the shape in the UI.
+      return this.declineAutoCompose(wiseTransferId, 'no_prior_invoice', 'first invoice for this client');
+    }
+    if (priorTotal !== prefill.totalMinor) {
+      return this.declineAutoCompose(
+        wiseTransferId,
+        'rate_changed',
+        `prefill=${prefill.totalMinor} vs prior=${priorTotal}`,
+      );
+    }
+
+    const result = await this.composeFromWise({
+      wiseTransferId,
+      clientId: prefill.suggestedClientId,
+      issuedAt: new Date(),
+      periodStart: prefill.suggestedPeriodStart,
+      periodEnd: prefill.suggestedPeriodEnd,
+      lines: [
+        {
+          description: prefill.suggestedLineDescription,
+          lineTotalMinor: prefill.totalMinor,
+        },
+      ],
+    });
+    await this.eventRepository.recordAction({
+      source: EventSource.System,
+      eventType: 'invoice.auto_composed',
+      payload: {
+        wiseTransferId,
+        invoiceId: result.invoice.id,
+        invoiceNumber: result.invoice.number,
+        clientId: prefill.suggestedClientId,
+        totalMinor: String(prefill.totalMinor),
+      },
+    });
+    this.logger.log(
+      `auto-composed invoice ${result.invoice.number} from wise_transfer ${wiseTransferId} (${client.name})`,
+    );
+    return { outcome: 'composed', invoiceId: result.invoice.id, invoiceNumber: result.invoice.number };
+  }
+
+  private async declineAutoCompose(
+    wiseTransferId: string,
+    reason: AutoComposeDeclineReason,
+    detail: string,
+  ): Promise<AutoComposeResult> {
+    await this.eventRepository.recordAction({
+      source: EventSource.System,
+      eventType: 'invoice.auto_compose_declined',
+      payload: { wiseTransferId, reason, detail },
+    });
+    this.logger.log(`auto-compose declined for wise_transfer ${wiseTransferId}: ${reason} (${detail})`);
+    return { outcome: 'declined', reason, detail };
   }
 
   private async requireInvoiceableWiseTransfer(wiseTransferId: string): Promise<WiseTransferRow> {

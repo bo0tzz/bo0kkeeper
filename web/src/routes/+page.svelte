@@ -4,6 +4,7 @@
   import { formatEur as eur } from '$lib/money';
   import { extractApiError } from '$lib/sdk';
   import {
+    awaitingInvoiceCount as getWiseAwaitingInvoiceCount,
     getLatestSession as getLatestBankingSession,
     listTransactions as listBankTransactions,
     type BankingSessionResponseDto as BankingSession,
@@ -47,6 +48,10 @@
      * both tiles counted the same physical un-linked pair from opposite
      * sides. */
     unmatchedBankTx: number;
+    /** Outbound Wise transfers that settled but have no linked invoice. Auto-
+     * compose declined (or hasn't fired yet) and the operator must run the
+     * manual compose flow from /wise/transfers. */
+    wiseAwaitingInvoice: number;
     failedEvents: number;
     /** Count of sheet.write_failed system events in the last 30 days. */
     sheetWriteFailures30d: number;
@@ -113,6 +118,7 @@
         wise,
         expenses,
         bankTx,
+        wiseAwaiting,
         bankingSession,
         agg,
         failed,
@@ -131,6 +137,7 @@
         }),
         listExpenses({ status: 'pending_review', limit: '1' }),
         listBankTransactions({ status: 'unmatched', limit: '1' }).catch(() => ({ items: [], total: 0 })),
+        getWiseAwaitingInvoiceCount().catch(() => ({ count: 0 })),
         getLatestBankingSession().catch(() => null),
         getQuarterlyAggregate({ year: String(year), quarter: String(quarter) }).catch(() => null),
         listEvents({ status: 'failed', limit: '1' }),
@@ -155,6 +162,7 @@
       counts = {
         pendingWiseCredits: wise.total,
         pendingExpenseReviews: expenses.total,
+        wiseAwaitingInvoice: wiseAwaiting.count,
         unmatchedInvoices: invoiceUnmatched?.count ?? 0,
         unmatchedBankTx: bankTx.total,
         failedEvents: failed.total,
@@ -202,6 +210,7 @@
       {@const totalThingsToDo =
         counts.pendingWiseCredits +
         counts.pendingExpenseReviews +
+        counts.wiseAwaitingInvoice +
         counts.unmatchedBankTx +
         counts.failedEvents +
         counts.staleSheetWrites}
@@ -282,6 +291,25 @@
                 </HStack>
                 {#if counts.pendingWiseCredits > 0}
                   <Button href={resolve('/wise')} variant="outline">Review →</Button>
+                {/if}
+              </Stack>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Wise transfer awaiting invoice</CardTitle>
+            </CardHeader>
+            <CardBody>
+              <Stack gap={3}>
+                <HStack class="items-center justify-between">
+                  <Heading size="medium" tag="h3">{counts.wiseAwaitingInvoice}</Heading>
+                  <Badge color={counts.wiseAwaitingInvoice === 0 ? 'secondary' : 'warning'}>
+                    {counts.wiseAwaitingInvoice === 0 ? 'auto-composed' : 'needs compose'}
+                  </Badge>
+                </HStack>
+                {#if counts.wiseAwaitingInvoice > 0}
+                  <Button href={resolve('/wise/transfers')} variant="outline">Compose →</Button>
                 {/if}
               </Stack>
             </CardBody>

@@ -26,6 +26,7 @@ type JobItemMap = {
   [JobName.BankingSweepStalePending]: Record<string, never>;
   [JobName.WiseReconcile]: Record<string, never>;
   [JobName.SheetWriteRetry]: Record<string, never>;
+  [JobName.InvoiceAutoComposeFromWise]: { wiseTransferId: string };
 };
 
 /** Producer-side: `data` shape for a given job name. */
