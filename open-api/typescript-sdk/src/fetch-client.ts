@@ -542,6 +542,9 @@ export type WiseTransferResponseDto = {
 export type WiseReconcileResponseDto = {
     enqueued: true;
 };
+export type WiseAwaitingInvoiceCountDto = {
+    count: number;
+};
 /**
  * Compute the BTW-aangifte aggregate for one quarter. Read-only — the data
  * lives in invoices/expenses/bank_transaction; this endpoint just rolls it
@@ -1356,6 +1359,20 @@ export function reconcileNow(opts?: Oazapfts.RequestOpts) {
     }>("/api/wise/reconcile", {
         ...opts,
         method: "POST"
+    }));
+}
+/**
+ * Count outbound transfers in `outgoing_payment_sent` that still have no
+ * linked invoice. Drives the dashboard's "Wise transfer awaiting invoice"
+ * tile — populated when auto-compose declined (or hasn't fired yet) and
+ * the operator needs to run the manual compose flow.
+ */
+export function awaitingInvoiceCount(opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: WiseAwaitingInvoiceCountDto;
+    }>("/api/wise/awaiting-invoice-count", {
+        ...opts
     }));
 }
 export enum Kind {

@@ -168,6 +168,23 @@ export class WiseTransferRepository {
     return new Map(rows.map((row) => [row.id, row.ourReference]));
   }
 
+  /**
+   * Count outbound transfers in `outgoing_payment_sent` that still have no
+   * linked invoice — i.e. the auto-compose declined (or hasn't fired yet)
+   * and the operator still needs to compose manually. Drives the
+   * dashboard's "Wise transfer awaiting invoice" tile.
+   */
+  async countOutgoingAwaitingInvoice(): Promise<number> {
+    const row = (await this.db
+      .selectFrom('wise_transfer')
+      .leftJoin('invoice', 'invoice.wiseTransferId', 'wise_transfer.id')
+      .select((eb) => eb.fn.countAll<string>().as('count'))
+      .where('wise_transfer.state', '=', WiseTransferState.OutgoingPaymentSent)
+      .where('invoice.id', 'is', null)
+      .executeTakeFirst()) as { count: string } | undefined;
+    return Number(row?.count ?? 0);
+  }
+
   /** Recent transfers, newest first. Drives the /transactions all-flows view. */
   findRecent(limit = 100): Promise<WiseTransferRow[]> {
     return this.db

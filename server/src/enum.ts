@@ -61,6 +61,16 @@ export enum JobName {
    * one succeeds.
    */
   SheetWriteRetry = 'sheet.write_retry',
+  /**
+   * Attempt to auto-compose an invoice from a settled wise_transfer. Fired
+   * when a wise_transfer reaches `outgoing_payment_sent`; the handler runs
+   * a set of guards and either composes the invoice (common case for a
+   * steady-cadence client) or declines, logging a system event with the
+   * reason. Declines surface as a dashboard tile the operator resolves
+   * manually. Idempotent — a repeated run on an already-invoiced transfer
+   * no-ops.
+   */
+  InvoiceAutoComposeFromWise = 'invoice.auto_compose_from_wise',
 }
 
 /** Tax/billing classification of a client; drives BTW treatment + invoice template selection. */

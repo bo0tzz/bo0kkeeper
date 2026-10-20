@@ -78,3 +78,11 @@ const WiseReconcileResponseSchema = z
   })
   .meta({ id: 'WiseReconcileResponseDto' });
 export class WiseReconcileResponseDto extends createZodDto(WiseReconcileResponseSchema) {}
+
+const WiseAwaitingInvoiceCountSchema = z
+  .object({
+    /** Outbound transfers in outgoing_payment_sent with no linked invoice. */
+    count: z.number().int().nonnegative(),
+  })
+  .meta({ id: 'WiseAwaitingInvoiceCountDto' });
+export class WiseAwaitingInvoiceCountDto extends createZodDto(WiseAwaitingInvoiceCountSchema) {}

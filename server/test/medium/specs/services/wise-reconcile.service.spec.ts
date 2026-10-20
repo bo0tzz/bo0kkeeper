@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { WiseTransferDirection, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { WiseApiError, WiseApiRepository, WiseTransfer } from 'src/repositories/wise-api.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
@@ -35,6 +36,7 @@ describe('WiseReconcileService', () => {
   let api: WiseApiRepository & {
     getTransfer: ReturnType<typeof vi.fn<WiseApiRepository['getTransfer']>>;
   };
+  let jobRepo: JobRepository & { queue: ReturnType<typeof vi.fn> };
   let service: WiseReconcileService;
 
   beforeEach(async () => {
@@ -43,7 +45,10 @@ describe('WiseReconcileService', () => {
     api = { getTransfer: vi.fn<WiseApiRepository['getTransfer']>() } as unknown as WiseApiRepository & {
       getTransfer: ReturnType<typeof vi.fn<WiseApiRepository['getTransfer']>>;
     };
-    service = new WiseReconcileService(repo, api, new EventRepository(db));
+    jobRepo = { queue: vi.fn(), queueAll: vi.fn(), setup: vi.fn() } as unknown as JobRepository & {
+      queue: ReturnType<typeof vi.fn>;
+    };
+    service = new WiseReconcileService(repo, api, new EventRepository(db), jobRepo);
   });
 
   afterEach(async () => {

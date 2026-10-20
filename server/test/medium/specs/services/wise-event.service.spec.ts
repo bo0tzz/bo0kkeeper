@@ -1,6 +1,7 @@
 import { Kysely } from 'kysely';
 import { EventSource, EventStatus, WiseTransferDirection, WiseTransferState } from 'src/enum';
 import { EventRepository } from 'src/repositories/event.repository';
+import { JobRepository } from 'src/repositories/job.repository';
 import { WiseApiRepository } from 'src/repositories/wise-api.repository';
 import { WiseTransferRepository } from 'src/repositories/wise-transfer.repository';
 import { DB } from 'src/schema';
@@ -48,6 +49,7 @@ describe('WiseEventService', () => {
   let eventRepo: EventRepository;
   let transferRepo: WiseTransferRepository;
   let wiseApi: WiseApiRepository & { getTransfer: ReturnType<typeof vi.fn<WiseApiRepository['getTransfer']>> };
+  let jobRepo: JobRepository & { queue: ReturnType<typeof vi.fn> };
   let service: WiseEventService;
 
   beforeEach(async () => {
@@ -60,7 +62,10 @@ describe('WiseEventService', () => {
     // Default: refetch fails silently so existing tests behave state-only.
     // Drift-specific tests override this mock.
     wiseApi.getTransfer.mockRejectedValue(new Error('getTransfer not stubbed'));
-    service = new WiseEventService(eventRepo, transferRepo, wiseApi);
+    jobRepo = { queue: vi.fn(), queueAll: vi.fn(), setup: vi.fn() } as unknown as JobRepository & {
+      queue: ReturnType<typeof vi.fn>;
+    };
+    service = new WiseEventService(eventRepo, transferRepo, wiseApi, jobRepo);
   });
 
   afterEach(async () => {
