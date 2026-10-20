@@ -513,6 +513,7 @@ export type WiseTransferListItemDto = {
     feeCurrency: string;
     ourReference: string | null;
     correlationId: string | null;
+    invoiceDismissedAt: string | null;
     linkedInvoiceId: string | null;
     linkedInvoiceNumber: string | null;
 };
@@ -538,6 +539,7 @@ export type WiseTransferResponseDto = {
     feeCurrency: string;
     ourReference: string | null;
     correlationId: string | null;
+    invoiceDismissedAt: string | null;
 };
 export type WiseReconcileResponseDto = {
     enqueued: true;
@@ -1373,6 +1375,23 @@ export function awaitingInvoiceCount(opts?: Oazapfts.RequestOpts) {
         data: WiseAwaitingInvoiceCountDto;
     }>("/api/wise/awaiting-invoice-count", {
         ...opts
+    }));
+}
+/**
+ * Mark a settled outbound transfer as "not invoiceable" so it stops
+ * showing in the "Wise transfer awaiting invoice" count and the
+ * auto-compose job declines on it. One-way; un-dismissing is a direct
+ * DB flip if it comes up.
+ */
+export function dismissInvoice({ id }: {
+    id: string;
+}, opts?: Oazapfts.RequestOpts) {
+    return oazapfts.ok(oazapfts.fetchJson<{
+        status: 200;
+        data: WiseTransferResponseDto;
+    }>(`/api/wise/transfers/${encodeURIComponent(id)}/dismiss-invoice`, {
+        ...opts,
+        method: "POST"
     }));
 }
 export enum Kind {

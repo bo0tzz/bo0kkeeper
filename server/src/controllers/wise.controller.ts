@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { ApiQueryFromDto, Authenticated } from 'src/decorators';
 import {
@@ -90,6 +90,23 @@ export class WiseController {
     const count = await this.wiseTransferRepository.countOutgoingAwaitingInvoice();
     return { count };
   }
+
+  /**
+   * Mark a settled outbound transfer as "not invoiceable" so it stops
+   * showing in the "Wise transfer awaiting invoice" count and the
+   * auto-compose job declines on it. One-way; un-dismissing is a direct
+   * DB flip if it comes up.
+   */
+  @Post('transfers/:id/dismiss-invoice')
+  @Authenticated()
+  @ApiOkResponse({ type: WiseTransferResponseDto })
+  async dismissInvoice(@Param('id', ParseUUIDPipe) id: string): Promise<WiseTransferResponseDto> {
+    const updated = await this.wiseTransferRepository.markInvoiceDismissed(id, new Date());
+    if (!updated) {
+      throw new NotFoundException(`wise_transfer ${id} not found`);
+    }
+    return mapWiseTransfer(updated);
+  }
 }
 
 function mapWiseTransfer(row: WiseTransferRow): WiseTransferResponseDto {
@@ -107,5 +124,10 @@ function mapWiseTransfer(row: WiseTransferRow): WiseTransferResponseDto {
     feeCurrency: row.feeCurrency,
     ourReference: row.ourReference,
     correlationId: row.correlationId,
+    invoiceDismissedAt: row.invoiceDismissedAt
+      ? row.invoiceDismissedAt instanceof Date
+        ? row.invoiceDismissedAt.toISOString()
+        : new Date(row.invoiceDismissedAt).toISOString()
+      : null,
   } as WiseTransferResponseDto;
 }

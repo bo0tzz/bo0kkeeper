@@ -38,6 +38,8 @@ const WiseTransferResponseSchema = z
     feeCurrency: z.string(),
     ourReference: z.string().nullable(),
     correlationId: z.string().nullable(),
+    /** Set when the operator dismissed the invoice-pending prompt for this transfer. */
+    invoiceDismissedAt: z.string().nullable(),
   })
   .meta({ id: 'WiseTransferResponseDto' });
 export class WiseTransferResponseDto extends createZodDto(WiseTransferResponseSchema) {}

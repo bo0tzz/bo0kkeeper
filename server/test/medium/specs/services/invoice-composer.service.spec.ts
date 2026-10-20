@@ -476,6 +476,27 @@ describe('InvoiceComposerService', () => {
       const result = await composer.tryAutoComposeFromWise(inbound.id);
       expect(result).toMatchObject({ outcome: 'declined', reason: 'wrong_direction' });
     });
+
+    it('declines invoice_dismissed when the operator marked the transfer not invoiceable', async () => {
+      await setTemplateDescription(db, clientId);
+      await seedPriorInvoice(composer, db, clientId);
+      const settled = await seedOutgoingTransfer(db);
+      await new WiseTransferRepository(db).markInvoiceDismissed(settled.id, new Date());
+
+      const result = await composer.tryAutoComposeFromWise(settled.id);
+      expect(result).toMatchObject({ outcome: 'declined', reason: 'invoice_dismissed' });
+    });
+
+    it('countOutgoingAwaitingInvoice excludes dismissed transfers', async () => {
+      const repo = new WiseTransferRepository(db);
+      const t1 = await seedOutgoingTransfer(db);
+      const t2 = await seedOutgoingTransfer(db);
+      expect(await repo.countOutgoingAwaitingInvoice()).toBe(2);
+      await repo.markInvoiceDismissed(t1.id, new Date());
+      expect(await repo.countOutgoingAwaitingInvoice()).toBe(1);
+      await repo.markInvoiceDismissed(t2.id, new Date());
+      expect(await repo.countOutgoingAwaitingInvoice()).toBe(0);
+    });
   });
 
   it('never records BTW for a non-EU client even if a rate is passed', async () => {
