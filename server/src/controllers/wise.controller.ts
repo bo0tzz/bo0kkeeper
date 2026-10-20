@@ -5,6 +5,7 @@ import {
   DraftFromEventDto,
   ListWiseTransfersQueryDto,
   ListWiseTransfersResponseDto,
+  WiseAwaitingInvoiceCountDto,
   WiseReconcileResponseDto,
   WiseTransferResponseDto,
 } from 'src/dtos/wise.dto';
@@ -74,6 +75,20 @@ export class WiseController {
   async reconcileNow(): Promise<WiseReconcileResponseDto> {
     await this.jobRepository.queue(JobName.WiseReconcile, {});
     return { enqueued: true };
+  }
+
+  /**
+   * Count outbound transfers in `outgoing_payment_sent` that still have no
+   * linked invoice. Drives the dashboard's "Wise transfer awaiting invoice"
+   * tile — populated when auto-compose declined (or hasn't fired yet) and
+   * the operator needs to run the manual compose flow.
+   */
+  @Get('awaiting-invoice-count')
+  @Authenticated()
+  @ApiOkResponse({ type: WiseAwaitingInvoiceCountDto })
+  async awaitingInvoiceCount(): Promise<WiseAwaitingInvoiceCountDto> {
+    const count = await this.wiseTransferRepository.countOutgoingAwaitingInvoice();
+    return { count };
   }
 }
 

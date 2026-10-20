@@ -182,6 +182,30 @@ export class InvoiceRepository {
     return row.periodEnd instanceof Date ? row.periodEnd : new Date(row.periodEnd);
   }
 
+  /**
+   * Sum of the first invoice's lines for this client, most-recent first — the
+   * reference "what the recurring billing total has historically been." Used
+   * by the Wise auto-compose rate-pattern guard: a prefill totalMinor that
+   * doesn't match this means something changed (rate adjustment, period
+   * split, one-off bonus) and the operator should compose manually.
+   * Returns null when the client has no prior invoices.
+   */
+  async findLatestLineTotalForClient(clientId: string): Promise<bigint | null> {
+    const row = (await this.db
+      .selectFrom('invoice')
+      .innerJoin('invoice_line', 'invoice_line.invoiceId', 'invoice.id')
+      .select((eb) => eb.fn.sum<string>('invoice_line.lineTotalMinor').as('total'))
+      .where('invoice.clientId', '=', clientId)
+      .groupBy('invoice.id')
+      .orderBy('invoice.issuedAt', 'desc')
+      .limit(1)
+      .executeTakeFirst()) as { total: string | null } | undefined;
+    if (!row?.total) {
+      return null;
+    }
+    return BigInt(row.total);
+  }
+
   /** Set the paperless document id once the PDF has been pushed. */
   async setPaperlessDocId(invoiceId: string, paperlessDocId: string): Promise<void> {
     await this.db
