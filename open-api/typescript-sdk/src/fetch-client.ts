@@ -468,26 +468,6 @@ export type RetrySheetWritesResponseDto = {
 export type SheetWriteStatusDto = {
     staleCount: number;
 };
-export type ListTransactionsResponseDto = {
-    items: {
-        id: string;
-        source: Source2;
-        date: string;
-        amountMinor: string;
-        currency: string;
-        counterparty: string | null;
-        "type": string;
-        reference: string | null;
-        description: string;
-        match: {
-            kind: Kind4;
-            id: string;
-            confidence: string | null;
-        } | null;
-        state: string | null;
-    }[];
-    total: number;
-};
 export type WiseWebhookDto = {
     event_type: string;
     schema_version?: string;
@@ -1291,22 +1271,6 @@ export function getSheetWriteStatus(opts?: Oazapfts.RequestOpts) {
         ...opts
     }));
 }
-export function list({ dateFrom, dateTo, source }: {
-    dateFrom?: string;
-    dateTo?: string;
-    source?: string;
-}, opts?: Oazapfts.RequestOpts) {
-    return oazapfts.ok(oazapfts.fetchJson<{
-        status: 200;
-        data: ListTransactionsResponseDto;
-    }>(`/api/transactions${QS.query(QS.explode({
-        dateFrom,
-        dateTo,
-        source
-    }))}`, {
-        ...opts
-    }));
-}
 /**
  * Wise webhook endpoint. RSA-SHA256-signed bodies are verified before ingestion.
  * The handler is intentionally minimal — verify, idempotent INSERT, return 200.
@@ -1463,13 +1427,4 @@ export enum Status3 {
     Degraded = "degraded",
     Broken = "broken",
     NotConfigured = "not_configured"
-}
-export enum Source2 {
-    Bank = "bank",
-    Wise = "wise"
-}
-export enum Kind4 {
-    WiseTransfer = "wise_transfer",
-    Invoice = "invoice",
-    Expense = "expense"
 }

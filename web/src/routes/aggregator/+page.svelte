@@ -1,15 +1,7 @@
 <script lang="ts">
   import { formatDate } from '$lib/format';
   import { formatEur as eur } from '$lib/money';
-  import {
-    closePeriod,
-    getQuarterlyAggregate,
-    Kind,
-    Kind2,
-    Kind3,
-    reopenPeriod,
-    type QuarterlyAggregateResponseDto,
-  } from '@bo0kkeeper/sdk';
+  import { getQuarterlyAggregate, Kind, Kind2, Kind3, type QuarterlyAggregateResponseDto } from '@bo0kkeeper/sdk';
   import { Alert, Badge, Button, Heading, HStack, Select, Stack, Text } from '@immich/ui';
 
   type AggregatorWarning = QuarterlyAggregateResponseDto['warnings'][number];
@@ -37,30 +29,6 @@
   $effect(() => {
     void load();
   });
-
-  let closing = $state(false);
-  async function close() {
-    closing = true;
-    try {
-      await closePeriod({ year, quarter, closePeriodDto: {} });
-      await load();
-    } catch (error_) {
-      error = (error_ as Error).message;
-    } finally {
-      closing = false;
-    }
-  }
-  async function reopen() {
-    closing = true;
-    try {
-      await reopenPeriod({ year, quarter });
-      await load();
-    } catch (error_) {
-      error = (error_ as Error).message;
-    } finally {
-      closing = false;
-    }
-  }
 
   const classLabels: Record<ClientClass, string> = {
     non_eu: 'Non-EU (export)',
@@ -117,15 +85,6 @@
         {/if}
       </HStack>
       <HStack gap={2}>
-        {#if data}
-          {#if data.closedAt}
-            <Button size="small" variant="ghost" disabled={closing} onclick={reopen}>Reopen</Button>
-          {:else}
-            <Button size="small" variant="ghost" disabled={closing} onclick={close}>
-              {closing ? 'Closing…' : 'Mark filed'}
-            </Button>
-          {/if}
-        {/if}
         <Button
           size="small"
           variant="ghost"
