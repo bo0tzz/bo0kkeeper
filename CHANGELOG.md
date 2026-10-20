@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.10.0...v0.11.0) (2026-10-20)
+
+
+### Features
+
+* **server:** auto-compose invoices from settled Wise transfers ([#218](https://github.com/bo0tzz/bo0kkeeper/issues/218)) ([2a7bb40](https://github.com/bo0tzz/bo0kkeeper/commit/2a7bb4029d7bf25d1201192e7329941f17860c87))
+* **web:** merge double-counted match tiles into one 'Needs linking' ([#215](https://github.com/bo0tzz/bo0kkeeper/issues/215)) ([5f2683f](https://github.com/bo0tzz/bo0kkeeper/commit/5f2683f831ccb6deb0437bf43d902d62a5b88b2d))
+
 ## [0.10.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.9.4...v0.10.0) (2026-10-18)
 
 
