@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.11.0...v0.12.0) (2026-10-20)
+
+
+### Features
+
+* **wise:** dismiss invoice prompt for not-invoiceable transfers ([#219](https://github.com/bo0tzz/bo0kkeeper/issues/219)) ([9b3636a](https://github.com/bo0tzz/bo0kkeeper/commit/9b3636a99c2ea1dc02f0847b89aa1fc11682f723))
+
 ## [0.11.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.10.0...v0.11.0) (2026-10-20)
 
 
