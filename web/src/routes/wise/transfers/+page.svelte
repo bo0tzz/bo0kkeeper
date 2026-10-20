@@ -204,17 +204,20 @@
                 {:else if t.invoiceDismissedAt}
                   <Text size="small" color="muted">Dismissed</Text>
                 {:else if t.direction === 'out' && t.state === 'outgoing_payment_sent'}
-                  <HStack gap={2} class="items-center">
-                    <a
-                      href={resolve('/invoices/compose-from-wise/[wiseTransferId]', { wiseTransferId: t.id })}
-                      class="text-primary underline"
-                    >
-                      Compose
-                    </a>
-                    <Button size="small" variant="ghost" disabled={dismissing === t.id} onclick={() => dismiss(t.id)}>
-                      {dismissing === t.id ? 'Dismissing…' : 'Dismiss'}
-                    </Button>
-                  </HStack>
+                  <a
+                    href={resolve('/invoices/compose-from-wise/[wiseTransferId]', { wiseTransferId: t.id })}
+                    class="whitespace-nowrap text-primary underline"
+                  >
+                    Compose
+                  </a>
+                  <button
+                    type="button"
+                    class="whitespace-nowrap text-muted-foreground underline hover:text-foreground disabled:opacity-50"
+                    disabled={dismissing === t.id}
+                    onclick={() => dismiss(t.id)}
+                  >
+                    {dismissing === t.id ? 'Dismissing…' : 'Dismiss'}
+                  </button>
                 {:else}
                   —
                 {/if}
