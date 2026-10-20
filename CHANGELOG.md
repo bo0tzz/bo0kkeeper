@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.12.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.12.0...v0.12.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* **deps:** update dependency nestjs-cls to v6.3.1 ([#205](https://github.com/bo0tzz/bo0kkeeper/issues/205)) ([4bdaf18](https://github.com/bo0tzz/bo0kkeeper/commit/4bdaf186a577546293db32062a03c2ddec0241d9))
+* **deps:** update dependency testcontainers to v12.2.1 ([#206](https://github.com/bo0tzz/bo0kkeeper/issues/206)) ([19db613](https://github.com/bo0tzz/bo0kkeeper/commit/19db61389c05ac78f878a5b68f3556eb6cb833b8))
+* **deps:** update dependency unplugin-swc to v1.6.0 ([#208](https://github.com/bo0tzz/bo0kkeeper/issues/208)) ([d42f485](https://github.com/bo0tzz/bo0kkeeper/commit/d42f48569d8ef1bc8cf0f7161db1f806aca0771c))
+* **deps:** update dependency zod to v4.6.7 ([#209](https://github.com/bo0tzz/bo0kkeeper/issues/209)) ([7eb4d45](https://github.com/bo0tzz/bo0kkeeper/commit/7eb4d45907bb5d980cd968e592eb69dcd21b9018))
+* **deps:** update docker/build-push-action action to v7.4.0 ([#210](https://github.com/bo0tzz/bo0kkeeper/issues/210)) ([c52db08](https://github.com/bo0tzz/bo0kkeeper/commit/c52db0823f31dde0390bad0ef4db1ed306059aa5))
+* **deps:** update docker/dockerfile docker tag to v1.28 ([#211](https://github.com/bo0tzz/bo0kkeeper/issues/211)) ([5f6d3af](https://github.com/bo0tzz/bo0kkeeper/commit/5f6d3aff29b205b0266e22d363e74d668633dcb5))
+* **deps:** update docker/setup-buildx-action action to v4.4.1 ([#212](https://github.com/bo0tzz/bo0kkeeper/issues/212)) ([9b87389](https://github.com/bo0tzz/bo0kkeeper/commit/9b8738949a17c897a78d90ef58dad8660d4d9b81))
+* **deps:** update eslint ([#213](https://github.com/bo0tzz/bo0kkeeper/issues/213)) ([1aa32b7](https://github.com/bo0tzz/bo0kkeeper/commit/1aa32b70ee3f7401ad0899df2b8a3fc60affee0c))
+* **deps:** update ghcr.io/paperless-ngx/paperless-ngx:latest docker digest to dba0242 ([#214](https://github.com/bo0tzz/bo0kkeeper/issues/214)) ([3128d41](https://github.com/bo0tzz/bo0kkeeper/commit/3128d41ba692bc58c931d4cea9735539132335a5))
+* **web:** wise-transfers Compose/Dismiss layout clipping ([#221](https://github.com/bo0tzz/bo0kkeeper/issues/221)) ([e025090](https://github.com/bo0tzz/bo0kkeeper/commit/e02509039b6c60b315b75f0094dd608f4ace6c5b))
+
 ## [0.12.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.11.0...v0.12.0) (2026-10-20)
 
 
