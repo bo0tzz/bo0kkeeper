@@ -170,9 +170,9 @@ export class WiseTransferRepository {
 
   /**
    * Count outbound transfers in `outgoing_payment_sent` that still have no
-   * linked invoice — i.e. the auto-compose declined (or hasn't fired yet)
-   * and the operator still needs to compose manually. Drives the
-   * dashboard's "Wise transfer awaiting invoice" tile.
+   * linked invoice AND haven't been manually dismissed — i.e. the auto-compose
+   * declined (or hasn't fired yet) and the operator still needs to compose
+   * manually. Drives the dashboard's "Wise transfer awaiting invoice" tile.
    */
   async countOutgoingAwaitingInvoice(): Promise<number> {
     const row = (await this.db
@@ -180,9 +180,26 @@ export class WiseTransferRepository {
       .leftJoin('invoice', 'invoice.wiseTransferId', 'wise_transfer.id')
       .select((eb) => eb.fn.countAll<string>().as('count'))
       .where('wise_transfer.state', '=', WiseTransferState.OutgoingPaymentSent)
+      .where('wise_transfer.invoiceDismissedAt', 'is', null)
       .where('invoice.id', 'is', null)
       .executeTakeFirst()) as { count: string } | undefined;
     return Number(row?.count ?? 0);
+  }
+
+  /**
+   * Mark a wise_transfer as not-invoiceable. Operator-driven from
+   * `/wise/transfers`; suppresses the dashboard tile and the auto-compose
+   * attempt. Returns the updated row, or undefined if the transfer doesn't
+   * exist.
+   */
+  async markInvoiceDismissed(id: string, at: Date): Promise<WiseTransferRow | undefined> {
+    const updated = await this.db
+      .updateTable('wise_transfer')
+      .set({ invoiceDismissedAt: at, updatedAt: new Date() })
+      .where('id', '=', id)
+      .returningAll()
+      .executeTakeFirst();
+    return updated as WiseTransferRow | undefined;
   }
 
   /** Recent transfers, newest first. Drives the /transactions all-flows view. */

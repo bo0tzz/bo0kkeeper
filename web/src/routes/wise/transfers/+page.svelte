@@ -2,6 +2,7 @@
   import { resolve } from '$app/paths';
   import { extractApiError } from '$lib/sdk';
   import {
+    dismissInvoice as dismissWiseInvoice,
     listTransfers as listWiseTransfers,
     reconcileNow as reconcileWise,
     type ListWiseTransfersResponseDto,
@@ -32,8 +33,22 @@
   let data = $state<ListWiseTransfersResponseDto | null>(null);
   let loading = $state(false);
   let reconciling = $state(false);
+  let dismissing = $state<string | null>(null);
   let info = $state<string | null>(null);
   let error = $state<string | null>(null);
+
+  async function dismiss(id: string) {
+    dismissing = id;
+    error = null;
+    try {
+      await dismissWiseInvoice({ id });
+      await load();
+    } catch (error_) {
+      error = extractApiError(error_).message;
+    } finally {
+      dismissing = null;
+    }
+  }
 
   let stateFilter = $state<'' | WiseTransferState>('');
   let page = $state(1);
@@ -186,13 +201,20 @@
               <TableCell>
                 {#if t.linkedInvoiceNumber}
                   <code>{t.linkedInvoiceNumber}</code>
+                {:else if t.invoiceDismissedAt}
+                  <Text size="small" color="muted">Dismissed</Text>
                 {:else if t.direction === 'out' && t.state === 'outgoing_payment_sent'}
-                  <a
-                    href={resolve('/invoices/compose-from-wise/[wiseTransferId]', { wiseTransferId: t.id })}
-                    class="text-primary underline"
-                  >
-                    Compose
-                  </a>
+                  <HStack gap={2} class="items-center">
+                    <a
+                      href={resolve('/invoices/compose-from-wise/[wiseTransferId]', { wiseTransferId: t.id })}
+                      class="text-primary underline"
+                    >
+                      Compose
+                    </a>
+                    <Button size="small" variant="ghost" disabled={dismissing === t.id} onclick={() => dismiss(t.id)}>
+                      {dismissing === t.id ? 'Dismissing…' : 'Dismiss'}
+                    </Button>
+                  </HStack>
                 {:else}
                   —
                 {/if}

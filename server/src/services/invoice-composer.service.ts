@@ -72,6 +72,7 @@ export type AutoComposeDeclineReason =
   | 'transfer_not_found'
   | 'wrong_direction'
   | 'wrong_state'
+  | 'invoice_dismissed'
   | 'no_suggested_client'
   | 'no_suggested_period'
   | 'no_line_description'
@@ -436,6 +437,13 @@ export class InvoiceComposerService {
       // Idempotent no-op; don't log a decline — this fires on every retry of
       // a job that already succeeded, so logging would be noise.
       return { outcome: 'already_invoiced', invoiceId: existing.id };
+    }
+    if (transfer.invoiceDismissedAt) {
+      return this.declineAutoCompose(
+        wiseTransferId,
+        'invoice_dismissed',
+        `operator dismissed at ${new Date(transfer.invoiceDismissedAt).toISOString()}`,
+      );
     }
 
     const prefill = await this.prefillFromWise(wiseTransferId);

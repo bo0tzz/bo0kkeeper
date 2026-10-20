@@ -105,6 +105,15 @@ export class WiseTransferTable {
   @ForeignKeyColumn(() => EventTable, { nullable: true, onDelete: 'SET NULL' })
   sourceEventId!: string | null;
 
+  /**
+   * Set when the operator marks a settled outbound transfer as "not
+   * invoiceable" from `/wise/transfers`. Suppresses it from the dashboard
+   * "Wise transfer awaiting invoice" count and makes auto-compose decline
+   * with `invoice_dismissed`. Null for everything else.
+   */
+  @Column({ type: 'timestamp with time zone', nullable: true })
+  invoiceDismissedAt!: Timestamp | null;
+
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;
 
