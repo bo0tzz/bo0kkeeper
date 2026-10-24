@@ -286,23 +286,68 @@ export class BankMatcherService {
   }
 
   /**
-   * Things the user might want to manually link a bank tx to. With a free-
-   * text query, this is a substring match on the most useful identifier per
-   * type. Without one, we exclude candidates that are already matched to
-   * another bank_transaction — there's no reason to surface a transfer or
-   * invoice that's already accounted for elsewhere. With a query the user
-   * is searching on purpose, so we include matched rows too (they might be
-   * looking at a wrong existing match).
+   * Things the user might want to manually link a bank tx to.
+   *
+   * Three modes:
+   * 1. Text query only — substring match across all three types; includes
+   *    already-matched rows so the operator can find a wrong existing match.
+   * 2. bankTxId only — directional + amount-aware filter. Outflow bank_txs
+   *    only match expenses (nothing else makes sense to pay out of our
+   *    account); inflow bank_txs only match invoices + wise_transfers (both
+   *    represent money landing). Within each applicable type, candidates
+   *    sort by amount proximity to the bank_tx (exact matches first).
+   * 3. Both bankTxId and q — operator deliberately broadening the search;
+   *    we drop the directional filter and honor the text query.
    */
-  async findMatchCandidates(query: string | undefined, limit = 20): Promise<MatchCandidates> {
+  async findMatchCandidates(
+    query: string | undefined,
+    options: { bankTxId?: string; limit?: number } = {},
+  ): Promise<MatchCandidates> {
+    const limit = options.limit ?? 20;
     const q = query?.trim().toLowerCase();
     const args = { query: q || undefined, limit };
+
+    const bankTx = options.bankTxId ? await this.bankTransactionRepository.findById(options.bankTxId) : null;
+    if (!bankTx || q) {
+      // Mode 1 or 3 — fall through to the unfiltered search across all types.
+      const [transfers, invoices, expenses] = await Promise.all([
+        this.wiseTransferRepository.findMatchCandidates(args),
+        this.invoiceRepository.findMatchCandidates(args),
+        this.expenseRepository.findMatchCandidates(args),
+      ]);
+      return { transfers, invoices, expenses };
+    }
+
+    // Mode 2 — directional. Outflow (negative amount) can only match an
+    // expense we're paying; inflow matches invoices (clients paying us) or
+    // wise_transfers (sweeps landing at the bank).
+    const isOutflow = BigInt(bankTx.amountMinor) < 0n;
     const [transfers, invoices, expenses] = await Promise.all([
-      this.wiseTransferRepository.findMatchCandidates(args),
-      this.invoiceRepository.findMatchCandidates(args),
-      this.expenseRepository.findMatchCandidates(args),
+      isOutflow ? Promise.resolve([]) : this.wiseTransferRepository.findMatchCandidates(args),
+      isOutflow ? Promise.resolve([]) : this.invoiceRepository.findMatchCandidates(args),
+      isOutflow ? this.expenseRepository.findMatchCandidates(args) : Promise.resolve([]),
     ]);
-    return { transfers, invoices, expenses };
+
+    const target = isOutflow ? -BigInt(bankTx.amountMinor) : BigInt(bankTx.amountMinor);
+    const bankCurrency = bankTx.currency;
+    return {
+      transfers: sortByAmountProximity(
+        // Same-currency only; wise_transfer sweeps land in bankCurrency as `targetAmountMinor`.
+        transfers.filter((t) => t.targetCurrency === bankCurrency),
+        (t) => BigInt(t.targetAmountMinor),
+        target,
+      ),
+      invoices: sortByAmountProximity(
+        invoices.filter((i) => i.currency === bankCurrency),
+        (i) => BigInt(i.totalMinor),
+        target,
+      ),
+      expenses: sortByAmountProximity(
+        expenses.filter((e) => e.currency === bankCurrency),
+        (e) => BigInt(e.amountMinor),
+        target,
+      ),
+    };
   }
 
   /**
@@ -485,4 +530,25 @@ function isFuzzyMatch(a: string, b: string): boolean {
 
 function addDays(d: Date, days: number): Date {
   return new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * Rank candidates by how close their amount is to a target. Exact matches
+ * come first; otherwise sort by absolute distance in minor units. Preserves
+ * the original relative order of ties (JavaScript's sort is stable), so a
+ * query-first then amount-sorted result keeps the repo's inherent recency.
+ */
+function sortByAmountProximity<T>(items: T[], amountOf: (t: T) => bigint, target: bigint): T[] {
+  return items.toSorted((a, b) => {
+    const da = abs(amountOf(a) - target);
+    const db = abs(amountOf(b) - target);
+    if (da === db) {
+      return 0;
+    }
+    return da < db ? -1 : 1;
+  });
+}
+
+function abs(n: bigint): bigint {
+  return n < 0n ? -n : n;
 }

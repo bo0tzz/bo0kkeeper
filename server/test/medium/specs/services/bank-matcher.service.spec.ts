@@ -49,6 +49,51 @@ async function ingestSnsFeeRow(repo: BankTransactionRepository, externalId: stri
   return result.row;
 }
 
+async function seedCandidateInvoice(
+  clientRepo: ClientRepository,
+  invoiceRepo: InvoiceRepository,
+  totalMinor: bigint,
+  currency: string,
+) {
+  const client = await clientRepo.create({
+    name: `Client ${totalMinor} ${currency}`,
+    class: ClientClass.Domestic,
+    tradeName: TradeName.ItServices,
+    address: { line1: 'X', city: 'Y' },
+  });
+  return invoiceRepo.issue({
+    year: 2099,
+    invoice: {
+      clientId: client.id,
+      issuedAt: new Date('2099-05-01'),
+      currency,
+      totalMinor,
+      btwRateBps: null,
+      btwMinor: null,
+      sourceEventId: null,
+    },
+    lines: [{ ordinal: 0, description: 'X', lineTotalMinor: totalMinor, unitLabel: null, quantity: null }],
+  });
+}
+
+async function seedCandidateBankTx(repo: BankTransactionRepository, externalId: string, amountMinor: bigint) {
+  const result = await repo.ingest({
+    source: BankSource.SnsCsv,
+    externalId,
+    txDate: new Date('2099-05-02'),
+    amountMinor,
+    currency: 'EUR',
+    counterpartyName: null,
+    counterpartyIban: null,
+    description: '',
+    rawPayload: {},
+  });
+  if (!result.ingested) {
+    throw new Error('precondition');
+  }
+  return result.row;
+}
+
 describe('BankMatcherService', () => {
   let db: Kysely<DB>;
   let bankRepo: BankTransactionRepository;
@@ -943,6 +988,86 @@ describe('BankMatcherService', () => {
       it('throws on unknown bank-tx id', async () => {
         await expect(matcher.reprocess('00000000-0000-0000-0000-000000000999')).rejects.toThrow(/not found/);
       });
+    });
+  });
+
+  describe('findMatchCandidates with bankTxId', () => {
+    let expenseRepo: ExpenseRepository;
+    beforeEach(() => {
+      expenseRepo = new ExpenseRepository(db);
+    });
+
+    async function seedExpense(docId: string, amountMinor: bigint) {
+      const r = await expenseRepo.ingest({
+        paperlessDocId: docId,
+        vendor: `Vendor ${docId}`,
+        expenseDate: new Date('2099-05-01'),
+        amountMinor,
+        currency: 'EUR',
+        btwRateBps: null,
+        btwMinor: null,
+        locationClass: ExpenseLocationClass.Domestic,
+        category: '',
+        notes: null,
+        sourceEventId: null,
+      });
+      if (!r.ingested) {
+        throw new Error('precondition');
+      }
+      return r.row;
+    }
+
+    it('outflow: only expenses, nearest amount first', async () => {
+      const far = await seedExpense('far', 9000n);
+      const near = await seedExpense('near', 4575n);
+      const mid = await seedExpense('mid', 1000n);
+      await seedCandidateInvoice(clientRepo, invoiceRepo, 4574n, 'EUR');
+      const tx = await seedCandidateBankTx(bankRepo, 'out:1', -4574n);
+
+      const c = await matcher.findMatchCandidates(undefined, { bankTxId: tx.id });
+
+      expect(c.expenses.map((e) => e.id)).toEqual([near.id, mid.id, far.id]);
+      expect(c.invoices).toEqual([]);
+      expect(c.transfers).toEqual([]);
+    });
+
+    it('inflow: same-currency invoices and wise transfers, no expenses', async () => {
+      await seedExpense('e1', 23_898n);
+      await seedCandidateInvoice(clientRepo, invoiceRepo, 23_898n, 'USD');
+      const other = await seedCandidateInvoice(clientRepo, invoiceRepo, 5000n, 'EUR');
+      const exact = await seedCandidateInvoice(clientRepo, invoiceRepo, 23_898n, 'EUR');
+      const transfer = await transferRepo.create({
+        wiseTransferId: 'cand-1',
+        direction: WiseTransferDirection.Out,
+        sourceAmountMinor: 28_000n,
+        sourceCurrency: 'USD',
+        targetAmountMinor: 23_898n,
+        targetCurrency: 'EUR',
+        fxRate: '0.85',
+        feeMinor: 0n,
+        feeCurrency: 'USD',
+        state: WiseTransferState.OutgoingPaymentSent,
+        stateUpdatedAt: new Date('2099-05-01'),
+        ourReference: 'TXN-9999',
+        counterpartyName: null,
+        correlationId: null,
+      });
+      const tx = await seedCandidateBankTx(bankRepo, 'in:1', 23_898n);
+
+      const c = await matcher.findMatchCandidates(undefined, { bankTxId: tx.id });
+
+      expect(c.invoices.map((i) => i.id)).toEqual([exact.id, other.id]);
+      expect(c.transfers.map((t) => t.id)).toEqual([transfer.id]);
+      expect(c.expenses).toEqual([]);
+    });
+
+    it('a text query bypasses the direction filter', async () => {
+      const invoice = await seedCandidateInvoice(clientRepo, invoiceRepo, 5000n, 'EUR');
+      const tx = await seedCandidateBankTx(bankRepo, 'out:2', -5000n);
+
+      const c = await matcher.findMatchCandidates(invoice.number, { bankTxId: tx.id });
+
+      expect(c.invoices.map((i) => i.id)).toEqual([invoice.id]);
     });
   });
 

@@ -121,6 +121,20 @@ const MatchCandidatesResponseSchema = z
   .meta({ id: 'BankTxMatchCandidatesDto' });
 export class BankTxMatchCandidatesDto extends createZodDto(MatchCandidatesResponseSchema) {}
 
+const MatchCandidatesQuerySchema = z
+  .object({
+    /** Free-text search across TXN ref / invoice number / vendor. When set,
+     * the directional and amount filters are bypassed. */
+    q: z.string().optional(),
+    /** Scope candidates to those directionally and amount-compatible with
+     * this bank_tx. Outflow bank_txs only surface expenses; inflow bank_txs
+     * only surface invoices + wise_transfers; same-currency only; sorted by
+     * amount proximity. Ignored when `q` is present. */
+    bankTxId: z.uuid().optional(),
+  })
+  .meta({ id: 'BankTxMatchCandidatesQueryDto' });
+export class BankTxMatchCandidatesQueryDto extends createZodDto(MatchCandidatesQuerySchema) {}
+
 // Give the enum a stable OpenAPI id so `.nullable()` composes cleanly in the
 // generated SDK (an inline nullable enum emits `enum: [..., null]` which
 // oazapfts translates to a TS enum member missing an initializer).

@@ -348,7 +348,7 @@
   async function loadCandidates() {
     candidatesLoading = true;
     try {
-      candidates = await listMatchCandidates({ q: candidateQuery || undefined });
+      candidates = await listMatchCandidates({ q: candidateQuery || undefined, bankTxId: linkingTx?.id });
     } catch (error_) {
       error = extractApiError(error_).message;
     } finally {
@@ -847,7 +847,11 @@
           {/if}
 
           {#if !candidatesLoading && candidates.transfers.length === 0 && candidates.invoices.length === 0 && candidates.expenses.length === 0}
-            <Text color="muted">No candidates. Try a different search.</Text>
+            <Text color="muted">
+              {candidateQuery
+                ? 'No candidates. Try a different search.'
+                : 'No unmatched candidates in this direction. Search to look across all types.'}
+            </Text>
           {/if}
         </Stack>
       </ModalBody>
