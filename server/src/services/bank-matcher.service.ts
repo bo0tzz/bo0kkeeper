@@ -294,8 +294,8 @@ export class BankMatcherService {
    * 2. bankTxId only — directional + amount-aware filter. Outflow bank_txs
    *    only match expenses (nothing else makes sense to pay out of our
    *    account); inflow bank_txs only match invoices + wise_transfers (both
-   *    represent money landing). Within each applicable type, candidates
-   *    sort by amount proximity to the bank_tx (exact matches first).
+   *    represent money landing). Same currency only; cancelled/failed
+   *    transfers and rejected expenses are dropped; nearest amount first.
    * 3. Both bankTxId and q — operator deliberately broadening the search;
    *    we drop the directional filter and honor the text query.
    */
@@ -320,34 +320,17 @@ export class BankMatcherService {
 
     // Mode 2 — directional. Outflow (negative amount) can only match an
     // expense we're paying; inflow matches invoices (clients paying us) or
-    // wise_transfers (sweeps landing at the bank).
-    const isOutflow = BigInt(bankTx.amountMinor) < 0n;
+    // wise_transfers (sweeps landing at the bank). Ranking happens in SQL so
+    // the limit keeps the nearest amounts, not the most recent rows.
+    const amount = BigInt(bankTx.amountMinor);
+    const isOutflow = amount < 0n;
+    const near = { amountMinor: isOutflow ? -amount : amount, currency: bankTx.currency };
     const [transfers, invoices, expenses] = await Promise.all([
-      isOutflow ? Promise.resolve([]) : this.wiseTransferRepository.findMatchCandidates(args),
-      isOutflow ? Promise.resolve([]) : this.invoiceRepository.findMatchCandidates(args),
-      isOutflow ? this.expenseRepository.findMatchCandidates(args) : Promise.resolve([]),
+      isOutflow ? [] : this.wiseTransferRepository.findMatchCandidates({ limit, near }),
+      isOutflow ? [] : this.invoiceRepository.findMatchCandidates({ limit, near }),
+      isOutflow ? this.expenseRepository.findMatchCandidates({ limit, near }) : [],
     ]);
-
-    const target = isOutflow ? -BigInt(bankTx.amountMinor) : BigInt(bankTx.amountMinor);
-    const bankCurrency = bankTx.currency;
-    return {
-      transfers: sortByAmountProximity(
-        // Same-currency only; wise_transfer sweeps land in bankCurrency as `targetAmountMinor`.
-        transfers.filter((t) => t.targetCurrency === bankCurrency),
-        (t) => BigInt(t.targetAmountMinor),
-        target,
-      ),
-      invoices: sortByAmountProximity(
-        invoices.filter((i) => i.currency === bankCurrency),
-        (i) => BigInt(i.totalMinor),
-        target,
-      ),
-      expenses: sortByAmountProximity(
-        expenses.filter((e) => e.currency === bankCurrency),
-        (e) => BigInt(e.amountMinor),
-        target,
-      ),
-    };
+    return { transfers, invoices, expenses };
   }
 
   /**
@@ -530,25 +513,4 @@ function isFuzzyMatch(a: string, b: string): boolean {
 
 function addDays(d: Date, days: number): Date {
   return new Date(d.getTime() + days * 24 * 60 * 60 * 1000);
-}
-
-/**
- * Rank candidates by how close their amount is to a target. Exact matches
- * come first; otherwise sort by absolute distance in minor units. Preserves
- * the original relative order of ties (JavaScript's sort is stable), so a
- * query-first then amount-sorted result keeps the repo's inherent recency.
- */
-function sortByAmountProximity<T>(items: T[], amountOf: (t: T) => bigint, target: bigint): T[] {
-  return items.toSorted((a, b) => {
-    const da = abs(amountOf(a) - target);
-    const db = abs(amountOf(b) - target);
-    if (da === db) {
-      return 0;
-    }
-    return da < db ? -1 : 1;
-  });
-}
-
-function abs(n: bigint): bigint {
-  return n < 0n ? -n : n;
 }

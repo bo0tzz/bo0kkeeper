@@ -4,6 +4,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { ExpenseLocationClass, ExpenseStatus, MatchConfidence } from 'src/enum';
 import { DB } from 'src/schema';
 import { ExpenseTable } from 'src/schema/tables/expense.table';
+import { MatchCandidateTarget } from 'src/types';
 
 export type Expense = Selectable<ExpenseTable>;
 export type NewExpense = Insertable<ExpenseTable>;
@@ -269,13 +270,23 @@ export class ExpenseRepository {
    * substring filter and includes already-matched rows (the operator may be
    * fixing a wrong link). Without, restricts to unmatched.
    */
-  async findMatchCandidates(input: { query?: string; limit: number }): Promise<ExpenseMatchCandidate[]> {
+  async findMatchCandidates(input: {
+    query?: string;
+    limit: number;
+    near?: MatchCandidateTarget;
+  }): Promise<ExpenseMatchCandidate[]> {
     const like = input.query ? `%${input.query.toLowerCase()}%` : null;
     let qb = this.db
       .selectFrom('expense')
       .select(['id', 'vendor', 'amountMinor', 'currency', 'expenseDate', 'status'])
-      .orderBy('expenseDate', 'desc')
       .limit(input.limit);
+    qb = input.near
+      ? qb
+          .where('currency', '=', input.near.currency)
+          .where('status', '!=', ExpenseStatus.Rejected)
+          .orderBy(sql`abs(${sql.ref('amountMinor')} - ${input.near.amountMinor})`)
+          .orderBy('expenseDate', 'desc')
+      : qb.orderBy('expenseDate', 'desc');
     qb = like
       ? qb.where((eb) => eb(eb.fn<string>('lower', ['vendor']), 'like', like))
       : qb.where(({ not, exists, selectFrom }) =>
