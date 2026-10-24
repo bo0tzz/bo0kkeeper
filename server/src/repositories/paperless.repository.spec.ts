@@ -118,6 +118,34 @@ describe('PaperlessRepository', () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
+  describe('listInboxTagIds', () => {
+    it('returns only inbox tags, across pages', async () => {
+      // Paperless ignores ?is_inbox_tag=true, so every tag comes back.
+      const fetchFn = vi
+        .fn()
+        .mockResolvedValueOnce(
+          okResponse({
+            results: [
+              { id: 1, name: 'Business', is_inbox_tag: false },
+              { id: 4, name: 'Inbox', is_inbox_tag: true },
+            ],
+            next: 'https://paperless.fake/api/tags/?page=2',
+          }),
+        )
+        .mockResolvedValueOnce(okResponse({ results: [{ id: 9, name: 'Triage', is_inbox_tag: true }], next: null }));
+      const service = new PaperlessRepository(fetchFn);
+      await expect(service.listInboxTagIds()).resolves.toEqual([4, 9]);
+    });
+
+    it('returns nothing when no tag is an inbox tag', async () => {
+      const fetchFn = vi
+        .fn()
+        .mockResolvedValueOnce(okResponse({ results: [{ id: 1, name: 'Business', is_inbox_tag: false }], next: null }));
+      const service = new PaperlessRepository(fetchFn);
+      await expect(service.listInboxTagIds()).resolves.toEqual([]);
+    });
+  });
+
   describe('checkTagsExist', () => {
     it('returns per-name existence + id from the live tag set', async () => {
       const fetchFn = vi.fn().mockResolvedValueOnce(

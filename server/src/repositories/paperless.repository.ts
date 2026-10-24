@@ -186,11 +186,14 @@ export class PaperlessRepository {
    * the "strip inbox tags from docs bo0kkeeper uploaded" path: those docs
    * shouldn't sit in the operator's triage queue because we KNOW what
    * they are.
+   *
+   * Filtered here, not via the query string: the tags endpoint silently
+   * ignores `?is_inbox_tag=true` and returns every tag.
    */
   async listInboxTagIds(): Promise<number[]> {
     const baseUrl = this.requireBaseUrl();
     const ids: number[] = [];
-    let url: string | null = `${baseUrl}/api/tags/?is_inbox_tag=true&page_size=100`;
+    let url: string | null = `${baseUrl}/api/tags/?page_size=100`;
     while (url) {
       const response = await this.fetchFn(url, {
         method: 'GET',
@@ -204,9 +207,11 @@ export class PaperlessRepository {
           `Paperless inbox-tag list failed: ${response.status}`,
         );
       }
-      const page = safeJson(text) as { results: Array<{ id: number }>; next: string | null };
+      const page = safeJson(text) as { results: Array<{ id: number; is_inbox_tag: boolean }>; next: string | null };
       for (const tag of page.results) {
-        ids.push(tag.id);
+        if (tag.is_inbox_tag) {
+          ids.push(tag.id);
+        }
       }
       url = page.next;
     }
