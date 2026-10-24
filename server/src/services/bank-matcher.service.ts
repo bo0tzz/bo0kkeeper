@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { EventSource, MatchConfidence } from 'src/enum';
+import { BankTxCategory, EventSource, MatchConfidence } from 'src/enum';
 import { BankTransaction, BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseMatchCandidate, ExpenseRepository } from 'src/repositories/expense.repository';
@@ -10,8 +10,10 @@ import {
   WiseTransferRow,
 } from 'src/repositories/wise-transfer.repository';
 import { RecurringFeeService } from 'src/services/recurring-fee.service';
+import { SettingsService } from 'src/services/settings.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { toDate } from 'src/utils/date';
+import { isSalaryPayout } from 'src/utils/drawings';
 import { absMinor } from 'src/utils/money';
 
 const TXN_REF_PATTERN = /\bTXN-\d{4,}\b/;
@@ -74,6 +76,7 @@ export class BankMatcherService {
     private readonly sheetSync: SheetSyncService,
     private readonly eventRepository: EventRepository,
     private readonly recurringFee: RecurringFeeService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   async tryMatch(bankTx: BankTransaction): Promise<MatchResult> {
@@ -93,6 +96,17 @@ export class BankMatcherService {
     const feeOutcome = await this.recurringFee.tryHandleRecurringFee(bankTx);
     if (feeOutcome) {
       return feeOutcome;
+    }
+
+    if (isSalaryPayout(bankTx, await this.settingsService.getDrawingsRule())) {
+      await this.bankTransactionRepository.setCategory(bankTx.id, BankTxCategory.Drawings);
+      await this.eventRepository.recordAction({
+        source: EventSource.System,
+        eventType: 'banking.tx.auto_categorized',
+        payload: { bankTxId: bankTx.id, category: BankTxCategory.Drawings, reason: 'salary payout' },
+      });
+      this.logger.log(`bank_tx ${bankTx.id} auto-categorized as ${BankTxCategory.Drawings} (salary payout)`);
+      return { matched: false, reason: `auto-categorized as ${BankTxCategory.Drawings}` };
     }
 
     const description = bankTx.description ?? '';

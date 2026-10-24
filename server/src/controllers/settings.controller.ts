@@ -15,7 +15,7 @@ import { SettingsService } from 'src/services/settings.service';
 
 /**
  * Read + write the operator-editable application settings (issuer info,
- * paperless tag names, expense extraction prompt). Secrets, infra, and init-once values stay in env
+ * paperless tag names, expense extraction prompt, salary payout rule). Secrets, infra, and init-once values stay in env
  * and aren't surfaced here at all.
  */
 @ApiTags('Settings')
@@ -83,6 +83,14 @@ export class SettingsController {
         patch.extractFieldDescriptions = body.extraction.fieldDescriptions;
       }
     }
+    if (body.drawings) {
+      if (body.drawings.ibans !== undefined) {
+        patch.drawingsIbans = body.drawings.ibans;
+      }
+      if (body.drawings.descriptionContains !== undefined) {
+        patch.drawingsDescriptionContains = body.drawings.descriptionContains;
+      }
+    }
     const updated = await this.settingsService.update(patch);
     await this.eventRepository.recordAction({
       source: EventSource.Manual,
@@ -126,6 +134,10 @@ function toDto(s: AppSettings): SettingsResponseDto {
     extraction: {
       ownNames: s.extractOwnNames,
       fieldDescriptions: s.extractFieldDescriptions,
+    },
+    drawings: {
+      ibans: s.drawingsIbans,
+      descriptionContains: s.drawingsDescriptionContains,
     },
     updatedAt: new Date(s.updatedAt).toISOString(),
   };

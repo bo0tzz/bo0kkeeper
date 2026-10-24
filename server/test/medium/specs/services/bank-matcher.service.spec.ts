@@ -10,6 +10,7 @@ import {
   WiseTransferDirection,
   WiseTransferState,
 } from 'src/enum';
+import { AppSettingsRepository } from 'src/repositories/app-settings.repository';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
@@ -19,6 +20,7 @@ import { WiseTransferRepository } from 'src/repositories/wise-transfer.repositor
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { RecurringFeeService } from 'src/services/recurring-fee.service';
+import { SettingsService } from 'src/services/settings.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyDB } from 'test/utils';
@@ -40,6 +42,26 @@ async function ingestSnsFeeRow(repo: BankTransactionRepository, externalId: stri
     currency: 'EUR',
     counterpartyName: 'SNS Bank',
     counterpartyIban: null,
+    description,
+    rawPayload: {},
+  });
+  if (!result.ingested) {
+    throw new Error('precondition');
+  }
+  return result.row;
+}
+
+const PERSONAL_IBAN = 'NL91ABNA0417164300';
+
+async function ingestPersonalTransfer(repo: BankTransactionRepository, externalId: string, description: string) {
+  const result = await repo.ingest({
+    source: BankSource.SnsCsv,
+    externalId,
+    txDate: new Date('2099-04-24'),
+    amountMinor: -250_000n,
+    currency: 'EUR',
+    counterpartyName: 'P. Jansen',
+    counterpartyIban: PERSONAL_IBAN,
     description,
     rawPayload: {},
   });
@@ -131,6 +153,7 @@ describe('BankMatcherService', () => {
   let matcher: BankMatcherService;
   let sheetSync: SheetSyncService;
   let recurringFee: RecurringFeeService;
+  let settingsService: SettingsService;
 
   beforeEach(async () => {
     db = await getKyselyDB();
@@ -155,6 +178,7 @@ describe('BankMatcherService', () => {
       new EventRepository(db),
     );
     recurringFee = new RecurringFeeService(bankRepo, new ExpenseRepository(db), new EventRepository(db), sheetSync);
+    settingsService = new SettingsService(new AppSettingsRepository(db));
     matcher = new BankMatcherService(
       bankRepo,
       new ExpenseRepository(db),
@@ -163,6 +187,7 @@ describe('BankMatcherService', () => {
       sheetSync,
       new EventRepository(db),
       recurringFee,
+      settingsService,
     );
   });
 
@@ -793,6 +818,45 @@ describe('BankMatcherService', () => {
     const summary = await matcher.matchAllUnmatched();
     expect(summary.matched).toBe(1);
     expect(summary.unmatched).toBe(1);
+  });
+
+  describe('salary payouts', () => {
+    beforeEach(async () => {
+      await settingsService.update({
+        drawingsIbans: ['NL91 ABNA 0417 1643 00'],
+        drawingsDescriptionContains: 'salaris',
+      });
+    });
+
+    it('categorises a salary transfer to a personal IBAN as drawings', async () => {
+      const row = await ingestPersonalTransfer(bankRepo, 'salary:april', 'Salaris');
+
+      const result = await matcher.tryMatch(row);
+
+      expect(result).toEqual({ matched: false, reason: 'auto-categorized as drawings' });
+      const refetched = await bankRepo.findById(row.id);
+      expect(refetched?.category).toBe('drawings');
+      expect(refetched?.matchedAt).toBeNull();
+    });
+
+    it('leaves other transfers to the personal IBAN for regular matching', async () => {
+      const row = await ingestPersonalTransfer(bankRepo, 'reimbursement', 'Acme Supplies (reimbursement)');
+
+      await matcher.tryMatch(row);
+
+      const refetched = await bankRepo.findById(row.id);
+      expect(refetched?.category).toBeNull();
+    });
+
+    it('does nothing without configured IBANs', async () => {
+      await settingsService.update({ drawingsIbans: [] });
+      const row = await ingestPersonalTransfer(bankRepo, 'salary:may', 'Salaris');
+
+      await matcher.tryMatch(row);
+
+      const refetched = await bankRepo.findById(row.id);
+      expect(refetched?.category).toBeNull();
+    });
   });
 
   describe('recurring fee handling', () => {

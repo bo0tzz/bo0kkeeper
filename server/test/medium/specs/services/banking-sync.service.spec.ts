@@ -1,5 +1,6 @@
 import { Kysely } from 'kysely';
 import { BankingSessionStatus, BankSource, WiseTransferDirection, WiseTransferState } from 'src/enum';
+import { AppSettingsRepository } from 'src/repositories/app-settings.repository';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { BankingSessionRepository } from 'src/repositories/banking-session.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
@@ -18,6 +19,7 @@ import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { BankingSyncService, mapTransaction } from 'src/services/banking-sync.service';
 import { RecurringFeeService } from 'src/services/recurring-fee.service';
+import { SettingsService } from 'src/services/settings.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyDB } from 'test/utils';
@@ -136,6 +138,7 @@ describe('BankingSyncService', () => {
       sheetSync,
       new EventRepository(db),
       recurringFee,
+      new SettingsService(new AppSettingsRepository(db)),
     );
     api = fakeApi([]);
     service = new BankingSyncService(sessionRepo, bankRepo, api, matcher, new EventRepository(db));

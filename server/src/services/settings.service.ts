@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { AppSettings, AppSettingsRepository } from 'src/repositories/app-settings.repository';
+import { DrawingsRule } from 'src/utils/drawings';
 import {
   DEFAULT_EXPENSE_EXTRACT_FIELD_DESCRIPTIONS,
   ExpenseExtractFieldDescriptions,
@@ -43,6 +44,8 @@ export class SettingsService implements OnModuleInit {
       paperlessOutgoingInvoiceTags: ['Business', 'Invoice', 'bo0kkeeper'],
       extractOwnNames: [],
       extractFieldDescriptions: DEFAULT_EXPENSE_EXTRACT_FIELD_DESCRIPTIONS,
+      drawingsIbans: [],
+      drawingsDescriptionContains: 'salaris',
     });
     this.logger.log('Seeded empty app_settings row — configure via /settings before first use');
     return seeded;
@@ -97,6 +100,11 @@ export class SettingsService implements OnModuleInit {
     return { ownNames: s.extractOwnNames, fieldDescriptions: s.extractFieldDescriptions };
   }
 
+  async getDrawingsRule(): Promise<DrawingsRule> {
+    const s = await this.get();
+    return { ibans: s.drawingsIbans, descriptionContains: s.drawingsDescriptionContains };
+  }
+
   async update(
     patch: Partial<{
       issuerKvk: string;
@@ -110,6 +118,8 @@ export class SettingsService implements OnModuleInit {
       paperlessOutgoingInvoiceTags: string[];
       extractOwnNames: string[];
       extractFieldDescriptions: ExpenseExtractFieldDescriptions;
+      drawingsIbans: string[];
+      drawingsDescriptionContains: string;
     }>,
   ): Promise<AppSettings> {
     const current = await this.get();

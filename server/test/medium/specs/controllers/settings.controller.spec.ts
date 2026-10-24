@@ -42,4 +42,13 @@ describe('SettingsController', () => {
     expect(updated.paperless).toEqual(before.paperless);
     await expect(settingsService.getExpenseExtraction()).resolves.toEqual({ ownNames: ['Jansen'], fieldDescriptions });
   });
+
+  it('seeds and updates the salary payout rule', async () => {
+    const seeded = await controller.get();
+    expect(seeded.drawings).toEqual({ ibans: [], descriptionContains: 'salaris' });
+
+    const updated = await controller.update({ drawings: { ibans: ['NL91 ABNA 0417 1643 00'] } });
+
+    expect(updated.drawings).toEqual({ ibans: ['NL91 ABNA 0417 1643 00'], descriptionContains: 'salaris' });
+  });
 });
