@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.14.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.13.0...v0.14.0) (2026-10-24)
+
+
+### Features
+
+* **banking:** categorise salary payouts as drawings automatically ([#245](https://github.com/bo0tzz/bo0kkeeper/issues/245)) ([b227e53](https://github.com/bo0tzz/bo0kkeeper/commit/b227e536e332eb2a2324a71f7e4e880d7971b60c))
+
+
+### Bug Fixes
+
+* **deps:** update dependency @swc/core to v1.16.20 ([#238](https://github.com/bo0tzz/bo0kkeeper/issues/238)) ([a3ceacc](https://github.com/bo0tzz/bo0kkeeper/commit/a3ceacc1e53dbf3d9bed0cab4a1d97e9d7de14fb))
+* **deps:** update dependency vite to v8.3.5 ([#239](https://github.com/bo0tzz/bo0kkeeper/issues/239)) ([683e181](https://github.com/bo0tzz/bo0kkeeper/commit/683e181f46dd0a594a4310670451c1c215f1168f))
+* **deps:** update docker/login-action action to v4.7.0 ([#244](https://github.com/bo0tzz/bo0kkeeper/issues/244)) ([b4e5352](https://github.com/bo0tzz/bo0kkeeper/commit/b4e5352ac225d85747cd957365d757fe3702fb7b))
+* **export:** leave the bank-fee provenance note out of the rollup ([#241](https://github.com/bo0tzz/bo0kkeeper/issues/241)) ([2141a29](https://github.com/bo0tzz/bo0kkeeper/commit/2141a2938933af8a00c5ed3fc3c8e86d2f2c42aa))
+* **invoices:** stop the paperless inbox strip wiping outgoing tags ([#240](https://github.com/bo0tzz/bo0kkeeper/issues/240)) ([166be08](https://github.com/bo0tzz/bo0kkeeper/commit/166be08875ffed31c3921a79c5355457a15e046a))
+
 ## [0.13.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.12.1...v0.13.0) (2026-10-24)
 
 
