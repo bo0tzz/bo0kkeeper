@@ -23,7 +23,7 @@ RUN set -eux; \
 # ---- Stage: deps ---------------------------------------------------------
 # Install ALL workspace dependencies (server + web + open-api sdk). Cached
 # on the lockfile alone — code edits don't bust this layer.
-FROM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS deps
+FROM node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS deps
 WORKDIR /app
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -42,7 +42,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 # Compile the SvelteKit static site + nest build the server. Output:
 #   /app/web/build/        — static SPA bundle (precompressed)
 #   /app/server/dist/      — compiled server JS
-FROM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS build
+FROM node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS build
 WORKDIR /app
 RUN corepack enable
 COPY --from=deps /app/node_modules ./node_modules
@@ -60,7 +60,7 @@ RUN pnpm --filter @bo0kkeeper/sdk build \
 # Re-resolve a production-only node_modules graph for the server. Drops
 # devDependencies (vitest, eslint, prettier, etc.) so the runtime image
 # stays smaller.
-FROM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS prod-deps
+FROM node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS prod-deps
 WORKDIR /app
 RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -71,7 +71,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile --prod --filter bo0kkeeper --ignore-scripts
 
 # ---- Stage: runtime ------------------------------------------------------
-FROM node:24-bookworm-slim@sha256:a5f4366e834695d5f363b920c104953a535d3a9864d1bdf74566a0ebe01daee5 AS runtime
+FROM node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS runtime
 # Build identifier — CI passes the release tag (e.g. `0.4.3`) or short SHA.
 # Surfaced in startup logs + `/api/system/info` so the running build
 # uniquely identifies a commit. `dev` is the fallback when this image is
