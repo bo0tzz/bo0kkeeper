@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.13.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.12.1...v0.13.0) (2026-10-24)
+
+
+### Features
+
+* **banking:** rank link candidates by direction and amount ([#233](https://github.com/bo0tzz/bo0kkeeper/issues/233)) ([b13e273](https://github.com/bo0tzz/bo0kkeeper/commit/b13e273f2737c95083aae9ec0f01df1ccd8a3258))
+* **expenses:** prefill pending expenses with a local extraction model ([#237](https://github.com/bo0tzz/bo0kkeeper/issues/237)) ([eae07c0](https://github.com/bo0tzz/bo0kkeeper/commit/eae07c0de89edb33bfdfc2d03de8be006bb2c8ac))
+
+
+### Bug Fixes
+
+* **deps:** update debian:13-slim docker digest to 62bd423 ([#229](https://github.com/bo0tzz/bo0kkeeper/issues/229)) ([7c24040](https://github.com/bo0tzz/bo0kkeeper/commit/7c24040195d4418e4f2d84a5001398481d50a396))
+* **deps:** update dependency @immich/sql-tools to v0.6.6 ([#223](https://github.com/bo0tzz/bo0kkeeper/issues/223)) ([2b92518](https://github.com/bo0tzz/bo0kkeeper/commit/2b92518001239762d568f1143d73a7762242f147))
+* **deps:** update dependency jose to v6.2.13 ([#224](https://github.com/bo0tzz/bo0kkeeper/issues/224)) ([78ae810](https://github.com/bo0tzz/bo0kkeeper/commit/78ae81020636044340e63af3c71f6b84cbe5b3f2))
+* **deps:** update dependency knip to v6.43.0 ([#225](https://github.com/bo0tzz/bo0kkeeper/issues/225)) ([ce3965e](https://github.com/bo0tzz/bo0kkeeper/commit/ce3965eca3503f7087b79ee61c3110f9e222dd7e))
+* **deps:** update docker.io/library/redis:8 docker digest to 97ec881 ([#230](https://github.com/bo0tzz/bo0kkeeper/issues/230)) ([106a2c3](https://github.com/bo0tzz/bo0kkeeper/commit/106a2c34e183605f5bfa99b2021c32ea18dd5162))
+* **deps:** update ghcr.io/paperless-ngx/paperless-ngx:latest docker digest to 9bc6e82 ([#235](https://github.com/bo0tzz/bo0kkeeper/issues/235)) ([f06ce4b](https://github.com/bo0tzz/bo0kkeeper/commit/f06ce4b9fbdb4a67377caa04fda71b8f361d2d71))
+* **deps:** update nestjs ([#226](https://github.com/bo0tzz/bo0kkeeper/issues/226)) ([752352b](https://github.com/bo0tzz/bo0kkeeper/commit/752352b46e878b307030196cd4d47c9b0791f79b))
+* **deps:** update node.js to 55fb5f5 ([#231](https://github.com/bo0tzz/bo0kkeeper/issues/231)) ([267ce59](https://github.com/bo0tzz/bo0kkeeper/commit/267ce59c410c57bdaf584289c6ba320072857f92))
+* **deps:** update playwright monorepo to v1.64.1 ([#227](https://github.com/bo0tzz/bo0kkeeper/issues/227)) ([ae13c3f](https://github.com/bo0tzz/bo0kkeeper/commit/ae13c3f7a8c82479cb315fed69d9f21bafaa7c8e))
+* **deps:** update pnpm to v11.28.8 ([#228](https://github.com/bo0tzz/bo0kkeeper/issues/228)) ([21e25c8](https://github.com/bo0tzz/bo0kkeeper/commit/21e25c8c799d8dd8bc63b9dd5718e9f80a98ee90))
+* **deps:** update postgres:18 docker digest to edb0c08 ([#236](https://github.com/bo0tzz/bo0kkeeper/issues/236)) ([5ec6b5e](https://github.com/bo0tzz/bo0kkeeper/commit/5ec6b5ef1eaba7b977af6fde98b7ad58dad85c8d))
+
 ## [0.12.1](https://github.com/bo0tzz/bo0kkeeper/compare/v0.12.0...v0.12.1) (2026-10-20)
 
 
