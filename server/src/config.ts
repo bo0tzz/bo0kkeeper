@@ -1,4 +1,6 @@
 import { DatabaseConnectionParams } from '@immich/sql-tools';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import z from 'zod';
 
 const ConfigSchema = z
@@ -87,6 +89,16 @@ const ConfigSchema = z
     SHEETS_SPREADSHEET_ID: z.string().optional(),
 
     /**
+     * Model that prefills pending expenses from the receipt text: an `hf:` URI
+     * (downloaded into EXTRACT_MODEL_DIR on first use) or a local GGUF path.
+     * Unset = no prefill; expenses land with empty fields for manual entry.
+     */
+    EXTRACT_MODEL_URI: z.string().min(1).optional(),
+    EXTRACT_MODEL_DIR: z.string().default(join(homedir(), '.cache', 'bo0kkeeper', 'models')),
+    /** Seconds without extractions before the model is unloaded from memory. 0 keeps it loaded. */
+    EXTRACT_MODEL_TTL: z.coerce.number().int().nonnegative().default(300),
+
+    /**
      * Filesystem path to the built SvelteKit static site. When set, the server
      * also serves the web app at `/` (SPA fallback for client routes). Empty
      * in dev — Vite serves the web on its own port — set in the prod Docker
@@ -166,6 +178,12 @@ export type Config = {
     serviceAccountPrivateKey?: string;
     spreadsheetId?: string;
   };
+  extraction: {
+    /** `hf:` URI or local GGUF path; unset disables expense prefill. */
+    modelUri?: string;
+    modelDir: string;
+    modelTtlSeconds: number;
+  };
   /** Optional path to the SvelteKit static build; when set, server serves the SPA too. */
   webDistDir?: string;
 };
@@ -228,6 +246,11 @@ export function loadConfig(): Config {
       serviceAccountEmail: result.data.SHEETS_SERVICE_ACCOUNT_EMAIL,
       serviceAccountPrivateKey: result.data.SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY,
       spreadsheetId: result.data.SHEETS_SPREADSHEET_ID,
+    },
+    extraction: {
+      modelUri: result.data.EXTRACT_MODEL_URI,
+      modelDir: result.data.EXTRACT_MODEL_DIR,
+      modelTtlSeconds: result.data.EXTRACT_MODEL_TTL,
     },
     webDistDir: result.data.WEB_DIST_DIR,
   };

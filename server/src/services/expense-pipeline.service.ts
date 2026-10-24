@@ -4,6 +4,8 @@ import { EventSource, ExpenseLocationClass, JobName, QueueName } from 'src/enum'
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository, NewExpense } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
+import { JobRepository } from 'src/repositories/job.repository';
+import { LlmRepository } from 'src/repositories/llm.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 import { JobOf } from 'src/types';
@@ -11,10 +13,10 @@ import { PaperlessPayload, readPaperlessEventPayload, resolvePaperlessDocId } fr
 
 /**
  * Consumes paperless `document.consumed` events and creates `pending_review`
- * expense rows. OCR-extracted fields land where paperless reliably surfaces
- * them (vendor from correspondent, date from `created`); amount and BTW
- * are left for the user to fill in during review — paperless's OCR isn't
- * trustworthy for BTW splits (the docs/decisions log spells out why).
+ * expense rows. Paperless metadata seeds what it reliably surfaces (vendor
+ * from correspondent, date from `created`); when an extraction model is
+ * configured, `ExpenseExtractionService` then prefills the rest from the
+ * document text for the operator to check during review.
  */
 @Injectable()
 export class ExpensePipelineService {
@@ -24,6 +26,8 @@ export class ExpensePipelineService {
     private readonly eventRepository: EventRepository,
     private readonly expenseRepository: ExpenseRepository,
     private readonly invoiceRepository: InvoiceRepository,
+    private readonly jobRepository: JobRepository,
+    private readonly llmRepository: LlmRepository,
     private readonly paperlessService: PaperlessRepository,
     private readonly settingsService: SettingsService,
   ) {}
@@ -105,6 +109,9 @@ export class ExpensePipelineService {
     const result = await this.expenseRepository.ingest(newExpense);
     if (result.ingested) {
       this.logger.log(`expense pending_review created from paperless ${parsed.documentId} (event ${event.id})`);
+      if (this.llmRepository.isEnabled()) {
+        await this.jobRepository.queue(JobName.ExtractExpenseFields, { expenseId: result.row.id });
+      }
     } else {
       this.logger.log(`paperless ${parsed.documentId} already has expense ${result.existingId}`);
     }

@@ -8,6 +8,7 @@ import {
   UpdateDateColumn,
 } from '@immich/sql-tools';
 import { ColumnType } from 'kysely';
+import type { ExpenseExtractFieldDescriptions } from 'src/utils/expense-extraction';
 
 /**
  * Single-row table for operator-editable application settings. Things that
@@ -22,6 +23,7 @@ import { ColumnType } from 'kysely';
  * What lives here:
  * - Issuer info (KvK, VAT id, full address, IBAN) — printed on every invoice
  * - Paperless tag names — used by the ingest webhook + invoice archive
+ * - Expense extraction prompt + the operator's own names (vendor filter)
  *
  * What does NOT live here:
  * - Secrets (API tokens, RSA keys, OIDC client secret) — env only
@@ -63,6 +65,18 @@ export class AppSettingsTable {
   /** Tag NAMES applied to invoices uploaded to paperless. Auto-created if missing. */
   @Column({ type: 'jsonb' })
   paperlessOutgoingInvoiceTags!: ColumnType<string[]>;
+
+  // ─── Expense extraction ─────────────────────────────────────────────────
+  /**
+   * The operator's own names (case-insensitive substrings). Receipts list
+   * them as the billed party; extraction skips them when picking a vendor.
+   */
+  @Column({ type: 'jsonb' })
+  extractOwnNames!: ColumnType<string[]>;
+
+  /** Per-field instructions in the extraction prompt, keyed by template field. */
+  @Column({ type: 'jsonb' })
+  extractFieldDescriptions!: ColumnType<ExpenseExtractFieldDescriptions>;
 
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;

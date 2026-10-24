@@ -1,5 +1,9 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { AppSettings, AppSettingsRepository } from 'src/repositories/app-settings.repository';
+import {
+  DEFAULT_EXPENSE_EXTRACT_FIELD_DESCRIPTIONS,
+  ExpenseExtractFieldDescriptions,
+} from 'src/utils/expense-extraction';
 
 /**
  * Operator-editable application settings, persisted in the `app_settings`
@@ -37,6 +41,8 @@ export class SettingsService implements OnModuleInit {
       issuerIban: 'CONFIGURE',
       paperlessExpenseTags: ['Business', 'Bills'],
       paperlessOutgoingInvoiceTags: ['Business', 'Invoice', 'bo0kkeeper'],
+      extractOwnNames: [],
+      extractFieldDescriptions: DEFAULT_EXPENSE_EXTRACT_FIELD_DESCRIPTIONS,
     });
     this.logger.log('Seeded empty app_settings row — configure via /settings before first use');
     return seeded;
@@ -83,6 +89,14 @@ export class SettingsService implements OnModuleInit {
     return s.paperlessOutgoingInvoiceTags;
   }
 
+  async getExpenseExtraction(): Promise<{
+    ownNames: string[];
+    fieldDescriptions: ExpenseExtractFieldDescriptions;
+  }> {
+    const s = await this.get();
+    return { ownNames: s.extractOwnNames, fieldDescriptions: s.extractFieldDescriptions };
+  }
+
   async update(
     patch: Partial<{
       issuerKvk: string;
@@ -94,6 +108,8 @@ export class SettingsService implements OnModuleInit {
       issuerIban: string;
       paperlessExpenseTags: string[];
       paperlessOutgoingInvoiceTags: string[];
+      extractOwnNames: string[];
+      extractFieldDescriptions: ExpenseExtractFieldDescriptions;
     }>,
   ): Promise<AppSettings> {
     const current = await this.get();

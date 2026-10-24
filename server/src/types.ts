@@ -27,6 +27,17 @@ type JobItemMap = {
   [JobName.WiseReconcile]: Record<string, never>;
   [JobName.SheetWriteRetry]: Record<string, never>;
   [JobName.InvoiceAutoComposeFromWise]: { wiseTransferId: string };
+  [JobName.ExtractExpenseFields]: { expenseId: string };
+};
+
+/** Expense fields set by the extraction model; absent = left for the operator. */
+export type ExpensePrefill = {
+  vendor?: string;
+  /** YYYY-MM-DD */
+  expenseDate?: string;
+  /** Gross EUR amount, minor units as a decimal string. */
+  amountMinor?: string;
+  btwRateBps?: number;
 };
 
 /** Rank match candidates by distance from this (unsigned) amount, same currency only. */

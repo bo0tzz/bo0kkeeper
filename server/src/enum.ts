@@ -71,6 +71,13 @@ export enum JobName {
    * no-ops.
    */
   InvoiceAutoComposeFromWise = 'invoice.auto_compose_from_wise',
+  /**
+   * Prefill a freshly ingested paperless expense (vendor, date, amount, BTW
+   * rate) from the document text with the local extraction model. Enqueued
+   * on ingest when EXTRACT_MODEL_URI is set; no-ops once the operator has
+   * touched the row.
+   */
+  ExtractExpenseFields = 'expense.extract_fields',
 }
 
 /** Tax/billing classification of a client; drives BTW treatment + invoice template selection. */

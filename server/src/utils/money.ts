@@ -32,3 +32,13 @@ export function minorToMajor(minor: bigint): number {
 export function absMinor(minor: bigint): bigint {
   return minor < 0n ? -minor : minor;
 }
+
+/**
+ * BTW contained in a gross (BTW-inclusive) amount, in minor units:
+ * `gross × rate / (100% + rate)`, truncated so the last cent goes to the
+ * base. Same formula as the web's `deriveBtwMinor`, which the expense review
+ * form uses when the operator edits the amount or rate.
+ */
+export function btwInGross(grossMinor: bigint, rateBps: number): bigint {
+  return (grossMinor * BigInt(rateBps)) / BigInt(10_000 + rateBps);
+}

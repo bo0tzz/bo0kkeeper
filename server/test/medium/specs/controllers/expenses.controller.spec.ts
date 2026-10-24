@@ -211,6 +211,7 @@ describe('ExpensesController', () => {
         {
           id: 101,
           title: 'Receipt A',
+          content: '',
           correspondent: null,
           document_type: null,
           tags: [1, 2],
@@ -220,6 +221,7 @@ describe('ExpensesController', () => {
         {
           id: 102,
           title: 'Receipt B',
+          content: '',
           correspondent: null,
           document_type: null,
           tags: [1, 2],
@@ -241,6 +243,7 @@ describe('ExpensesController', () => {
         {
           id: 201,
           title: 'Already',
+          content: '',
           correspondent: null,
           document_type: null,
           tags: [1],

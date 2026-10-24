@@ -192,6 +192,44 @@
     return minorToMajor(deriveBtwMinor(grossMinor, rateBps).toString());
   }
 
+  const PREFILL_NOTE = 'Prefilled from the document — check it';
+
+  /** Flags fields still showing the extraction model's value, until the operator changes them. */
+  function prefillNote(
+    expense: ExpenseResponse,
+    field: keyof NonNullable<ExpenseResponse['prefilled']>,
+  ): string | undefined {
+    const prefilled = expense.prefilled?.[field];
+    const draft = drafts[expense.id];
+    if (prefilled === undefined || !draft) {
+      return undefined;
+    }
+    let current: string | number;
+    switch (field) {
+      case 'vendor': {
+        current = draft.vendor;
+        break;
+      }
+      case 'expenseDate': {
+        current = draft.expenseDate;
+        break;
+      }
+      case 'amountMinor': {
+        try {
+          current = majorToMinor(draft.amountMajor);
+        } catch {
+          return undefined;
+        }
+        break;
+      }
+      case 'btwRateBps': {
+        current = Number.parseInt(draft.btwRatePercent, 10) * 100;
+        break;
+      }
+    }
+    return current === prefilled ? PREFILL_NOTE : undefined;
+  }
+
   function recalcBtw(id: string) {
     const draft = drafts[id];
     if (!draft) {
@@ -543,15 +581,16 @@
               {:else if expense.status === 'rejected'}
                 <Alert color="warning">This expense is rejected. Re-saving doesn't restore it to pending review.</Alert>
               {/if}
-              <HStack gap={3}>
-                <Field label="Vendor" invalid={hasIssue('vendor')}>
+              <!-- Bottom-aligned so inputs line up when only some fields carry a prefill note. -->
+              <HStack gap={3} class="items-end">
+                <Field label="Vendor" description={prefillNote(expense, 'vendor')} invalid={hasIssue('vendor')}>
                   <Input bind:value={drafts[expense.id].vendor} />
                 </Field>
-                <Field label="Date" invalid={hasIssue('expenseDate')}>
+                <Field label="Date" description={prefillNote(expense, 'expenseDate')} invalid={hasIssue('expenseDate')}>
                   <Input bind:value={drafts[expense.id].expenseDate} placeholder="YYYY-MM-DD" />
                 </Field>
               </HStack>
-              <HStack gap={3}>
+              <HStack gap={3} class="items-end">
                 <Field label="Currency" invalid={hasIssue('currency')}>
                   <Select
                     value={drafts[expense.id].currency}
@@ -563,6 +602,7 @@
                   label={drafts[expense.id].currency === 'EUR'
                     ? 'Amount (gross, EUR)'
                     : `Amount (gross, ${drafts[expense.id].currency})`}
+                  description={prefillNote(expense, 'amountMinor')}
                   invalid={hasIssue('amountMinor')}
                 >
                   <Input
@@ -572,7 +612,11 @@
                     oninput={() => recalcBtw(expense.id)}
                   />
                 </Field>
-                <Field label="BTW rate (%)" invalid={hasIssue('btwRateBps')}>
+                <Field
+                  label="BTW rate (%)"
+                  description={prefillNote(expense, 'btwRateBps')}
+                  invalid={hasIssue('btwRateBps')}
+                >
                   <Select
                     value={drafts[expense.id].btwRatePercent}
                     options={ratesForLocation(drafts[expense.id].locationClass)}

@@ -1,5 +1,15 @@
 import { createZodDto } from 'nestjs-zod';
+import { ExpenseExtractFieldDescriptions } from 'src/utils/expense-extraction';
 import z from 'zod';
+
+/** Keyed by the extraction template's field names, which the model sees verbatim. */
+const ExtractFieldDescriptionsSchema = z.object({
+  organizations: z.string().max(500),
+  invoice_date: z.string().max(500),
+  total_amount_eur: z.string().max(500),
+  btw_rate_percent: z.string().max(500),
+  currency: z.string().max(500),
+}) satisfies z.ZodType<ExpenseExtractFieldDescriptions>;
 
 const SettingsResponseSchema = z
   .object({
@@ -15,6 +25,11 @@ const SettingsResponseSchema = z
     paperless: z.object({
       expenseTags: z.array(z.string()),
       outgoingInvoiceTags: z.array(z.string()),
+    }),
+    extraction: z.object({
+      /** Case-insensitive substrings; organizations containing one are never picked as vendor. */
+      ownNames: z.array(z.string()),
+      fieldDescriptions: ExtractFieldDescriptionsSchema,
     }),
     updatedAt: z.iso.datetime(),
   })
@@ -38,6 +53,12 @@ const UpdateSettingsBodySchema = z
       .object({
         expenseTags: z.array(z.string()),
         outgoingInvoiceTags: z.array(z.string()),
+      })
+      .partial(),
+    extraction: z
+      .object({
+        ownNames: z.array(z.string().min(1).max(200)),
+        fieldDescriptions: ExtractFieldDescriptionsSchema,
       })
       .partial(),
   })

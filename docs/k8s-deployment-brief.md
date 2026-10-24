@@ -32,6 +32,8 @@ resources:
 
 Memory budget is generous because pg-boss runs in-process — a busy job period briefly inflates RSS.
 
+With `EXTRACT_MODEL_URI` set, the expense-extraction model lives in the same process while documents are being processed (~1.7 GiB anonymous plus the mmapped GGUF, ~1.9 GiB of reclaimable page cache) and is unloaded after `EXTRACT_MODEL_TTL` idle seconds. Raise the memory limit to ~3Gi, mount a disk-backed `emptyDir` at `EXTRACT_MODEL_DIR` for the downloaded GGUF (~1.8 GiB, re-downloaded after a pod restart; not `medium: Memory`, whose pages count against the memory limit), and leave CPU unlimited: llama.cpp uses every physical core it sees, and a quota makes each extraction crawl.
+
 ## Dependencies the deploy needs to reach
 
 | System | Direction | Required? | Notes |
@@ -94,10 +96,13 @@ Concurrent pods are safe (`kysely_migrations_lock` table serializes them) but yo
 | `WISE_TARGET_RECIPIENT_ID` | optional | — | Wise recipient id of the user's Dutch bank account. Needed for drafting transfers. |
 | `WISE_TXN_REFERENCE_START` | no | `0` | Starting offset for system-issued `TXN-NNNN` references. Leave at 0 unless re-deploying onto an existing reference space. |
 | `PAPERLESS_BASE_URL` | optional | — | Paperless instance URL, no trailing slash. E.g. `https://paperless.example.com`. |
+| `EXTRACT_MODEL_URI` | optional | (unset = no prefill) | Model that prefills pending expenses from the document text. `hf:mradermacher/NuExtract-2.0-4B-GGUF/NuExtract-2.0-4B.Q4_K_M.gguf`, or a local GGUF path. Fill in your own names on `/settings` so they aren't picked as the vendor. |
+| `EXTRACT_MODEL_DIR` | with `EXTRACT_MODEL_URI` | `~/.cache/bo0kkeeper/models` | Where remote models are downloaded. Point at an `emptyDir` mount. |
+| `EXTRACT_MODEL_TTL` | no | `300` | Idle seconds before the model is unloaded from memory. `0` keeps it loaded. |
 | `ENABLE_BANKING_API_BASE_URL` | no | `https://api.enablebanking.com` | Leave default. |
 | `ENABLE_BANKING_REDIRECT_URI` | optional | — | `https://<public-hostname>/api/banking/auth/callback`. Required if using Enable Banking. |
 
-Invoice-issuer info (KvK, VAT id, address, IBAN) and paperless tag-gates live in the `app_settings` DB row and are edited via `/settings` in the UI — not env vars. First boot seeds the row with `'CONFIGURE'` placeholders; configure those values via the UI before issuing invoices or ingesting expenses.
+Invoice-issuer info (KvK, VAT id, address, IBAN), paperless tag-gates, and the expense extraction prompt plus your own names (never picked as a vendor) live in the `app_settings` DB row and are edited via `/settings` in the UI — not env vars. First boot seeds the row with `'CONFIGURE'` placeholders; configure those values via the UI before issuing invoices or ingesting expenses.
 
 ## Env vars — secrets (Secret, SOPS-managed)
 

@@ -195,6 +195,23 @@ export class ExpenseRepository {
     return updated;
   }
 
+  /**
+   * Write model-extracted fields onto an expense, but only while it's still
+   * exactly as ingest left it: pending review and never updated. Every write
+   * path bumps `updatedAt`, so an operator edit (or an earlier prefill) makes
+   * this a no-op instead of clobbering their values.
+   */
+  async applyPrefill(id: string, patch: ExpenseUpdate): Promise<Expense | undefined> {
+    return (await this.db
+      .updateTable('expense')
+      .set({ ...patch, updatedAt: new Date() })
+      .where('id', '=', id)
+      .where('status', '=', ExpenseStatus.PendingReview)
+      .whereRef('updatedAt', '=', 'createdAt')
+      .returningAll()
+      .executeTakeFirst()) as Expense | undefined;
+  }
+
   async approve(id: string, patch: Omit<ExpenseUpdate, 'status' | 'reviewedAt'> = {}): Promise<Expense | undefined> {
     return this.update(id, { ...patch, status: ExpenseStatus.Approved, reviewedAt: new Date() });
   }

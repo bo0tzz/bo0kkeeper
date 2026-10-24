@@ -14,6 +14,7 @@ import { ExpenseLocationClass, ExpenseStatus } from 'src/enum';
 import { BankTransactionTable } from 'src/schema/tables/bank-transaction.table';
 import { EventTable } from 'src/schema/tables/event.table';
 import { WiseTransferTable } from 'src/schema/tables/wise-transfer.table';
+import { ExpensePrefill } from 'src/types';
 
 /**
  * Receipt/expense row. Two source flavours:
@@ -119,6 +120,14 @@ export class ExpenseTable {
 
   @ForeignKeyColumn(() => EventTable, { nullable: true, onDelete: 'SET NULL' })
   sourceEventId!: string | null;
+
+  /**
+   * Values the extraction model filled in after ingest, kept so the review
+   * UI can flag fields the operator hasn't checked yet. Null when the model
+   * didn't run or the operator got to the row first.
+   */
+  @Column({ type: 'jsonb', nullable: true })
+  prefilled!: ColumnType<ExpensePrefill> | null;
 
   /**
    * When a sheet expense row was successfully written for this expense.

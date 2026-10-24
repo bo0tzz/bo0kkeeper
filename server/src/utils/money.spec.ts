@@ -1,4 +1,4 @@
-import { absMinor, majorToMinor, minorToMajor } from 'src/utils/money';
+import { absMinor, btwInGross, majorToMinor, minorToMajor } from 'src/utils/money';
 import { describe, expect, it } from 'vitest';
 
 describe('majorToMinor', () => {
@@ -42,5 +42,21 @@ describe('absMinor', () => {
     expect(absMinor(-2985n)).toBe(2985n);
     expect(absMinor(2985n)).toBe(2985n);
     expect(absMinor(0n)).toBe(0n);
+  });
+});
+
+describe('btwInGross', () => {
+  it('splits the BTW out of a gross amount', () => {
+    expect(btwInGross(12_100n, 2100)).toBe(2100n);
+    expect(btwInGross(10_900n, 900)).toBe(900n);
+  });
+
+  it('truncates so the remainder cent stays in the base', () => {
+    // 1000 × 21/121 = 173.55…
+    expect(btwInGross(1000n, 2100)).toBe(173n);
+  });
+
+  it('is zero at a zero rate', () => {
+    expect(btwInGross(5000n, 0)).toBe(0n);
   });
 });
