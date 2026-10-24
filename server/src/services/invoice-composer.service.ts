@@ -201,7 +201,8 @@ export class InvoiceComposerService {
       const inboxTagIds = await this.paperlessService.listInboxTagIds();
       if (inboxTagIds.length > 0) {
         const doc = await this.paperlessService.getDocument(docId);
-        const stripped = doc.tags.filter((id) => !inboxTagIds.includes(id));
+        // Tags we asked for stay, even if one is also an inbox tag.
+        const stripped = doc.tags.filter((id) => !inboxTagIds.includes(id) || tagIds?.includes(id));
         if (stripped.length !== doc.tags.length) {
           await this.paperlessService.setDocumentTags(docId, stripped);
           this.logger.log(`invoice ${invoice.number}: stripped inbox tags from paperless doc ${docId}`);

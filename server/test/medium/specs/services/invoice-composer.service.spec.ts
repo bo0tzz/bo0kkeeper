@@ -193,6 +193,26 @@ describe('InvoiceComposerService', () => {
     expect(setTagsMock.mock.calls[0]).toEqual(['paperless-doc-42', [1, 2, 3]]);
   });
 
+  it('archive job keeps the tags it asked for even when paperless counts them as inbox tags', async () => {
+    paperless.listInboxTagIds = vi.fn().mockResolvedValue([1, 99]);
+    paperless.getDocument = vi.fn().mockResolvedValue({ id: 42, tags: [1, 2, 3, 99] });
+    const setTagsMock = vi.fn().mockResolvedValue(void 0);
+    paperless.setDocumentTags = setTagsMock;
+
+    const composed = await composer.composeAndIssue({
+      clientId,
+      issuedAt: new Date('2099-04-15T00:00:00Z'),
+      currency: 'USD',
+      eurTotalMinor: 100_000n,
+      fxRate: '0.85',
+      lines: [{ description: 'X', lineTotalMinor: 100_000n }],
+    });
+
+    await composer.handleArchiveInvoiceToPaperless({ invoiceId: composed.invoice.id });
+
+    expect(setTagsMock).toHaveBeenCalledExactlyOnceWith('paperless-doc-42', [1, 2, 3]);
+  });
+
   it('archive job skips the inbox-tag patch when no inbox tags are configured', async () => {
     paperless.listInboxTagIds = vi.fn().mockResolvedValue([]);
     const setTagsMock = vi.fn();
