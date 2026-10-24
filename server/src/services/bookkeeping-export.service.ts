@@ -167,7 +167,8 @@ export class BookkeepingExportService {
       return {
         date: new Date(r.expenseDate),
         counterparty: r.vendor,
-        description: r.notes ?? '',
+        // Bank-fee expenses carry an internal provenance note, not a description.
+        description: r.sourceBankTxId ? '' : (r.notes ?? ''),
         vatId: null,
         totalIncMinor,
         exclVatMinor,

@@ -4,6 +4,8 @@ import {
   BankSource,
   ClientClass,
   ExpenseLocationClass,
+  ExpenseStatus,
+  MatchConfidence,
   TradeName,
   WiseTransferDirection,
   WiseTransferState,
@@ -389,6 +391,51 @@ describe('BookkeepingExportService', () => {
     const cells = await readXlsxStrings(buffer);
     expect(cells).toContain('PrintCo');
     expect(cells).not.toContain('PendingVendor');
+  });
+
+  it('leaves the description empty for auto-created bank-fee expenses', async () => {
+    const feeTx = await bankRepo.ingest({
+      source: BankSource.SnsCsv,
+      externalId: 'q1:bank-fee',
+      txDate: new Date('2099-02-20'),
+      amountMinor: -121n,
+      currency: 'EUR',
+      counterpartyName: null,
+      counterpartyIban: null,
+      description: 'Kosten klantonderzoek',
+      rawPayload: {},
+    });
+    if (!feeTx.ingested) {
+      throw new Error('precondition');
+    }
+    const fee = await expenseRepo.ingestFromBankFee({
+      sourceBankTxId: feeTx.row.id,
+      paperlessDocId: null,
+      vendor: 'Example Bank',
+      expenseDate: new Date('2099-02-20'),
+      amountMinor: 121n,
+      currency: 'EUR',
+      btwRateBps: 2100,
+      btwMinor: 21n,
+      locationClass: ExpenseLocationClass.Domestic,
+      status: ExpenseStatus.Approved,
+      reviewedAt: new Date('2099-02-20'),
+      notes: 'Auto-created from bank-tx; statement line is vereenvoudigde factuur (Art. 35a Wet OB).',
+    });
+    if (!fee.ingested) {
+      throw new Error('precondition');
+    }
+    await bankRepo.setMatch(feeTx.row.id, { type: 'expense', id: fee.row.id }, MatchConfidence.AutoHigh);
+
+    const { buffer } = await service.exportQuarter(2099, 1);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buffer as unknown as ArrayBuffer);
+    const sheet = wb.worksheets[0];
+    const row = Array.from({ length: sheet.rowCount }, (_, i) => i + 1).find(
+      (r) => String(sheet.getCell(r, 3).value ?? '') === 'Example Bank',
+    );
+    expect(row).toBeDefined();
+    expect(String(sheet.getCell(row!, 4).value ?? '')).toBe('');
   });
 
   it('grows a section past its reserved-row capacity (no label leakage)', async () => {
