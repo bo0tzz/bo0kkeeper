@@ -14,8 +14,8 @@ import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { SettingsService } from 'src/services/settings.service';
 
 /**
- * Read + write the operator-editable application settings (issuer info +
- * paperless tag names). Secrets, infra, and init-once values stay in env
+ * Read + write the operator-editable application settings (issuer info,
+ * paperless tag names, expense extraction prompt). Secrets, infra, and init-once values stay in env
  * and aren't surfaced here at all.
  */
 @ApiTags('Settings')
@@ -75,6 +75,14 @@ export class SettingsController {
         patch.paperlessOutgoingInvoiceTags = body.paperless.outgoingInvoiceTags;
       }
     }
+    if (body.extraction) {
+      if (body.extraction.ownNames !== undefined) {
+        patch.extractOwnNames = body.extraction.ownNames;
+      }
+      if (body.extraction.fieldDescriptions !== undefined) {
+        patch.extractFieldDescriptions = body.extraction.fieldDescriptions;
+      }
+    }
     const updated = await this.settingsService.update(patch);
     await this.eventRepository.recordAction({
       source: EventSource.Manual,
@@ -114,6 +122,10 @@ function toDto(s: AppSettings): SettingsResponseDto {
     paperless: {
       expenseTags: s.paperlessExpenseTags,
       outgoingInvoiceTags: s.paperlessOutgoingInvoiceTags,
+    },
+    extraction: {
+      ownNames: s.extractOwnNames,
+      fieldDescriptions: s.extractFieldDescriptions,
     },
     updatedAt: new Date(s.updatedAt).toISOString(),
   };

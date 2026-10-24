@@ -76,6 +76,15 @@ const ExpenseResponseSchema = z
     reviewedAt: z.iso.datetime().nullable(),
     notes: z.string().nullable(),
     sourceEventId: z.string().nullable(),
+    /** Fields the extraction model filled in; the review UI flags them until checked. */
+    prefilled: z
+      .object({
+        vendor: z.string().optional(),
+        expenseDate: z.iso.date().optional(),
+        amountMinor: z.string().optional(),
+        btwRateBps: z.number().int().optional(),
+      })
+      .nullable(),
     /**
      * ID of the bank_transaction that matched this expense, if any. Populated
      * on list responses (joined from bank_transaction) so the UI can hide the
@@ -135,6 +144,7 @@ export function mapExpense(row: Expense | ExpenseWithMatch): ExpenseResponseDto 
     reviewedAt: row.reviewedAt ? toIso(row.reviewedAt) : null,
     notes: row.notes,
     sourceEventId: row.sourceEventId,
+    prefilled: row.prefilled,
     matchedBankTxId: withMatch.matchedBankTxId ?? null,
     wiseTransferId: row.wiseTransferId,
     eurAmountMinor: row.eurAmountMinor === null ? null : String(row.eurAmountMinor),

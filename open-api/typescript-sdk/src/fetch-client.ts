@@ -273,6 +273,12 @@ export type ExpenseResponseDto = {
     reviewedAt: string | null;
     notes: string | null;
     sourceEventId: string | null;
+    prefilled: {
+        vendor?: string;
+        expenseDate?: string;
+        amountMinor?: string;
+        btwRateBps?: number;
+    } | null;
     matchedBankTxId: string | null;
     wiseTransferId: string | null;
     eurAmountMinor: string | null;
@@ -419,6 +425,16 @@ export type SettingsResponseDto = {
         expenseTags: string[];
         outgoingInvoiceTags: string[];
     };
+    extraction: {
+        ownNames: string[];
+        fieldDescriptions: {
+            organizations: string;
+            invoice_date: string;
+            total_amount_eur: string;
+            btw_rate_percent: string;
+            currency: string;
+        };
+    };
     updatedAt: string;
 };
 export type UpdateSettingsDto = {
@@ -434,6 +450,16 @@ export type UpdateSettingsDto = {
     paperless?: {
         expenseTags?: string[];
         outgoingInvoiceTags?: string[];
+    };
+    extraction?: {
+        ownNames?: string[];
+        fieldDescriptions?: {
+            organizations: string;
+            invoice_date: string;
+            total_amount_eur: string;
+            btw_rate_percent: string;
+            currency: string;
+        };
     };
 };
 export type PaperlessTagCheckDto = {

@@ -55,6 +55,8 @@ type FetchLike = typeof fetch;
 export type PaperlessDocument = {
   id: number;
   title: string;
+  /** Paperless's OCR text (or the embedded text layer for born-digital PDFs). */
+  content: string;
   correspondent: number | null;
   document_type: number | null;
   tags: number[];

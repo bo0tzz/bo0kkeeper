@@ -13,6 +13,16 @@
   import { Alert, Button, Field, Heading, HStack, Input, Stack, Text, Textarea } from '@immich/ui';
 
   type PaperlessTagCheckResult = PaperlessTagCheckResponseDto['results'][number];
+  type FieldDescriptions = SettingsResponseDto['extraction']['fieldDescriptions'];
+
+  // Prompt order. The API object's key order means nothing (jsonb reorders keys).
+  const DESCRIPTION_FIELDS: (keyof FieldDescriptions)[] = [
+    'organizations',
+    'invoice_date',
+    'total_amount_eur',
+    'btw_rate_percent',
+    'currency',
+  ];
 
   let loaded = $state<SettingsResponseDto | null>(null);
   let loading = $state(false);
@@ -35,6 +45,8 @@
   let iban = $state('');
   let expenseTagsRaw = $state('');
   let outgoingInvoiceTagsRaw = $state('');
+  let ownNamesRaw = $state('');
+  let fieldDescriptions = $state<FieldDescriptions | null>(null);
 
   function applyToDraft(s: SettingsResponseDto) {
     kvk = s.issuer.kvk;
@@ -46,6 +58,8 @@
     iban = s.issuer.iban;
     expenseTagsRaw = s.paperless.expenseTags.join(', ');
     outgoingInvoiceTagsRaw = s.paperless.outgoingInvoiceTags.join(', ');
+    ownNamesRaw = s.extraction.ownNames.join(', ');
+    fieldDescriptions = { ...s.extraction.fieldDescriptions };
   }
 
   async function load() {
@@ -85,6 +99,10 @@
           paperless: {
             expenseTags: splitTags(expenseTagsRaw),
             outgoingInvoiceTags: splitTags(outgoingInvoiceTagsRaw),
+          },
+          extraction: {
+            ownNames: splitTags(ownNamesRaw),
+            ...(fieldDescriptions && { fieldDescriptions }),
           },
         },
       });
@@ -205,6 +223,31 @@
           {/if}
         </Stack>
       </div>
+
+      {#if fieldDescriptions}
+        <div class="rounded border p-4">
+          <Stack gap={4}>
+            <Heading size="medium" tag="h2">Expense extraction</Heading>
+            <Text size="small" color="muted">
+              Used when the extraction model prefills new expenses from the document text.
+            </Text>
+            <Field
+              label="Your names on receipts (comma-separated)"
+              description="Organizations containing one of these (any case) are never picked as the vendor."
+            >
+              <Textarea bind:value={ownNamesRaw} placeholder="Jansen, Jansen Design" />
+            </Field>
+            <Text size="small" color="muted">
+              Field instructions, as the model sees them in the prompt. Leave one empty to drop it.
+            </Text>
+            {#each DESCRIPTION_FIELDS as field (field)}
+              <Field label={field}>
+                <Textarea bind:value={fieldDescriptions[field]} />
+              </Field>
+            {/each}
+          </Stack>
+        </div>
+      {/if}
 
       <HStack gap={3}>
         <Button variant="ghost" onclick={reset} disabled={saving}>Reset</Button>

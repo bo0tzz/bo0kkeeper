@@ -2,6 +2,7 @@ import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { BankingSessionService } from 'src/services/banking-session.service';
 import { BankingSyncService } from 'src/services/banking-sync.service';
 import { BookkeepingExportService } from 'src/services/bookkeeping-export.service';
+import { ExpenseExtractionService } from 'src/services/expense-extraction.service';
 import { ExpensePipelineService } from 'src/services/expense-pipeline.service';
 import { InvoiceComposerService } from 'src/services/invoice-composer.service';
 import { QuarterlyAggregatorService } from 'src/services/quarterly-aggregator.service';
@@ -20,6 +21,7 @@ export const services = [
   BankingSyncService,
   BankMatcherService,
   BookkeepingExportService,
+  ExpenseExtractionService,
   ExpensePipelineService,
   InvoiceComposerService,
   QuarterlyAggregatorService,

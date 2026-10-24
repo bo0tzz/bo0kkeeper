@@ -8,6 +8,7 @@ import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { HealthRepository } from 'src/repositories/health.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
 import { JobRepository } from 'src/repositories/job.repository';
+import { LlmRepository } from 'src/repositories/llm.repository';
 import { OidcRepository } from 'src/repositories/oidc.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { PeriodCloseRepository } from 'src/repositories/period-close.repository';
@@ -27,6 +28,7 @@ export const repositories = [
   HealthRepository,
   InvoiceRepository,
   JobRepository,
+  LlmRepository,
   OidcRepository,
   PaperlessRepository,
   PeriodCloseRepository,

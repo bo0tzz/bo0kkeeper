@@ -17,6 +17,11 @@ overrides:
   # cookie to 2.x. Renovate is pinned to `<2` via `allowedVersions` in
   # renovate.json5, so it will not reopen the widening PR.
   cookie: ">=0.7.0 <2"
+  # node-llama-cpp ships every GPU build as an optional dep; we run CPU-only,
+  # and these add ~640MB to the image.
+  "@node-llama-cpp/linux-x64-cuda": "-"
+  "@node-llama-cpp/linux-x64-cuda-ext": "-"
+  "@node-llama-cpp/linux-x64-vulkan": "-"
 packageExtensions:
   nestjs-kysely:
     dependencies:
@@ -36,5 +41,8 @@ allowBuilds:
   "@tailwindcss/oxide": true
   cpu-features: false
   esbuild: false
+  # Prebuilt CPU binary comes via @node-llama-cpp/linux-x64; the postinstall
+  # only matters for building from source.
+  node-llama-cpp: false
   protobufjs: false
   ssh2: false

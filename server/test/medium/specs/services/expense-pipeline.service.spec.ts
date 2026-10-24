@@ -1,9 +1,19 @@
 import { Kysely } from 'kysely';
-import { ClientClass, EventSource, EventStatus, ExpenseLocationClass, ExpenseStatus, TradeName } from 'src/enum';
+import {
+  ClientClass,
+  EventSource,
+  EventStatus,
+  ExpenseLocationClass,
+  ExpenseStatus,
+  JobName,
+  TradeName,
+} from 'src/enum';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
 import { ExpenseRepository } from 'src/repositories/expense.repository';
 import { InvoiceRepository } from 'src/repositories/invoice.repository';
+import { JobRepository } from 'src/repositories/job.repository';
+import { LlmRepository } from 'src/repositories/llm.repository';
 import { PaperlessRepository } from 'src/repositories/paperless.repository';
 import { DB } from 'src/schema';
 import { ExpensePipelineService } from 'src/services/expense-pipeline.service';
@@ -47,10 +57,33 @@ function fakePaperless(opts: { docTags?: number[]; tagIds?: Map<string, number> 
   } as unknown as PaperlessRepository;
 }
 
+function fakeJobs(): JobRepository {
+  return { queue: vi.fn().mockResolvedValue('job-id') } as unknown as JobRepository;
+}
+
+function fakeLlm(isEnabled: boolean): LlmRepository {
+  return { isEnabled: () => isEnabled } as unknown as LlmRepository;
+}
+
+async function ingestPaperlessDoc(eventRepo: EventRepository, service: ExpensePipelineService, documentId: number) {
+  const ingest = await eventRepo.ingest({
+    source: EventSource.Paperless,
+    eventType: 'document.consumed',
+    externalId: `paperless:${documentId}`,
+    occurredAt: new Date('2099-04-05'),
+    payload: { document_id: documentId, created: '2099-04-05' },
+  });
+  if (!ingest.ingested) {
+    throw new Error('precondition');
+  }
+  await service.handleProcessPaperlessDocument({ eventId: ingest.event.id });
+}
+
 describe('ExpensePipelineService', () => {
   let db: Kysely<DB>;
   let eventRepo: EventRepository;
   let expenseRepo: ExpenseRepository;
+  let jobs: JobRepository;
   let paperless: PaperlessRepository;
   let service: ExpensePipelineService;
 
@@ -58,11 +91,14 @@ describe('ExpensePipelineService', () => {
     db = await getKyselyDB();
     eventRepo = new EventRepository(db);
     expenseRepo = new ExpenseRepository(db);
+    jobs = fakeJobs();
     paperless = fakePaperless();
     service = new ExpensePipelineService(
       eventRepo,
       expenseRepo,
       new InvoiceRepository(db),
+      jobs,
+      fakeLlm(false),
       paperless,
       fakeSettings([]),
     );
@@ -99,6 +135,29 @@ describe('ExpensePipelineService', () => {
 
     const eventAfter = await eventRepo.findById(ingest.event.id);
     expect(eventAfter?.status).toBe(EventStatus.Processed);
+  });
+
+  describe('extraction', () => {
+    it('queues field extraction for a new expense when a model is configured', async () => {
+      service = new ExpensePipelineService(
+        eventRepo,
+        expenseRepo,
+        new InvoiceRepository(db),
+        jobs,
+        fakeLlm(true),
+        paperless,
+        fakeSettings([]),
+      );
+      await ingestPaperlessDoc(eventRepo, service, 5150);
+
+      const [expense] = await expenseRepo.findPendingReview();
+      expect(jobs.queue).toHaveBeenCalledExactlyOnceWith(JobName.ExtractExpenseFields, { expenseId: expense.id });
+    });
+
+    it('does not queue extraction without a model', async () => {
+      await ingestPaperlessDoc(eventRepo, service, 5151);
+      expect(jobs.queue).not.toHaveBeenCalled();
+    });
   });
 
   // paperless v2.20.x has no id-shaped placeholder, so the workflow can only
@@ -232,6 +291,8 @@ describe('ExpensePipelineService', () => {
         eventRepo,
         expenseRepo,
         new InvoiceRepository(db),
+        jobs,
+        fakeLlm(false),
         paperless,
         fakeSettings(['Business', 'Bills']),
       );
@@ -262,6 +323,8 @@ describe('ExpensePipelineService', () => {
         eventRepo,
         expenseRepo,
         new InvoiceRepository(db),
+        jobs,
+        fakeLlm(false),
         paperless,
         fakeSettings(['Business', 'Bills']),
       );
@@ -320,6 +383,8 @@ describe('ExpensePipelineService', () => {
         eventRepo,
         expenseRepo,
         invoiceRepo,
+        jobs,
+        fakeLlm(false),
         paperless,
         fakeSettings(['Business', 'Bills']),
       );
@@ -349,6 +414,8 @@ describe('ExpensePipelineService', () => {
         eventRepo,
         expenseRepo,
         new InvoiceRepository(db),
+        jobs,
+        fakeLlm(false),
         paperless,
         fakeSettings(['Business', 'Bills']),
       );
