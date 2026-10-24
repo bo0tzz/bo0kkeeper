@@ -167,8 +167,8 @@ importers:
         specifier: ^8.59.3
         version: 8.72.0(eslint@10.13.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)
       unplugin-swc:
-        specifier: ^1.5.9
-        version: 1.6.0(@swc/core@1.16.20(@swc/helpers@0.5.21))(esbuild@0.27.7)(rolldown@1.2.14)(rollup@4.61.1)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.16.20(@swc/helpers@0.5.21))(esbuild@0.27.7)(lightningcss@1.33.0)(postcss@8.5.30))
+        specifier: ^2.0.0
+        version: 2.0.0(@swc/core@1.16.20(@swc/helpers@0.5.21))(esbuild@0.27.7)(rolldown@1.2.14)(rollup@4.61.1)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.16.20(@swc/helpers@0.5.21))(esbuild@0.27.7)(lightningcss@1.33.0)(postcss@8.5.30))
       vite-tsconfig-paths:
         specifier: ^6.1.1
         version: 6.1.1(supports-color@8.1.1)(typescript@6.0.3)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.1))
@@ -4828,8 +4828,9 @@ packages:
     resolution: {integrity: sha512-pjy2bYhSsufwWlKwPc+l3cN7+wuJlK6uz0YdJEOlQDbl6jo/YlPi4mb8agUkVC8BF7V8NuzeyPNqRksA3hztKQ==}
     engines: {node: '>= 0.8'}
 
-  unplugin-swc@1.6.0:
-    resolution: {integrity: sha512-aOdzxAwJvz1GeQ8vwSNA2N8AreHYBrpwxqnwzxmB7LCdeZiXOBDj0rgjZod+lMxFsJGm8k6lF/1iKF/9wacLbw==}
+  unplugin-swc@2.0.0:
+    resolution: {integrity: sha512-hMdGJEtkwiJhzuXXx4Nb1XYDeD9KG4+P7KZOaErJTpZNYhTo1sbWIsXb+u410zXyaqH00veNX4UxOr6TpUwNiQ==}
+    engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       '@swc/core': ^1.2.108
 
@@ -9585,7 +9586,7 @@ snapshots:
 
   unpipe@1.0.0: {}
 
-  unplugin-swc@1.6.0(@swc/core@1.16.20(@swc/helpers@0.5.21))(esbuild@0.27.7)(rolldown@1.2.14)(rollup@4.61.1)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.16.20(@swc/helpers@0.5.21))(esbuild@0.27.7)(lightningcss@1.33.0)(postcss@8.5.30)):
+  unplugin-swc@2.0.0(@swc/core@1.16.20(@swc/helpers@0.5.21))(esbuild@0.27.7)(rolldown@1.2.14)(rollup@4.61.1)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.27.7)(jiti@2.7.0)(terser@5.49.0)(yaml@2.9.1))(webpack@5.106.2(@swc/core@1.16.20(@swc/helpers@0.5.21))(esbuild@0.27.7)(lightningcss@1.33.0)(postcss@8.5.30)):
     dependencies:
       '@rollup/pluginutils': 5.4.0(rollup@4.61.1)
       '@swc/core': 1.16.20(@swc/helpers@0.5.21)
