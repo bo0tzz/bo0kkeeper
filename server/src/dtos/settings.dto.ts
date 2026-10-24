@@ -31,6 +31,12 @@ const SettingsResponseSchema = z
       ownNames: z.array(z.string()),
       fieldDescriptions: ExtractFieldDescriptionsSchema,
     }),
+    drawings: z.object({
+      /** Personal account IBANs; outgoing salary transfers to these are categorised as drawings. */
+      ibans: z.array(z.string()),
+      /** Case-insensitive phrase a salary transfer's description contains. */
+      descriptionContains: z.string(),
+    }),
     updatedAt: z.iso.datetime(),
   })
   .meta({ id: 'SettingsResponseDto' });
@@ -59,6 +65,12 @@ const UpdateSettingsBodySchema = z
       .object({
         ownNames: z.array(z.string().min(1).max(200)),
         fieldDescriptions: ExtractFieldDescriptionsSchema,
+      })
+      .partial(),
+    drawings: z
+      .object({
+        ibans: z.array(z.string().regex(/^[A-Z]{2}\d{2}[A-Z0-9 ]{10,34}$/i, { error: 'Not an IBAN' })),
+        descriptionContains: z.string().max(200),
       })
       .partial(),
   })

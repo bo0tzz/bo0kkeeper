@@ -24,6 +24,7 @@ import type { ExpenseExtractFieldDescriptions } from 'src/utils/expense-extracti
  * - Issuer info (KvK, VAT id, full address, IBAN) — printed on every invoice
  * - Paperless tag names — used by the ingest webhook + invoice archive
  * - Expense extraction prompt + the operator's own names (vendor filter)
+ * - Salary payout recognition (personal IBANs) for auto-categorising drawings
  *
  * What does NOT live here:
  * - Secrets (API tokens, RSA keys, OIDC client secret) — env only
@@ -77,6 +78,19 @@ export class AppSettingsTable {
   /** Per-field instructions in the extraction prompt, keyed by template field. */
   @Column({ type: 'jsonb' })
   extractFieldDescriptions!: ColumnType<ExpenseExtractFieldDescriptions>;
+
+  // ─── Drawings ───────────────────────────────────────────────────────────
+  /**
+   * The operator's personal account IBANs. Outgoing transfers to one of
+   * these whose description contains `drawingsDescriptionContains` are
+   * salary payouts and get categorised as drawings.
+   */
+  @Column({ type: 'jsonb' })
+  drawingsIbans!: ColumnType<string[]>;
+
+  /** Case-insensitive phrase that tells a salary payout apart from e.g. a reimbursement. */
+  @Column({ type: 'text' })
+  drawingsDescriptionContains!: string;
 
   @CreateDateColumn()
   createdAt!: Generated<Timestamp>;

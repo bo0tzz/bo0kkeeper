@@ -102,7 +102,7 @@ Concurrent pods are safe (`kysely_migrations_lock` table serializes them) but yo
 | `ENABLE_BANKING_API_BASE_URL` | no | `https://api.enablebanking.com` | Leave default. |
 | `ENABLE_BANKING_REDIRECT_URI` | optional | — | `https://<public-hostname>/api/banking/auth/callback`. Required if using Enable Banking. |
 
-Invoice-issuer info (KvK, VAT id, address, IBAN), paperless tag-gates, and the expense extraction prompt plus your own names (never picked as a vendor) live in the `app_settings` DB row and are edited via `/settings` in the UI — not env vars. First boot seeds the row with `'CONFIGURE'` placeholders; configure those values via the UI before issuing invoices or ingesting expenses.
+Invoice-issuer info (KvK, VAT id, address, IBAN), paperless tag-gates, the expense extraction prompt plus your own names (never picked as a vendor), and your personal IBANs for auto-categorising salary payouts as drawings live in the `app_settings` DB row and are edited via `/settings` in the UI — not env vars. First boot seeds the row with `'CONFIGURE'` placeholders; configure those values via the UI before issuing invoices or ingesting expenses.
 
 ## Env vars — secrets (Secret, SOPS-managed)
 

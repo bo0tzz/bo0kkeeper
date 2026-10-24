@@ -12,6 +12,7 @@ import { Kysely } from 'kysely';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { loadConfig } from 'src/config';
+import { AppSettingsRepository } from 'src/repositories/app-settings.repository';
 import { BankTransactionRepository } from 'src/repositories/bank-transaction.repository';
 import { ClientRepository } from 'src/repositories/client.repository';
 import { EventRepository } from 'src/repositories/event.repository';
@@ -22,6 +23,7 @@ import { WiseTransferRepository } from 'src/repositories/wise-transfer.repositor
 import { DB } from 'src/schema';
 import { BankMatcherService } from 'src/services/bank-matcher.service';
 import { RecurringFeeService } from 'src/services/recurring-fee.service';
+import { SettingsService } from 'src/services/settings.service';
 import { SheetSyncService } from 'src/services/sheet-sync.service';
 import { SheetWriterService } from 'src/services/sheet-writer.service';
 import { getKyselyConfig } from 'src/utils/database';
@@ -66,6 +68,7 @@ async function main() {
       sheetSync,
       eventRepo,
       recurringFee,
+      new SettingsService(new AppSettingsRepository(db)),
     );
 
     let ingested = 0;

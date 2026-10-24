@@ -47,6 +47,8 @@
   let outgoingInvoiceTagsRaw = $state('');
   let ownNamesRaw = $state('');
   let fieldDescriptions = $state<FieldDescriptions | null>(null);
+  let drawingsIbansRaw = $state('');
+  let drawingsDescriptionContains = $state('');
 
   function applyToDraft(s: SettingsResponseDto) {
     kvk = s.issuer.kvk;
@@ -60,6 +62,8 @@
     outgoingInvoiceTagsRaw = s.paperless.outgoingInvoiceTags.join(', ');
     ownNamesRaw = s.extraction.ownNames.join(', ');
     fieldDescriptions = { ...s.extraction.fieldDescriptions };
+    drawingsIbansRaw = s.drawings.ibans.join(', ');
+    drawingsDescriptionContains = s.drawings.descriptionContains;
   }
 
   async function load() {
@@ -103,6 +107,10 @@
           extraction: {
             ownNames: splitTags(ownNamesRaw),
             ...(fieldDescriptions && { fieldDescriptions }),
+          },
+          drawings: {
+            ibans: splitTags(drawingsIbansRaw),
+            descriptionContains: drawingsDescriptionContains.trim(),
           },
         },
       });
@@ -248,6 +256,24 @@
           </Stack>
         </div>
       {/if}
+
+      <div class="rounded border p-4">
+        <Stack gap={4}>
+          <Heading size="medium" tag="h2">Drawings</Heading>
+          <Text size="small" color="muted">
+            Outgoing transfers to one of your personal accounts whose description contains the phrase are salary
+            payouts, and get categorised as drawings automatically. Leave the IBANs empty to turn this off.
+          </Text>
+          <HStack gap={3}>
+            <Field label="Personal IBANs (comma-separated)" invalid={issues.some((i) => i.path[0] === 'drawings')}>
+              <Input bind:value={drawingsIbansRaw} placeholder="NL91 ABNA 0417 1643 00" />
+            </Field>
+            <Field label="Description contains">
+              <Input bind:value={drawingsDescriptionContains} placeholder="salaris" />
+            </Field>
+          </HStack>
+        </Stack>
+      </div>
 
       <HStack gap={3}>
         <Button variant="ghost" onclick={reset} disabled={saving}>Reset</Button>

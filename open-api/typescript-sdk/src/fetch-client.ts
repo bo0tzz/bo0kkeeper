@@ -435,6 +435,10 @@ export type SettingsResponseDto = {
             currency: string;
         };
     };
+    drawings: {
+        ibans: string[];
+        descriptionContains: string;
+    };
     updatedAt: string;
 };
 export type UpdateSettingsDto = {
@@ -460,6 +464,10 @@ export type UpdateSettingsDto = {
             btw_rate_percent: string;
             currency: string;
         };
+    };
+    drawings?: {
+        ibans?: string[];
+        descriptionContains?: string;
     };
 };
 export type PaperlessTagCheckDto = {
