@@ -759,18 +759,26 @@ export function listTransactions({ dateFrom, dateTo, status, page, limit }: {
     }));
 }
 /**
- * Candidates for manual link. Defaults to recent rows of each type when no
- * query is given; with a query, filters by the most useful identifier per
- * type (wise reference, invoice number, vendor name).
+ * Candidates for manual link.
+ *
+ * - With a text query: substring match across all three types, no amount or
+ *   direction filter — operator is searching deliberately.
+ * - With `bankTxId` (and no query): directional filter + amount-proximity
+ *   sort. Outflow bank_txs only surface expenses; inflow bank_txs only
+ *   surface invoices + wise_transfers. Within each applicable type,
+ *   candidates are ordered closest-amount-first.
+ * - With neither: recent rows of each type.
  */
-export function matchCandidates({ q }: {
+export function matchCandidates({ q, bankTxId }: {
     q?: string;
+    bankTxId?: string;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
         status: 200;
         data: BankTxMatchCandidatesDto;
     }>(`/api/banking/match-candidates${QS.query(QS.explode({
-        q
+        q,
+        bankTxId
     }))}`, {
         ...opts
     }));

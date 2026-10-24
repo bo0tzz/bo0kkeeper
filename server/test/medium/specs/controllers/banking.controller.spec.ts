@@ -164,7 +164,7 @@ describe('BankingController', () => {
   });
 
   it('GET /match-candidates without a query returns recent items of each type', async () => {
-    const result = await controller.matchCandidates();
+    const result = await controller.matchCandidates({});
     expect(result).toEqual({ transfers: [], invoices: [], expenses: [] });
   });
 

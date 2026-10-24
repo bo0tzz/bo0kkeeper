@@ -4,6 +4,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { WiseTransferState } from 'src/enum';
 import { DB } from 'src/schema';
 import { WiseTransferTable } from 'src/schema/tables/wise-transfer.table';
+import { MatchCandidateTarget } from 'src/types';
 
 export type WiseTransferRow = Selectable<WiseTransferTable>;
 export type NewWiseTransfer = Insertable<WiseTransferTable>;
@@ -81,7 +82,11 @@ export class WiseTransferRepository {
    * Match-candidate list for the bank-tx Link modal. Substring search on
    * our TXN ref + Wise's id; unmatched-only when query is empty.
    */
-  async findMatchCandidates(input: { query?: string; limit: number }): Promise<WiseTransferMatchCandidate[]> {
+  async findMatchCandidates(input: {
+    query?: string;
+    limit: number;
+    near?: MatchCandidateTarget;
+  }): Promise<WiseTransferMatchCandidate[]> {
     const like = input.query ? `%${input.query.toLowerCase()}%` : null;
     let qb = this.db
       .selectFrom('wise_transfer')
@@ -96,8 +101,15 @@ export class WiseTransferRepository {
         'targetAmountMinor',
         'createdAt',
       ])
-      .orderBy('createdAt', 'desc')
       .limit(input.limit);
+    // Sweeps land at the bank as the target leg, so that's what we compare.
+    qb = input.near
+      ? qb
+          .where('targetCurrency', '=', input.near.currency)
+          .where('state', 'not in', [WiseTransferState.Cancelled, WiseTransferState.Failed])
+          .orderBy(sql`abs(${sql.ref('targetAmountMinor')} - ${input.near.amountMinor})`)
+          .orderBy('createdAt', 'desc')
+      : qb.orderBy('createdAt', 'desc');
     qb = like
       ? qb.where((eb) =>
           eb.or([

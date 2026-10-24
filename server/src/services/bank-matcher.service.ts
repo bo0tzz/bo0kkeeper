@@ -286,21 +286,49 @@ export class BankMatcherService {
   }
 
   /**
-   * Things the user might want to manually link a bank tx to. With a free-
-   * text query, this is a substring match on the most useful identifier per
-   * type. Without one, we exclude candidates that are already matched to
-   * another bank_transaction — there's no reason to surface a transfer or
-   * invoice that's already accounted for elsewhere. With a query the user
-   * is searching on purpose, so we include matched rows too (they might be
-   * looking at a wrong existing match).
+   * Things the user might want to manually link a bank tx to.
+   *
+   * Three modes:
+   * 1. Text query only — substring match across all three types; includes
+   *    already-matched rows so the operator can find a wrong existing match.
+   * 2. bankTxId only — directional + amount-aware filter. Outflow bank_txs
+   *    only match expenses (nothing else makes sense to pay out of our
+   *    account); inflow bank_txs only match invoices + wise_transfers (both
+   *    represent money landing). Same currency only; cancelled/failed
+   *    transfers and rejected expenses are dropped; nearest amount first.
+   * 3. Both bankTxId and q — operator deliberately broadening the search;
+   *    we drop the directional filter and honor the text query.
    */
-  async findMatchCandidates(query: string | undefined, limit = 20): Promise<MatchCandidates> {
+  async findMatchCandidates(
+    query: string | undefined,
+    options: { bankTxId?: string; limit?: number } = {},
+  ): Promise<MatchCandidates> {
+    const limit = options.limit ?? 20;
     const q = query?.trim().toLowerCase();
     const args = { query: q || undefined, limit };
+
+    const bankTx = options.bankTxId ? await this.bankTransactionRepository.findById(options.bankTxId) : null;
+    if (!bankTx || q) {
+      // Mode 1 or 3 — fall through to the unfiltered search across all types.
+      const [transfers, invoices, expenses] = await Promise.all([
+        this.wiseTransferRepository.findMatchCandidates(args),
+        this.invoiceRepository.findMatchCandidates(args),
+        this.expenseRepository.findMatchCandidates(args),
+      ]);
+      return { transfers, invoices, expenses };
+    }
+
+    // Mode 2 — directional. Outflow (negative amount) can only match an
+    // expense we're paying; inflow matches invoices (clients paying us) or
+    // wise_transfers (sweeps landing at the bank). Ranking happens in SQL so
+    // the limit keeps the nearest amounts, not the most recent rows.
+    const amount = BigInt(bankTx.amountMinor);
+    const isOutflow = amount < 0n;
+    const near = { amountMinor: isOutflow ? -amount : amount, currency: bankTx.currency };
     const [transfers, invoices, expenses] = await Promise.all([
-      this.wiseTransferRepository.findMatchCandidates(args),
-      this.invoiceRepository.findMatchCandidates(args),
-      this.expenseRepository.findMatchCandidates(args),
+      isOutflow ? [] : this.wiseTransferRepository.findMatchCandidates({ limit, near }),
+      isOutflow ? [] : this.invoiceRepository.findMatchCandidates({ limit, near }),
+      isOutflow ? this.expenseRepository.findMatchCandidates({ limit, near }) : [],
     ]);
     return { transfers, invoices, expenses };
   }

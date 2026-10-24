@@ -25,6 +25,7 @@ import {
   BankingSyncResponseDto,
   BankTransactionResponseDto,
   BankTxMatchCandidatesDto,
+  BankTxMatchCandidatesQueryDto,
   BankTxSetCategoryDto,
   BankTxSetMatchDto,
   ListBankTransactionsQueryDto,
@@ -179,15 +180,22 @@ export class BankingController {
   }
 
   /**
-   * Candidates for manual link. Defaults to recent rows of each type when no
-   * query is given; with a query, filters by the most useful identifier per
-   * type (wise reference, invoice number, vendor name).
+   * Candidates for manual link.
+   *
+   * - With a text query: substring match across all three types, no amount or
+   *   direction filter — operator is searching deliberately.
+   * - With `bankTxId` (and no query): directional filter + amount-proximity
+   *   sort. Outflow bank_txs only surface expenses; inflow bank_txs only
+   *   surface invoices + wise_transfers. Within each applicable type,
+   *   candidates are ordered closest-amount-first.
+   * - With neither: recent rows of each type.
    */
   @Get('match-candidates')
   @Authenticated()
+  @ApiQueryFromDto(BankTxMatchCandidatesQueryDto)
   @ApiOkResponse({ type: BankTxMatchCandidatesDto })
-  async matchCandidates(@Query('q') q?: string): Promise<BankTxMatchCandidatesDto> {
-    const candidates = await this.matcher.findMatchCandidates(q);
+  async matchCandidates(@Query() query: BankTxMatchCandidatesQueryDto): Promise<BankTxMatchCandidatesDto> {
+    const candidates = await this.matcher.findMatchCandidates(query.q, { bankTxId: query.bankTxId });
     return {
       transfers: candidates.transfers.map((t) => ({
         id: t.id,

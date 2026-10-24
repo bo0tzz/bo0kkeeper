@@ -4,6 +4,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { DB } from 'src/schema';
 import { InvoiceLineTable } from 'src/schema/tables/invoice-line.table';
 import { InvoiceTable } from 'src/schema/tables/invoice.table';
+import { MatchCandidateTarget } from 'src/types';
 
 export type Invoice = Selectable<InvoiceTable>;
 export type InvoiceLine = Selectable<InvoiceLineTable>;
@@ -306,7 +307,11 @@ export class InvoiceRepository {
    * Match-candidate list for the bank-tx Link modal. Substring search on
    * number + client name; unmatched-only when query is empty.
    */
-  async findMatchCandidates(input: { query?: string; limit: number }): Promise<InvoiceMatchCandidate[]> {
+  async findMatchCandidates(input: {
+    query?: string;
+    limit: number;
+    near?: MatchCandidateTarget;
+  }): Promise<InvoiceMatchCandidate[]> {
     const like = input.query ? `%${input.query.toLowerCase()}%` : null;
     let qb = this.db
       .selectFrom('invoice')
@@ -319,8 +324,13 @@ export class InvoiceRepository {
         'invoice.issuedAt',
         'client.name as clientName',
       ])
-      .orderBy('invoice.issuedAt', 'desc')
       .limit(input.limit);
+    qb = input.near
+      ? qb
+          .where('invoice.currency', '=', input.near.currency)
+          .orderBy(sql`abs(${sql.ref('invoice.totalMinor')} - ${input.near.amountMinor})`)
+          .orderBy('invoice.issuedAt', 'desc')
+      : qb.orderBy('invoice.issuedAt', 'desc');
     qb = like
       ? qb.where((eb) =>
           eb.or([

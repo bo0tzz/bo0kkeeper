@@ -29,6 +29,9 @@ type JobItemMap = {
   [JobName.InvoiceAutoComposeFromWise]: { wiseTransferId: string };
 };
 
+/** Rank match candidates by distance from this (unsigned) amount, same currency only. */
+export type MatchCandidateTarget = { amountMinor: bigint; currency: string };
+
 /** Producer-side: `data` shape for a given job name. */
 export type JobOf<T extends JobName> = T extends keyof JobItemMap ? JobItemMap[T] : never;
 
