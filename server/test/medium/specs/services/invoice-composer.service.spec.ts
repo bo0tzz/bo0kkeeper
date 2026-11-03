@@ -320,6 +320,28 @@ describe('InvoiceComposerService', () => {
       expect(prefill.suggestedClientId).toBe(clientId);
     });
 
+    it('prefillFromWise splits off the excess over the usual amount as a bonus', async () => {
+      await seedPriorInvoice(composer, db, clientId);
+      const transfer = await seedOutgoingTransfer(db, { sourceAmountMinor: 579_100n, originalCreditMinor: 579_100n });
+
+      const prefill = await composer.prefillFromWise(transfer.id);
+
+      expect(prefill.usualTotalMinor).toBe(479_100n);
+      expect(prefill.bonusMinor).toBe(100_000n);
+    });
+
+    it('prefillFromWise suggests no bonus when the payment is not above the usual amount', async () => {
+      await seedPriorInvoice(composer, db, clientId);
+      const regular = await seedOutgoingTransfer(db);
+      const smaller = await seedOutgoingTransfer(db, { sourceAmountMinor: 50_000n, originalCreditMinor: 50_000n });
+
+      await expect(composer.prefillFromWise(regular.id)).resolves.toMatchObject({ bonusMinor: null });
+      await expect(composer.prefillFromWise(smaller.id)).resolves.toMatchObject({
+        usualTotalMinor: 479_100n,
+        bonusMinor: null,
+      });
+    });
+
     it('rejects an inbound (direction=in) transfer', async () => {
       const transfer = await seedOutgoingTransfer(db, { direction: 'in' });
       await expect(composer.prefillFromWise(transfer.id)).rejects.toThrow(/direction=in/);
@@ -442,6 +464,33 @@ describe('InvoiceComposerService', () => {
 
       const result = await composer.tryAutoComposeFromWise(settled.id);
       expect(result).toMatchObject({ outcome: 'declined', reason: 'rate_changed' });
+    });
+
+    it('compares against the period line, so a bonus on the last invoice does not block the next one', async () => {
+      await setTemplateDescription(db, clientId);
+      const split = await seedOutgoingTransfer(db, { sourceAmountMinor: 579_100n, originalCreditMinor: 579_100n });
+      await composer.composeFromWise({
+        wiseTransferId: split.id,
+        clientId,
+        issuedAt: new Date('2099-01-15T00:00:00Z'),
+        periodStart: new Date('2099-01-01T00:00:00Z'),
+        periodEnd: new Date('2099-01-15T00:00:00Z'),
+        lines: [
+          { description: 'Services', lineTotalMinor: 479_100n },
+          { description: 'Bonus', lineTotalMinor: 100_000n },
+        ],
+      });
+      const bonusOnly = await seedOutgoingTransfer(db, { sourceAmountMinor: 50_000n, originalCreditMinor: 50_000n });
+      await composer.composeFromWise({
+        wiseTransferId: bonusOnly.id,
+        clientId,
+        issuedAt: new Date('2099-01-20T00:00:00Z'),
+        lines: [{ description: 'Bonus', lineTotalMinor: 50_000n }],
+      });
+      const settled = await seedOutgoingTransfer(db);
+
+      const result = await composer.tryAutoComposeFromWise(settled.id);
+      expect(result.outcome).toBe('composed');
     });
 
     it('declines client_not_template_driven when the client has a non-template description', async () => {

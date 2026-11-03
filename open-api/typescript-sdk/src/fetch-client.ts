@@ -398,6 +398,8 @@ export type WiseInvoicePrefillDto = {
     suggestedPeriodStart: string | null;
     suggestedPeriodEnd: string | null;
     suggestedLineDescription: string;
+    usualTotalMinor: string | null;
+    bonusMinor: string | null;
 };
 export type InvoiceComposeFromWiseDto = {
     clientId: string;

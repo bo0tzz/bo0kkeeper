@@ -1,4 +1,4 @@
-import { absMinor, btwInGross, majorToMinor, minorToMajor } from 'src/utils/money';
+import { absMinor, apportionMinor, btwInGross, majorToMinor, minorToMajor } from 'src/utils/money';
 import { describe, expect, it } from 'vitest';
 
 describe('majorToMinor', () => {
@@ -58,5 +58,23 @@ describe('btwInGross', () => {
 
   it('is zero at a zero rate', () => {
     expect(btwInGross(5000n, 0)).toBe(0n);
+  });
+});
+
+describe('apportionMinor', () => {
+  it('splits proportionally and always sums to the total', () => {
+    // 489012 × 4791/5791 = 404568.6… and × 1000/5791 = 84443.2…
+    const parts = apportionMinor(489_012n, [479_100n, 100_000n]);
+    expect(parts).toEqual([404_568n, 84_444n]);
+    expect(parts[0] + parts[1]).toBe(489_012n);
+  });
+
+  it('gives a single part the whole total', () => {
+    expect(apportionMinor(12_345n, [999n])).toEqual([12_345n]);
+  });
+
+  it('puts the total on the last part when all weights are zero', () => {
+    expect(apportionMinor(100n, [0n, 0n])).toEqual([0n, 100n]);
+    expect(apportionMinor(100n, [])).toEqual([]);
   });
 });

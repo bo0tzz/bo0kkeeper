@@ -94,6 +94,10 @@ const WiseInvoicePrefillSchema = z
      * Empty string when there's no suggested client.
      */
     suggestedLineDescription: z.string(),
+    /** The suggested client's regular per-period amount (minor units); null without history. */
+    usualTotalMinor: z.string().nullable(),
+    /** `totalMinor` above the usual amount, i.e. a bonus on top; null when it isn't above. */
+    bonusMinor: z.string().nullable(),
   })
   .meta({ id: 'WiseInvoicePrefillDto' });
 export class WiseInvoicePrefillDto extends createZodDto(WiseInvoicePrefillSchema) {}

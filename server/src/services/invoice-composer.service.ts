@@ -20,6 +20,7 @@ import { SettingsService } from 'src/services/settings.service';
 import { JobOf } from 'src/types';
 import { toDate } from 'src/utils/date';
 import { nextHalfMonth, Period, resolveDescription } from 'src/utils/description-template';
+import { apportionMinor } from 'src/utils/money';
 
 export type InvoiceLineInput = {
   description: string;
@@ -116,6 +117,10 @@ export type WiseInvoicePrefill = {
    * about either the period or the formatting boilerplate.
    */
   suggestedLineDescription: string;
+  /** The suggested client's regular per-period amount; null without history. */
+  usualTotalMinor: bigint | null;
+  /** How much `totalMinor` exceeds the usual amount — a bonus on top; null when it doesn't. */
+  bonusMinor: bigint | null;
 };
 
 /** Single template covers every client class; the data shape carries the variant. */
@@ -323,7 +328,9 @@ export class InvoiceComposerService {
 
     let suggestedPeriod: Period | null = null;
     let suggestedLineDescription = '';
+    let usualTotalMinor: bigint | null = null;
     if (suggestedClient) {
+      usualTotalMinor = await this.invoiceRepository.findUsualLineTotalForClient(suggestedClient.id);
       const lastEnd = await this.invoiceRepository.findLatestPeriodEndForClient(suggestedClient.id);
       suggestedPeriod = nextHalfMonth({ previousPeriodEnd: lastEnd ?? null, today: new Date() });
       suggestedLineDescription = resolveDescription({
@@ -350,6 +357,7 @@ export class InvoiceComposerService {
     // drew from the same pool. Books tie: invoice_EUR = swept_EUR +
     // Σ(expense_EUR at same rate).
     const eurTotalMinor = sourceMinor === 0n ? targetMinor : (totalMinor * targetMinor) / sourceMinor;
+    const bonusMinor = usualTotalMinor !== null && totalMinor > usualTotalMinor ? totalMinor - usualTotalMinor : null;
     return {
       wiseTransferId: transfer.id,
       currency: transfer.sourceCurrency,
@@ -360,6 +368,8 @@ export class InvoiceComposerService {
       suggestedPeriodStart: suggestedPeriod?.start ?? null,
       suggestedPeriodEnd: suggestedPeriod?.end ?? null,
       suggestedLineDescription,
+      usualTotalMinor,
+      bonusMinor,
     };
   }
 
@@ -480,17 +490,18 @@ export class InvoiceComposerService {
         'client.defaultDescription missing period placeholder',
       );
     }
-    const priorTotal = await this.invoiceRepository.findLatestLineTotalForClient(prefill.suggestedClientId);
-    if (priorTotal === null) {
+    if (prefill.usualTotalMinor === null) {
       // No history for this client — don't risk auto-composing the first
       // one. Let the operator confirm the shape in the UI.
       return this.declineAutoCompose(wiseTransferId, 'no_prior_invoice', 'first invoice for this client');
     }
-    if (priorTotal !== prefill.totalMinor) {
+    if (prefill.usualTotalMinor !== prefill.totalMinor) {
+      // A bonus on top or a rate change; the compose UI prefills the
+      // bonus split for the operator to confirm.
       return this.declineAutoCompose(
         wiseTransferId,
         'rate_changed',
-        `prefill=${prefill.totalMinor} vs prior=${priorTotal}`,
+        `prefill=${prefill.totalMinor} vs usual=${prefill.usualTotalMinor}`,
       );
     }
 
@@ -759,16 +770,24 @@ function domesticTable(invoice: InvoiceWithLines): Table {
 
 function nonEuTable(invoice: InvoiceWithLines): Table {
   const formatPrimary = (minor: bigint) => (invoice.currency === 'USD' ? formatMinorWhole(minor) : formatMinor(minor));
+  const lineMinors = invoice.lines.map((line) => BigInt(line.lineTotalMinor));
+  // With a fixed EUR total (Wise-flow invoices), split it across the lines so
+  // the per-line EUR adds up to the total shown underneath.
+  const eurLines =
+    invoice.eurTotalMinor === null || invoice.eurTotalMinor === undefined
+      ? null
+      : apportionMinor(BigInt(invoice.eurTotalMinor), lineMinors);
   return {
     headers: ['Description', 'Amount'],
     aligns: ['left', 'right'],
-    rows: invoice.lines.map((line) => {
-      const lineMinor = BigInt(line.lineTotalMinor);
-      return [
-        line.description,
-        formatLineAmount(invoice, formatPrimary(lineMinor), eurFromMinor(lineMinor, invoice.fxRate)),
-      ];
-    }),
+    rows: invoice.lines.map((line, index) => [
+      line.description,
+      formatLineAmount(
+        invoice,
+        formatPrimary(lineMinors[index]),
+        eurLines ? formatMinor(eurLines[index]) : eurFromMinor(lineMinors[index], invoice.fxRate),
+      ),
+    ]),
   };
 }
 

@@ -30,6 +30,11 @@
     amount: string;
   };
 
+  /** Regular period line, period line + bonus on top, or a standalone bonus (no period). */
+  type Shape = 'regular' | 'split' | 'bonus';
+
+  const BONUS_DESCRIPTION = 'Bonus';
+
   const wiseTransferId = page.params.wiseTransferId as string;
 
   let prefill = $state<WiseInvoicePrefill | null>(null);
@@ -41,6 +46,7 @@
   let periodStart = $state('');
   let periodEnd = $state('');
   let lines = $state<LineDraft[]>([{ description: '', amount: '' }]);
+  let shape = $state<Shape>('regular');
 
   let submitting = $state(false);
   let error = $state<string | null>(null);
@@ -68,16 +74,7 @@
       if (pf.suggestedClientId) {
         clientId = pf.suggestedClientId;
       }
-      // Period prefilled from the suggested client's last invoice (next half-month);
-      // operator can override. Server already substituted any `{period.*}` placeholders
-      // in client.defaultDescription, so `suggestedLineDescription` is the final string.
-      if (pf.suggestedPeriodStart) {
-        periodStart = pf.suggestedPeriodStart;
-      }
-      if (pf.suggestedPeriodEnd) {
-        periodEnd = pf.suggestedPeriodEnd;
-      }
-      lines = [{ description: pf.suggestedLineDescription, amount: minorToMajor(pf.totalMinor) }];
+      applyShape(pf.bonusMinor ? 'split' : 'regular');
     } catch (error_) {
       prefillError = extractApiError(error_).message;
     }
@@ -86,6 +83,40 @@
   $effect(() => {
     void load();
   });
+
+  /**
+   * Period prefilled from the suggested client's last invoice (next half-month);
+   * operator can override. Server already substituted any `{period.*}` placeholders
+   * in client.defaultDescription, so `suggestedLineDescription` is the final string.
+   * A standalone bonus gets no period so it doesn't shift the half-month cadence.
+   */
+  function applyShape(next: Shape) {
+    if (!prefill) {
+      return;
+    }
+    shape = next;
+    if (next === 'bonus') {
+      periodStart = '';
+      periodEnd = '';
+      lines = [{ description: BONUS_DESCRIPTION, amount: minorToMajor(prefill.totalMinor) }];
+      return;
+    }
+    periodStart = prefill.suggestedPeriodStart ?? '';
+    periodEnd = prefill.suggestedPeriodEnd ?? '';
+    lines =
+      next === 'split' && prefill.usualTotalMinor && prefill.bonusMinor
+        ? [
+            { description: prefill.suggestedLineDescription, amount: minorToMajor(prefill.usualTotalMinor) },
+            { description: BONUS_DESCRIPTION, amount: minorToMajor(prefill.bonusMinor) },
+          ]
+        : [{ description: prefill.suggestedLineDescription, amount: minorToMajor(prefill.totalMinor) }];
+  }
+
+  const shapeOptions = $derived([
+    { value: 'regular', label: 'Regular payment' },
+    ...(prefill?.bonusMinor ? [{ value: 'split', label: 'Regular payment + bonus' }] : []),
+    { value: 'bonus', label: 'Bonus only' },
+  ]);
 
   function addLine() {
     lines = [...lines, { description: '', amount: '' }];
@@ -204,6 +235,17 @@
             <Input bind:value={issuedAt} />
           </Field>
         </HStack>
+
+        <Field label="Invoice as">
+          <Select value={shape} options={shapeOptions} onChange={(value) => applyShape(value as Shape)} />
+        </Field>
+        {#if shape === 'split' && prefill.usualTotalMinor && prefill.bonusMinor}
+          <Text size="small" color="muted">
+            This payment is {prefill.currency}
+            {minorToMajor(prefill.bonusMinor)} more than the usual {minorToMajor(prefill.usualTotalMinor)}, so the
+            excess is on a bonus line.
+          </Text>
+        {/if}
 
         <HStack gap={3}>
           <Field label="Period start (optional)" invalid={hasIssue('periodStart')}>

@@ -42,3 +42,20 @@ export function absMinor(minor: bigint): bigint {
 export function btwInGross(grossMinor: bigint, rateBps: number): bigint {
   return (grossMinor * BigInt(rateBps)) / BigInt(10_000 + rateBps);
 }
+
+/**
+ * Split `totalMinor` across parts in proportion to `weights`, in whole minor
+ * units, so the parts always sum to exactly `totalMinor`. Each part is rounded
+ * down; the leftover cents go to the last part. Used to show per-line EUR on a
+ * multi-line invoice whose EUR total is fixed by the Wise sweep.
+ */
+export function apportionMinor(totalMinor: bigint, weights: bigint[]): bigint[] {
+  const weightSum = weights.reduce((sum, weight) => sum + weight, 0n);
+  if (weightSum === 0n) {
+    return weights.map((_, index) => (index === weights.length - 1 ? totalMinor : 0n));
+  }
+  const parts = weights.map((weight) => (totalMinor * weight) / weightSum);
+  const assigned = parts.reduce((sum, part) => sum + part, 0n);
+  parts[parts.length - 1] += totalMinor - assigned;
+  return parts;
+}
