@@ -5,7 +5,7 @@ node = "24"
 # (`pnpm-linux-x64.tar.gz`), which aqua-registry's recipe doesn't handle
 # yet — install fails with `no asset found: pnpm-linux-x64`. The npm
 # registry always has it.
-"npm:pnpm" = "11"
+"npm:pnpm" = "12"
 typst = "latest"
 
 # Local dev env (DB, OIDC, secrets). Gitignored — see .gitignore.
