@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.15.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.14.0...v0.15.0) (2026-11-03)
+
+
+### Features
+
+* **invoices:** split bonuses off regular Wise payments ([#255](https://github.com/bo0tzz/bo0kkeeper/issues/255)) ([44896cf](https://github.com/bo0tzz/bo0kkeeper/commit/44896cf7359eb18ec0779560fe11bcb5223e06c6))
+
+
+### Bug Fixes
+
+* **deps:** update debian:13-slim docker digest to f6b08b0 ([#257](https://github.com/bo0tzz/bo0kkeeper/issues/257)) ([145bc27](https://github.com/bo0tzz/bo0kkeeper/commit/145bc275872dae8964dd5c6782da3194d39031ad))
+* **deps:** update dependency happy-dom to v21 ([#248](https://github.com/bo0tzz/bo0kkeeper/issues/248)) ([e22ee3b](https://github.com/bo0tzz/bo0kkeeper/commit/e22ee3bb755937fac4eb9104bf1c608cbb056803))
+* **deps:** update dependency kysely-postgres-js to v5 ([#249](https://github.com/bo0tzz/bo0kkeeper/issues/249)) ([7ded5b5](https://github.com/bo0tzz/bo0kkeeper/commit/7ded5b52449dd9909a0296e27a62bcbf78773906))
+* **deps:** update dependency nestjs-cls to v7 ([#250](https://github.com/bo0tzz/bo0kkeeper/issues/250)) ([00d191e](https://github.com/bo0tzz/bo0kkeeper/commit/00d191e182878ec4b24bc10ab27a79511abf819b))
+* **deps:** update dependency unplugin-swc to v2 ([#251](https://github.com/bo0tzz/bo0kkeeper/issues/251)) ([3dec45d](https://github.com/bo0tzz/bo0kkeeper/commit/3dec45d216fa9dd5a90ade18c96ec7c44b9e1905))
+* **deps:** update docker.io/library/redis:8 docker digest to de1068a ([#258](https://github.com/bo0tzz/bo0kkeeper/issues/258)) ([5d57099](https://github.com/bo0tzz/bo0kkeeper/commit/5d57099b5ba093e4e996c6565abac46361f119d8))
+* **deps:** update nestjs to v12 ([#252](https://github.com/bo0tzz/bo0kkeeper/issues/252)) ([60f4e41](https://github.com/bo0tzz/bo0kkeeper/commit/60f4e410925a35156f1ebf5ba799cc87d004e1e9))
+* **deps:** update pnpm to v12 ([#253](https://github.com/bo0tzz/bo0kkeeper/issues/253)) ([3361fce](https://github.com/bo0tzz/bo0kkeeper/commit/3361fcee464acc5ae49d3a82cd68987ef40b9a26))
+* **deps:** update svelte ([#246](https://github.com/bo0tzz/bo0kkeeper/issues/246)) ([31c0242](https://github.com/bo0tzz/bo0kkeeper/commit/31c0242d248be2857a6fa147912024a60703b45d))
+* **mise:** update tool npm:pnpm to v12 ([#259](https://github.com/bo0tzz/bo0kkeeper/issues/259)) ([ebe86b4](https://github.com/bo0tzz/bo0kkeeper/commit/ebe86b4d640f91478e9bc1ad9ecc8f8ed71542a2))
+
 ## [0.14.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.13.0...v0.14.0) (2026-10-24)
 
 
