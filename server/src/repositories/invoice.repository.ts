@@ -184,27 +184,24 @@ export class InvoiceRepository {
   }
 
   /**
-   * Sum of the first invoice's lines for this client, most-recent first — the
-   * reference "what the recurring billing total has historically been." Used
-   * by the Wise auto-compose rate-pattern guard: a prefill totalMinor that
-   * doesn't match this means something changed (rate adjustment, period
-   * split, one-off bonus) and the operator should compose manually.
-   * Returns null when the client has no prior invoices.
+   * The client's recurring per-period amount: the first (period) line of its
+   * latest invoice that covers a billing period. Bonus lines and bonus-only
+   * invoices (no period) are left out, so a bonus doesn't move the baseline
+   * the next regular Wise payment is compared against. Null without any
+   * periodic invoice.
    */
-  async findLatestLineTotalForClient(clientId: string): Promise<bigint | null> {
-    const row = (await this.db
+  async findUsualLineTotalForClient(clientId: string): Promise<bigint | null> {
+    const row = await this.db
       .selectFrom('invoice')
       .innerJoin('invoice_line', 'invoice_line.invoiceId', 'invoice.id')
-      .select((eb) => eb.fn.sum<string>('invoice_line.lineTotalMinor').as('total'))
+      .select('invoice_line.lineTotalMinor')
       .where('invoice.clientId', '=', clientId)
-      .groupBy('invoice.id')
+      .where('invoice.periodEnd', 'is not', null)
+      .where('invoice_line.ordinal', '=', 0)
       .orderBy('invoice.issuedAt', 'desc')
       .limit(1)
-      .executeTakeFirst()) as { total: string | null } | undefined;
-    if (!row?.total) {
-      return null;
-    }
-    return BigInt(row.total);
+      .executeTakeFirst();
+    return row ? BigInt(row.lineTotalMinor) : null;
   }
 
   /** Set the paperless document id once the PDF has been pushed. */

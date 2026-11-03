@@ -119,6 +119,8 @@ export class InvoicesController {
       suggestedPeriodStart: prefill.suggestedPeriodStart ? toIsoDate(prefill.suggestedPeriodStart) : null,
       suggestedPeriodEnd: prefill.suggestedPeriodEnd ? toIsoDate(prefill.suggestedPeriodEnd) : null,
       suggestedLineDescription: prefill.suggestedLineDescription,
+      usualTotalMinor: prefill.usualTotalMinor === null ? null : String(prefill.usualTotalMinor),
+      bonusMinor: prefill.bonusMinor === null ? null : String(prefill.bonusMinor),
     };
   }
 
