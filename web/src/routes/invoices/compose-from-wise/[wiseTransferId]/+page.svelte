@@ -234,6 +234,9 @@
             <strong>{prefill.currency}</strong>
             {minorToMajor(prefill.totalMinor)} → € {minorToMajor(prefill.eurTotalMinor)}
           </Text>
+          {#if prefill.fxRate}
+            <Text size="small" color="muted">at {prefill.fxRate} EUR per {prefill.currency}</Text>
+          {/if}
           {#if prefill.ourReference}
             <Text size="small" color="muted">ref <code>{prefill.ourReference}</code></Text>
           {/if}

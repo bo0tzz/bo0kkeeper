@@ -318,6 +318,8 @@ describe('InvoiceComposerService', () => {
       expect(String(prefill.eurTotalMinor)).toBe('404572');
       expect(prefill.ourReference).toBe('TXN-0044');
       expect(prefill.suggestedClientId).toBe(clientId);
+      // 404_572 EUR cents landed for 479_100 USD cents sent.
+      expect(prefill.fxRate).toBe('0.844442');
     });
 
     it('prefillFromWise splits off the excess over the usual amount as a bonus', async () => {

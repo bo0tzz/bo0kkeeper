@@ -98,6 +98,8 @@ const WiseInvoicePrefillSchema = z
     usualTotalMinor: z.string().nullable(),
     /** `totalMinor` above the usual amount, i.e. a bonus on top; null when it isn't above. */
     bonusMinor: z.string().nullable(),
+    /** EUR per unit of `currency` that Wise delivered, fee and spread included. */
+    fxRate: z.string().nullable(),
   })
   .meta({ id: 'WiseInvoicePrefillDto' });
 export class WiseInvoicePrefillDto extends createZodDto(WiseInvoicePrefillSchema) {}
