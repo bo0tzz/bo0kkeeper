@@ -400,6 +400,14 @@ export class InvoiceComposerService {
     // EUR at the sweep's realized rate, applied to the full credit amount.
     // See prefillFromWise for the rationale — books tie: invoice_EUR =
     // swept_EUR + Σ(expense_EUR).
+    // The EUR total comes from the payment, the USD total from the lines;
+    // they only describe the same money if the lines add up to the payment.
+    const linesMinor = input.lines.reduce((sum, line) => sum + line.lineTotalMinor, 0n);
+    if (linesMinor !== originalMinor) {
+      throw new BadRequestException(
+        `Lines add up to ${transfer.sourceCurrency} ${formatMinor(linesMinor)} but the Wise payment was ${transfer.sourceCurrency} ${formatMinor(originalMinor)}`,
+      );
+    }
     const eurTotalMinor = sourceMinor === 0n ? targetMinor : (originalMinor * targetMinor) / sourceMinor;
     const effectiveRate = sourceMinor === 0n ? undefined : (Number(targetMinor) / Number(sourceMinor)).toFixed(6);
     return this.composeAndIssue({
