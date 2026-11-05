@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.16.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.15.0...v0.16.0) (2026-11-05)
+
+
+### Features
+
+* **invoices:** show the Wise rate on the compose page ([#269](https://github.com/bo0tzz/bo0kkeeper/issues/269)) ([b768745](https://github.com/bo0tzz/bo0kkeeper/commit/b768745d1fd89c25066e2e00ffa89a052bc9b53c))
+
+
+### Bug Fixes
+
+* **deps:** update debian:13-slim docker digest to a72b443 ([#270](https://github.com/bo0tzz/bo0kkeeper/issues/270)) ([6c5d684](https://github.com/bo0tzz/bo0kkeeper/commit/6c5d6840711dfe2a35393151b9b0c55ee750656d))
+* **deps:** update dependency @swc/core to v1.16.22 ([#263](https://github.com/bo0tzz/bo0kkeeper/issues/263)) ([d1cff52](https://github.com/bo0tzz/bo0kkeeper/commit/d1cff52b9a60eac23308113caf3ff368727d4687))
+* **deps:** update dependency jose to v6.2.15 ([#266](https://github.com/bo0tzz/bo0kkeeper/issues/266)) ([81cbfc1](https://github.com/bo0tzz/bo0kkeeper/commit/81cbfc1ae53bfccb0b0d75e3575e9ae270cd53e5))
+* **deps:** update dependency kysely to v0.29.8 ([#264](https://github.com/bo0tzz/bo0kkeeper/issues/264)) ([1ecb489](https://github.com/bo0tzz/bo0kkeeper/commit/1ecb4896b73e4b7a25dfdfd824593667e3e57341))
+* **deps:** update dependency nestjs-kysely to v3.1.5 ([#265](https://github.com/bo0tzz/bo0kkeeper/issues/265)) ([bf5c661](https://github.com/bo0tzz/bo0kkeeper/commit/bf5c661b40c13acdf95839f5d5ba94c9732e2881))
+* **deps:** update docker.io/library/redis:8 docker digest to f245f4c ([#271](https://github.com/bo0tzz/bo0kkeeper/issues/271)) ([262d3d0](https://github.com/bo0tzz/bo0kkeeper/commit/262d3d04db81e02963937f52386f6646694bb3e1))
+* **deps:** update ghcr.io/paperless-ngx/paperless-ngx:latest docker digest to d704e84 ([#260](https://github.com/bo0tzz/bo0kkeeper/issues/260)) ([b4767b5](https://github.com/bo0tzz/bo0kkeeper/commit/b4767b546e31d77618042e2f5acee571699b94bb))
+* **deps:** update node.js to 01d566e ([#261](https://github.com/bo0tzz/bo0kkeeper/issues/261)) ([8c8c9df](https://github.com/bo0tzz/bo0kkeeper/commit/8c8c9df276dd3c68c5549a77903f4c539ca94df6))
+* **deps:** update postgres:18 docker digest to bd5dfa4 ([#262](https://github.com/bo0tzz/bo0kkeeper/issues/262)) ([4a2c020](https://github.com/bo0tzz/bo0kkeeper/commit/4a2c0202a6f0a61267acd499ac60ed268a85bf0e))
+* **invoices:** require Wise invoice lines to add up to the payment ([#267](https://github.com/bo0tzz/bo0kkeeper/issues/267)) ([3560cae](https://github.com/bo0tzz/bo0kkeeper/commit/3560caee87bce2d56a0407b06659ce1be05e05c6))
+
 ## [0.15.0](https://github.com/bo0tzz/bo0kkeeper/compare/v0.14.0...v0.15.0) (2026-11-03)
 
 
