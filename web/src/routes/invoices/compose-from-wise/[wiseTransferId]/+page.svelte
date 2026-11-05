@@ -118,6 +118,22 @@
     { value: 'bonus', label: 'Bonus only' },
   ]);
 
+  /** Lines that get submitted: the ones with both a description and an amount. */
+  const filledLines = $derived(lines.filter((l) => l.description.trim() && l.amount.trim()));
+
+  /** Payment minus the submitted lines, in minor units; null while an amount doesn't parse. */
+  const unallocatedMinor = $derived.by(() => {
+    if (!prefill) {
+      return null;
+    }
+    try {
+      const linesMinor = filledLines.reduce((sum, line) => sum + BigInt(majorToMinor(line.amount)), 0n);
+      return BigInt(prefill.totalMinor) - linesMinor;
+    } catch {
+      return null;
+    }
+  });
+
   function addLine() {
     lines = [...lines, { description: '', amount: '' }];
   }
@@ -156,12 +172,10 @@
           issuedAt,
           periodStart: periodStart || undefined,
           periodEnd: periodEnd || undefined,
-          lines: lines
-            .filter((l) => l.description.trim() && l.amount.trim())
-            .map((l) => ({
-              description: l.description,
-              lineTotalMinor: majorToMinor(l.amount),
-            })),
+          lines: filledLines.map((l) => ({
+            description: l.description,
+            lineTotalMinor: majorToMinor(l.amount),
+          })),
         },
       });
     } catch (error_) {
@@ -258,7 +272,7 @@
 
         <Heading size="small" tag="h2">Lines</Heading>
         <Text size="small" color="muted">
-          Line amounts are in <strong>{prefill.currency}</strong>; they should sum to the source total above. For
+          Line amounts are in <strong>{prefill.currency}</strong>; they have to add up to the source total above. For
           paycheck + bonus + reimbursement on one transfer, split into multiple lines.
         </Text>
         {#each lines as _, index (index)}
@@ -277,9 +291,24 @@
         <HStack>
           <Button variant="outline" onclick={addLine}>+ Add line</Button>
         </HStack>
+        {#if unallocatedMinor === null}
+          <Text size="small" color="danger">Check the line amounts.</Text>
+        {:else if unallocatedMinor === 0n}
+          <Text size="small" color="success">Lines add up to the payment.</Text>
+        {:else}
+          <Text size="small" color="danger">
+            Lines add up to {prefill.currency}
+            {minorToMajor(String(BigInt(prefill.totalMinor) - unallocatedMinor))} of {minorToMajor(prefill.totalMinor)}:
+            {#if unallocatedMinor > 0n}
+              {minorToMajor(String(unallocatedMinor))} left to allocate.
+            {:else}
+              {minorToMajor(String(-unallocatedMinor))} over the payment.
+            {/if}
+          </Text>
+        {/if}
 
         <HStack gap={3}>
-          <Button color="primary" disabled={submitting} onclick={submit}>
+          <Button color="primary" disabled={submitting || unallocatedMinor !== 0n} onclick={submit}>
             {submitting ? 'Issuing…' : 'Issue invoice'}
           </Button>
           <a href={resolve('/wise/transfers')} class="text-primary underline">Cancel</a>

@@ -379,6 +379,23 @@ describe('InvoiceComposerService', () => {
       expect(String(result.invoice.eurTotalMinor)).toBe('423608');
     });
 
+    it('rejects lines that do not add up to the Wise payment', async () => {
+      const transfer = await seedOutgoingTransfer(db, { sourceAmountMinor: 579_100n, originalCreditMinor: 579_100n });
+
+      await expect(
+        composer.composeFromWise({
+          wiseTransferId: transfer.id,
+          clientId,
+          issuedAt: new Date('2099-01-15T00:00:00Z'),
+          lines: [
+            { description: 'Services', lineTotalMinor: 479_100n },
+            { description: 'Bonus', lineTotalMinor: 90_000n },
+          ],
+        }),
+      ).rejects.toThrow('Lines add up to USD 5691.00 but the Wise payment was USD 5791.00');
+      expect(await invoiceRepo.findByWiseTransferId(transfer.id)).toBeUndefined();
+    });
+
     it('rejects a transfer that already has an invoice (unique constraint)', async () => {
       const transfer = await seedOutgoingTransfer(db);
       await composer.composeFromWise({
@@ -412,7 +429,7 @@ describe('InvoiceComposerService', () => {
     clientId: string,
     lineTotal = 479_100n,
   ) {
-    const priorTransfer = await seedOutgoingTransfer(db);
+    const priorTransfer = await seedOutgoingTransfer(db, { sourceAmountMinor: lineTotal });
     await composer.composeFromWise({
       wiseTransferId: priorTransfer.id,
       clientId,
