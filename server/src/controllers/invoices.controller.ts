@@ -121,6 +121,7 @@ export class InvoicesController {
       suggestedLineDescription: prefill.suggestedLineDescription,
       usualTotalMinor: prefill.usualTotalMinor === null ? null : String(prefill.usualTotalMinor),
       bonusMinor: prefill.bonusMinor === null ? null : String(prefill.bonusMinor),
+      fxRate: prefill.fxRate,
     };
   }
 

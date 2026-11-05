@@ -121,6 +121,8 @@ export type WiseInvoicePrefill = {
   usualTotalMinor: bigint | null;
   /** How much `totalMinor` exceeds the usual amount — a bonus on top; null when it doesn't. */
   bonusMinor: bigint | null;
+  /** EUR per unit of `currency` that Wise delivered, fee and spread included; the invoice's fxRate. */
+  fxRate: string | null;
 };
 
 /** Single template covers every client class; the data shape carries the variant. */
@@ -359,6 +361,7 @@ export class InvoiceComposerService {
     const eurTotalMinor = sourceMinor === 0n ? targetMinor : (totalMinor * targetMinor) / sourceMinor;
     const bonusMinor = usualTotalMinor !== null && totalMinor > usualTotalMinor ? totalMinor - usualTotalMinor : null;
     return {
+      fxRate: wiseEffectiveRate(sourceMinor, targetMinor),
       wiseTransferId: transfer.id,
       currency: transfer.sourceCurrency,
       totalMinor,
@@ -409,7 +412,6 @@ export class InvoiceComposerService {
       );
     }
     const eurTotalMinor = sourceMinor === 0n ? targetMinor : (originalMinor * targetMinor) / sourceMinor;
-    const effectiveRate = sourceMinor === 0n ? undefined : (Number(targetMinor) / Number(sourceMinor)).toFixed(6);
     return this.composeAndIssue({
       clientId: input.clientId,
       issuedAt: input.issuedAt,
@@ -417,7 +419,7 @@ export class InvoiceComposerService {
       periodEnd: input.periodEnd,
       currency: transfer.sourceCurrency,
       eurTotalMinor,
-      fxRate: effectiveRate,
+      fxRate: wiseEffectiveRate(sourceMinor, targetMinor) ?? undefined,
       lines: input.lines,
       wiseTransferId: transfer.id,
     });
@@ -638,6 +640,15 @@ function formatMinorDutch(minor: bigint): string {
     return `${sign}${major.toString()},-`;
   }
   return `${sign}${major.toString()},${cents.toString().padStart(2, '0')}`;
+}
+
+/**
+ * The rate a Wise transfer actually delivered: EUR landed per unit sent, so
+ * Wise's fee and FX spread are baked in. Stored on Wise-flow invoices as
+ * `fxRate`; null for a zero-amount transfer.
+ */
+function wiseEffectiveRate(sourceMinor: bigint, targetMinor: bigint): string | null {
+  return sourceMinor === 0n ? null : (Number(targetMinor) / Number(sourceMinor)).toFixed(6);
 }
 
 function eurFromMinor(minor: bigint, fxRate: string | null): string {

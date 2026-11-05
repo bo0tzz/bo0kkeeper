@@ -400,6 +400,7 @@ export type WiseInvoicePrefillDto = {
     suggestedLineDescription: string;
     usualTotalMinor: string | null;
     bonusMinor: string | null;
+    fxRate: string | null;
 };
 export type InvoiceComposeFromWiseDto = {
     clientId: string;
