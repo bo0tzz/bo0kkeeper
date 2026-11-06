@@ -31,7 +31,7 @@
     "import-sns": "node ./dist/bin/import-sns.js"
   },
   "dependencies": {
-    "@immich/sql-tools": "^0.6.0",
+    "@immich/sql-tools": "^0.7.0",
     "@nestjs/common": "^12.0.0",
     "@nestjs/core": "^12.0.0",
     "@nestjs/platform-express": "^12.0.0",
