@@ -247,7 +247,7 @@ importers:
         version: 5.5.0(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/swagger@12.0.5(@nestjs/common@12.3.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.3.2)(reflect-metadata@0.2.2)(typescript@6.0.3))(rxjs@7.8.2)(zod@4.4.3)
       node-llama-cpp:
         specifier: ^3.22.2
-        version: 3.22.2(supports-color@7.2.0)(typescript@6.0.3)
+        version: 3.22.4(supports-color@7.2.0)(typescript@6.0.3)
       openid-client:
         specifier: ^6.8.4
         version: 6.8.8
@@ -736,8 +736,8 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
-  '@huggingface/jinja@0.5.10':
-    resolution: {integrity: sha512-SgS1D1bglQ94ceD4ZCL6eayUDy9uV1xuyk61OjgSxU5GJh7upqZCKII0JoTYMc6wWsg3JUgaPRX0ElQzXPk3Cw==}
+  '@huggingface/jinja@0.5.13':
+    resolution: {integrity: sha512-jM17MqFily1iyT/1LD3r5w8/CZiyapVB0+7vOw48PfVtzyKsXStmHE4jVTyDAD05Tqv3un1xrS9ILUU1ugQAYQ==}
     engines: {node: '>=18'}
 
   '@humanfs/core@0.19.2':
@@ -1094,72 +1094,72 @@ packages:
       typescript:
         optional: true
 
-  '@node-llama-cpp/linux-arm64@3.22.2':
-    resolution: {integrity: sha512-ulAPe+pqZtO1LrX3wa8Yvnw4VZiMJxdL500ebJdAxLxXt+HnqY2vksJ/ZBW+f+ZwwBu2wIS2auwVvS8JkZHffQ==}
+  '@node-llama-cpp/linux-arm64@3.22.4':
+    resolution: {integrity: sha512-mWkEYNg6DFGzuZaDyCATMn3MPnr2odAIJO0A89j2frcbwZkoTWW0FLUjUluA8aAjJRBRnI+dI6ME/x953VDIYg==}
     engines: {node: '>=20.0.0'}
     cpu: [arm64, x64]
     os: [linux]
     libc: [glibc]
 
-  '@node-llama-cpp/linux-armv7l@3.22.2':
-    resolution: {integrity: sha512-bzXeVGSrwxRH7m7p+SG5pC61T+97wb0aV2e84BXKfNDqMnOj7Z5qVtrxwwLAMYw+1wt4qz9KiuDLEmTqNaiUuQ==}
+  '@node-llama-cpp/linux-armv7l@3.22.4':
+    resolution: {integrity: sha512-1igBnysHH8UQhN2pErJVxs+8tW6G6IfSo78YcvM2rAqt+6ixU9Xa57dztNYCAHDtFVlRBHRqK4v7FQF5sfiC5g==}
     engines: {node: '>=20.0.0'}
     cpu: [arm, x64]
     os: [linux]
     libc: [glibc]
 
-  '@node-llama-cpp/linux-riscv64@3.22.2':
-    resolution: {integrity: sha512-PUE1sG+ZoMzGBTcM9V50UGLRRO4ESh9tNwScPFKV5fG9Ho02RuDORzOZvWw3giGrhdc8PY74yghJTUfFUyGdog==}
+  '@node-llama-cpp/linux-riscv64@3.22.4':
+    resolution: {integrity: sha512-X37jMqjF7q7m+WyTtMekEeKfulFB8HNjcKN/Vm6AsNGNrB92W/6angB/98xkG7BUBQYro1qp5H0AICevUljOKA==}
     engines: {node: '>=20.0.0'}
     cpu: [riscv64]
     os: [linux]
     libc: [glibc]
 
-  '@node-llama-cpp/linux-x64@3.22.2':
-    resolution: {integrity: sha512-JwSanJFqX2qsxPNwgQo/QMkijBzQKot7YaybXz7kjxfHq+RgXuw7Z/NyUPC1psQHOOnF6vV4FXBd8jmI2KZUJw==}
+  '@node-llama-cpp/linux-x64@3.22.4':
+    resolution: {integrity: sha512-L2dLOzw2AN+FzzpiRS9odeuAmwiDp0xxxGhhanbpDuZbN72Lz+ysa6+spUrBquZY4HDj9UvVNzXWQxSWvA7NIQ==}
     engines: {node: '>=20.0.0'}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@node-llama-cpp/mac-arm64-metal@3.22.2':
-    resolution: {integrity: sha512-bjCewyZcx7voQeu+pVPlDw+m0p0wrpkPw3SnkT0bCJ3VhIXdYyLUkCCQRYgxXz6MI5Qz7jv89JreD0OqzffIVA==}
+  '@node-llama-cpp/mac-arm64-metal@3.22.4':
+    resolution: {integrity: sha512-Vfj/oLQ9nNdnm8iR0hQzl2MV5iPYroXH45XEQykF39nbKkCBcsuqBOAf3l6vUkt9LbuEWn6COYEyqx6ISBuwhQ==}
     engines: {node: '>=20.0.0'}
     cpu: [arm64, x64]
     os: [darwin]
 
-  '@node-llama-cpp/mac-x64@3.22.2':
-    resolution: {integrity: sha512-RVLpD64ofXkQZTmARPnskFRjlaVf/9ZkPKKDFzHdlSYNlK5jdZz4ebB5XkM/KiFX8pQUMI4Xq8MwmA9oS78lTw==}
+  '@node-llama-cpp/mac-x64@3.22.4':
+    resolution: {integrity: sha512-JQJ0KB5rjnlNvwoJ9+NBFGmwMLB+dxzv5W8aE7KCn46BiUjSIMP39ZRZFwZ4FthfMYAi/+8s16EklonjiLvBwg==}
     engines: {node: '>=20.0.0'}
     cpu: [x64]
     os: [darwin]
 
-  '@node-llama-cpp/win-arm64@3.22.2':
-    resolution: {integrity: sha512-IhG0Zn4Rk1WuwORF5org+jfUCTOO6VPP1EOqFnHwSqr72Y9/ikOA4aOoqXDLr91s0iDVrCegvyLnJNEkQoCXEA==}
+  '@node-llama-cpp/win-arm64@3.22.4':
+    resolution: {integrity: sha512-BJr81A4VFGlZBNHnIOCJrwb5v2mMn8PsrG3Edn/T9KYzNKzvitnuqumaD9DVR4PT0vUz2Ead8VLjl9Oms+5iDw==}
     engines: {node: '>=20.0.0'}
     cpu: [arm64, x64]
     os: [win32]
 
-  '@node-llama-cpp/win-x64-cuda-ext@3.22.2':
-    resolution: {integrity: sha512-2MamWVicTf9+2xB6L5PZr/1kTkoeX27dXoGMzdWVbZvvacjYHe8cOe8tznM/vr0RG2oeKr7HjRS3/gWRtff9UA==}
+  '@node-llama-cpp/win-x64-cuda-ext@3.22.4':
+    resolution: {integrity: sha512-Nf3df7qSMsyUM21XCAgczc69ouNOwOe1YJ7eputv3LFYBAhjJpxl6HUVUsypXRZ4yiyoW+wY+ScfSJz9kA3MaA==}
     engines: {node: '>=20.0.0'}
     cpu: [x64]
     os: [win32]
 
-  '@node-llama-cpp/win-x64-cuda@3.22.2':
-    resolution: {integrity: sha512-gSrzutxJe/OTaRz8/e27lI9pCYbKyCIycULtTolP6CRp1nuhQ8So4Rn+GYvOoCRqp8qDYCuImwGEk30a6aiRjQ==}
+  '@node-llama-cpp/win-x64-cuda@3.22.4':
+    resolution: {integrity: sha512-/dTAclSuGyIhPhYm/OUuDwBjRiY20zoSSPCK2WRLp/ryvXmIrpx4+GPNjAV+lhWy7TYY0Obhmz21jMuhQYrMgQ==}
     engines: {node: '>=20.0.0'}
     cpu: [x64]
     os: [win32]
 
-  '@node-llama-cpp/win-x64-vulkan@3.22.2':
-    resolution: {integrity: sha512-jmQ7pQqOTZjrfDrxzRxsRt2qr0I5Km7ji4Wfdi886D3w+ljVdrJyZVIFVvVQpsY+4/az5Lq0HDM9WRdRdLH+mQ==}
+  '@node-llama-cpp/win-x64-vulkan@3.22.4':
+    resolution: {integrity: sha512-rkiHcMF+vr/kNn7yPGR5dtrtCCUn48iUNz/oCsk5rl1bdQ86zIVpg/FvyQMb1a8gdO9iBqELJLjXWGkFvMUqzg==}
     engines: {node: '>=20.0.0'}
     cpu: [x64]
     os: [win32]
 
-  '@node-llama-cpp/win-x64@3.22.2':
-    resolution: {integrity: sha512-COXVmE5kYkaIyGDPjYgFnVnI4qVwtkZM0t/AIwJjU2XOyfD3XyYh/WnzzrRni2lCv182qPojR0WJOm7bK/v7cA==}
+  '@node-llama-cpp/win-x64@3.22.4':
+    resolution: {integrity: sha512-5RxMuCV5P2dRlhqWgu/9LypXT2u7FKf8y65Qu0JDd4mTxBhobVt0H0ciwGmmhYi8yhBMWt7R93rlq+RW0oZSgw==}
     engines: {node: '>=20.0.0'}
     cpu: [x64]
     os: [win32]
@@ -1753,8 +1753,8 @@ packages:
   '@simple-git/args-pathspec@1.0.4':
     resolution: {integrity: sha512-EtMX6XjRWSastG2SdkmSQByPtJ9dx/NIjnHbpQPCYt62j4RmSx5rgLTGpw0YCjF5h191gZOmBfheOT23cRSFdw==}
 
-  '@simple-git/argv-parser@1.1.1':
-    resolution: {integrity: sha512-Q9lBcfQ+VQCpQqGJFHe5yooOS5hGdLFFbJ5R+R5aDsnkPCahtn1hSkMcORX65J2Z5lxSkD0lQorMsncuBQxYUw==}
+  '@simple-git/argv-parser@3.0.0':
+    resolution: {integrity: sha512-MhLm6/9J7PiVZghJnaJG4tOc+rTotsSINJkjbUqZA7lYmYklOXdk+d0UZ8Pm8WFcMuxafx3oSUIYYYnPY92GTQ==}
 
   '@sindresorhus/is@4.6.0':
     resolution: {integrity: sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw==}
@@ -3961,6 +3961,7 @@ packages:
 
   node-abort-controller@3.1.1:
     resolution: {integrity: sha512-AGK2yQKIjRuqnc6VkX2Xj5d+QW8xZ87pa1UK6yA6ouUyuxfHuMP6umE5QK7UmTeOAymo+Zx1Fxiuw9rVx8taHQ==}
+    deprecated: This package is no longer needed on supported Node.js versions. Node.js 16+ includes AbortController and AbortSignal as built-in globals. All Node.js versions requiring this polyfill are end-of-life. Use the built-in globals instead.
 
   node-addon-api@8.9.2:
     resolution: {integrity: sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg==}
@@ -3973,8 +3974,8 @@ packages:
     resolution: {integrity: sha512-Z3lTE9pLaJF47NyMhd4ww1yFTAP8YhYI8SleJiHzM46Fgpm5cnNzSl9XfzFNqbaz+VlJrIj3fXQ4DeN1Rjm6cw==}
     engines: {node: '>=18'}
 
-  node-llama-cpp@3.22.2:
-    resolution: {integrity: sha512-kHggUzq5+8aShET07hlGllyo+t7gNOl+xLQyEeyERStkm8JdBGVh+Yh4Jd/uZ15xYt8lYJIDYkzToLjhe0eyZw==}
+  node-llama-cpp@3.22.4:
+    resolution: {integrity: sha512-858llnlJZTvW8aFP5aBexBZBNZdKndcPTFnPGrobTFnDzw8mT8rdG0hG0mWhQpA7/9woApipXenu4OgM/BhVTQ==}
     engines: {node: '>=20.0.0'}
     hasBin: true
     peerDependencies:
@@ -4514,8 +4515,8 @@ packages:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
 
-  simple-git@3.36.0:
-    resolution: {integrity: sha512-cGQjLjK8bxJw4QuYT7gxHw3/IouVESbhahSsHrX97MzCL1gu2u7oy38W6L2ZIGECEfIBG4BabsWDPjBxJENv9Q==}
+  simple-git@4.1.0:
+    resolution: {integrity: sha512-FZJESy4Vxahk4eOadmRsWF5TjhCrfpDP563j8jAMbMEi/phIHPDgzN/tDkRIZ2GyQdLKEeXMPXqA8hhWjAdQZA==}
 
   simple-icons@16.19.0:
     resolution: {integrity: sha512-muxcz/FDvWFPrKJdsjaz79qsBjtZeVKUVIFl7wLVOwb+yqAag8FPe8+hFlMVRnmAXYQIm4eUDDm2+dhOj0cFgQ==}
@@ -5542,7 +5543,7 @@ snapshots:
       protobufjs: 7.6.5
       yargs: 17.7.3
 
-  '@huggingface/jinja@0.5.10': {}
+  '@huggingface/jinja@0.5.13': {}
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -5894,37 +5895,37 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
 
-  '@node-llama-cpp/linux-arm64@3.22.2':
+  '@node-llama-cpp/linux-arm64@3.22.4':
     optional: true
 
-  '@node-llama-cpp/linux-armv7l@3.22.2':
+  '@node-llama-cpp/linux-armv7l@3.22.4':
     optional: true
 
-  '@node-llama-cpp/linux-riscv64@3.22.2':
+  '@node-llama-cpp/linux-riscv64@3.22.4':
     optional: true
 
-  '@node-llama-cpp/linux-x64@3.22.2':
+  '@node-llama-cpp/linux-x64@3.22.4':
     optional: true
 
-  '@node-llama-cpp/mac-arm64-metal@3.22.2':
+  '@node-llama-cpp/mac-arm64-metal@3.22.4':
     optional: true
 
-  '@node-llama-cpp/mac-x64@3.22.2':
+  '@node-llama-cpp/mac-x64@3.22.4':
     optional: true
 
-  '@node-llama-cpp/win-arm64@3.22.2':
+  '@node-llama-cpp/win-arm64@3.22.4':
     optional: true
 
-  '@node-llama-cpp/win-x64-cuda-ext@3.22.2':
+  '@node-llama-cpp/win-x64-cuda-ext@3.22.4':
     optional: true
 
-  '@node-llama-cpp/win-x64-cuda@3.22.2':
+  '@node-llama-cpp/win-x64-cuda@3.22.4':
     optional: true
 
-  '@node-llama-cpp/win-x64-vulkan@3.22.2':
+  '@node-llama-cpp/win-x64-vulkan@3.22.4':
     optional: true
 
-  '@node-llama-cpp/win-x64@3.22.2':
+  '@node-llama-cpp/win-x64@3.22.4':
     optional: true
 
   '@oazapfts/runtime@1.2.0': {}
@@ -6254,7 +6255,7 @@ snapshots:
 
   '@simple-git/args-pathspec@1.0.4': {}
 
-  '@simple-git/argv-parser@1.1.1':
+  '@simple-git/argv-parser@3.0.0':
     dependencies:
       '@simple-git/args-pathspec': 1.0.4
 
@@ -8526,9 +8527,9 @@ snapshots:
       emojilib: 2.4.0
       skin-tone: 2.0.0
 
-  node-llama-cpp@3.22.2(supports-color@7.2.0)(typescript@6.0.3):
+  node-llama-cpp@3.22.4(supports-color@7.2.0)(typescript@6.0.3):
     dependencies:
-      '@huggingface/jinja': 0.5.10
+      '@huggingface/jinja': 0.5.13
       async-retry: 1.3.3
       bytes: 3.1.2
       chalk: 5.6.2
@@ -8549,7 +8550,7 @@ snapshots:
       pretty-ms: 9.3.1
       proper-lockfile: 4.1.2
       semver: 7.8.5
-      simple-git: 3.36.0(supports-color@7.2.0)
+      simple-git: 4.1.0(supports-color@7.2.0)
       slice-ansi: 8.0.0
       stdout-update: 4.0.1
       strip-ansi: 7.2.0
@@ -8557,17 +8558,17 @@ snapshots:
       which: 6.0.1
       yargs: 17.7.3
     optionalDependencies:
-      '@node-llama-cpp/linux-arm64': 3.22.2
-      '@node-llama-cpp/linux-armv7l': 3.22.2
-      '@node-llama-cpp/linux-riscv64': 3.22.2
-      '@node-llama-cpp/linux-x64': 3.22.2
-      '@node-llama-cpp/mac-arm64-metal': 3.22.2
-      '@node-llama-cpp/mac-x64': 3.22.2
-      '@node-llama-cpp/win-arm64': 3.22.2
-      '@node-llama-cpp/win-x64': 3.22.2
-      '@node-llama-cpp/win-x64-cuda': 3.22.2
-      '@node-llama-cpp/win-x64-cuda-ext': 3.22.2
-      '@node-llama-cpp/win-x64-vulkan': 3.22.2
+      '@node-llama-cpp/linux-arm64': 3.22.4
+      '@node-llama-cpp/linux-armv7l': 3.22.4
+      '@node-llama-cpp/linux-riscv64': 3.22.4
+      '@node-llama-cpp/linux-x64': 3.22.4
+      '@node-llama-cpp/mac-arm64-metal': 3.22.4
+      '@node-llama-cpp/mac-x64': 3.22.4
+      '@node-llama-cpp/win-arm64': 3.22.4
+      '@node-llama-cpp/win-x64': 3.22.4
+      '@node-llama-cpp/win-x64-cuda': 3.22.4
+      '@node-llama-cpp/win-x64-cuda-ext': 3.22.4
+      '@node-llama-cpp/win-x64-vulkan': 3.22.4
       typescript: 6.0.3
     transitivePeerDependencies:
       - supports-color
@@ -9180,12 +9181,12 @@ snapshots:
 
   signal-exit@4.1.0: {}
 
-  simple-git@3.36.0(supports-color@7.2.0):
+  simple-git@4.1.0(supports-color@7.2.0):
     dependencies:
       '@kwsites/file-exists': 1.1.1(supports-color@7.2.0)
       '@kwsites/promise-deferred': 1.1.1
       '@simple-git/args-pathspec': 1.0.4
-      '@simple-git/argv-parser': 1.1.1
+      '@simple-git/argv-parser': 3.0.0
       debug: 4.4.3(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
